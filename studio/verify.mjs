@@ -410,7 +410,7 @@ console.log('External single-language draft and consistent concurrent reload: pa
 // Execute the actual app with a tiny event surface. This verifies saving and
 // rendering behavior without claiming browser layout or native DOM coverage.
 const appSource = (await readFile(new URL('./app.js', import.meta.url), 'utf8')).replace(/^import .*;\n/gm, '');
-async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch = false, hash = '#/studio/script', failStorage = false, systemDark = false } = {}) {
+async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch = false, hash = '#/studio/script', failStorage = false, systemDark = false, queuedDialogClose = false } = {}) {
   const timers = new Map();
   let timerId = 0;
   const handlers = new Map();
@@ -426,6 +426,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     focus() {}, select() {}, click() {}, setAttribute() {}, querySelector() { return null; }, querySelectorAll() { return []; }
   });
   const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element();
+  if (queuedDialogClose) dialog.close = function () { this.open = false; queueMicrotask(() => this.listeners.get('close')?.({})); };
   const memberRoleHint = element(), issuedMemberKey = element();
   let memberSections = [];
   dialog.querySelectorAll = selector => selector === "input[name='sections']" ? memberSections : [];
@@ -844,7 +845,7 @@ console.log('Participant API client issuance, transient credentials, rights chan
   native.members.push({ id: 'hostile-member', name: '<img src=x onerror=alert(1)>', email: '" onclick="alert(1)@example.test', role: 'unknown<script>', sections: ['overview', '<script>department</script>'], accessStatus: 'unavailable' });
   const local = JSON.stringify(localState(makeDemo()));
   const stored = new Map([[workspaceKey, local], [settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
-  const ui = await appHarness({ stored, api, hash: '#/studio/team' });
+  const ui = await appHarness({ stored, api, hash: '#/studio/team', queuedDialogClose: true });
   assert.match(ui.app.innerHTML, /Команда проекта/);
   assert.match(ui.app.innerHTML, /data-action='member'/);
   for (const escaped of ['&lt;img src=x onerror=alert(1)&gt;', '&quot; onclick=&quot;alert(1)@example.test', 'unknown&lt;script&gt;', '&lt;script&gt;department&lt;/script&gt;']) assert.ok(ui.app.innerHTML.includes(escaped), `The team list escapes ${escaped}`);
@@ -868,12 +869,16 @@ console.log('Participant API client issuance, transient credentials, rights chan
   assert.equal(member.accessStatus, 'active');
   const key = ui.issuedMemberKey.value;
   assert.ok(key, 'The first create response displays the issued key');
+  assert.equal(ui.dialog.open, true);
+  ui.dialog.listeners.get('close')?.({});
+  assert.equal(ui.issuedMemberKey.value, key, 'A delayed close event from the former form cannot clear an open key dialog');
   assert.match(ui.dialog.innerHTML, /Передайте ключ лично; письмо на e-mail подключим позже/);
   for (const persisted of [vm.runInContext('JSON.stringify(state)', ui.context), vm.runInContext('JSON.stringify([...serverClient.known])', ui.context), ...stored.values()]) assert.ok(!persisted.includes(key), 'The issued key is absent from state, client baseline and device storage');
   assert.equal(stored.get(workspaceKey), local);
   await ui.dialogClickData('copy-member-key');
   assert.equal(ui.clipboard.at(-1), key, 'Copy writes the key displayed in the one-time dialog');
   ui.dialog.close();
+  await Promise.resolve();
   assert.ok(!ui.dialog.innerHTML.includes(key), 'Dismissing the key removes its DOM value');
   await ui.clickData('edit-member', member.id);
   assert.ok(!ui.dialog.innerHTML.includes(key), 'Reopening rights cannot recover a key');
@@ -922,3 +927,25 @@ console.log('Actual app team form, escaped data, role hints, one-time key copy, 
   }
 }
 console.log('Actual app producer/director management and read-only participant controls: passed.');
+
+// A manager who changes their own role must immediately adopt the new server
+// capability. Cached controls cannot keep the former right to manage a team.
+{
+  const api = nativeApi();
+  const admin = connect(api);
+  const p = await admin.loadProject('film');
+  const issued = await admin.createMember('film', { name: 'Режиссёр', email: 'director@example.test', role: 'director', sections }, p);
+  const stored = new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: issued.key })]]);
+  const ui = await appHarness({ stored, api, hash: '#/studio/team' });
+  assert.match(ui.app.innerHTML, /data-action='member'/);
+  await ui.clickData('edit-member', issued.member.id);
+  await ui.submit('member-form', { role: 'viewer', sections: ['overview', 'team'] }, { id: issued.member.id });
+  assert.equal(vm.runInContext('project()._capabilities.manageTeam', ui.context), false, 'Self downgrade refreshes the effective capability');
+  assert.match(ui.app.innerHTML, /director@example.test/);
+  for (const forbidden of ['data-action=\'member\'', 'data-edit-member=', 'data-revoke-member=']) assert.ok(!ui.app.innerHTML.includes(forbidden), 'Self downgrade removes all former team controls');
+  const before = api.calls.filter(c => c.method !== 'GET').length;
+  await ui.click('member');
+  await ui.submit('member-form', { name: 'Нельзя', email: 'no@example.test', role: 'writer', sections: ['overview'] });
+  assert.equal(api.calls.filter(c => c.method !== 'GET').length, before, 'Cached management actions do not survive a self downgrade');
+}
+console.log('Actual app self role change immediately refreshes server rights and removes management controls: passed.');

@@ -47,3 +47,43 @@ dialog{background:var(--bg);color:var(--text);border:1px solid var(--line);borde
 .server-draft{background:var(--paper-bg);color:var(--paper-text);border-color:var(--paper-line);color-scheme:var(--paper-scheme)}
 .server-draft textarea{background:transparent;color:var(--paper-text);border-color:var(--paper-line)}
 .server-draft label,.server-draft p{color:var(--paper-muted)}
+
+.team-space{min-width:0}
+.team-space .page-heading p,.team-space .access-note,.team-space .empty p{font-size:16px}
+.team-space .btn,.team-dialog .btn{min-height:44px;font-size:16px;white-space:normal;text-align:center}
+.team-members{display:flex;flex-direction:column;gap:16px}
+.team-member{padding:24px;background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:0}
+.team-member .member-info{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.team-member .member-info>div{min-width:0}
+.team-member .avatar{width:44px;height:44px;font-size:16px}
+.team-member h2{font-size:20px;line-height:1.5;margin:0;letter-spacing:0;overflow-wrap:anywhere}
+.member-email{font-size:16px;margin:4px 0 0;color:var(--muted);overflow-wrap:anywhere}
+.member-access{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0 0;font-size:16px}
+.member-access>div{min-width:0}
+.member-access dt{color:var(--muted);margin-bottom:4px}
+.member-access dd{margin:0;overflow-wrap:anywhere}
+.member-sections{grid-column:1/-1}
+.member-sections dd{display:flex;flex-wrap:wrap;gap:8px}
+.member-sections .badge{font-size:16px;white-space:normal;overflow-wrap:anywhere;max-width:100%}
+.member-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+.team-dialog .dialog-header p,.team-dialog label,.team-dialog input,.team-dialog select,.team-dialog textarea,.team-dialog p{font-size:16px}
+.team-dialog .icon-btn{width:44px;min-height:44px;flex:none}
+.team-dialog input,.team-dialog select{min-height:44px;max-width:100%}
+.team-dialog .dialog-header h2{overflow-wrap:anywhere}
+.role-hint{line-height:1.7;color:var(--muted);margin:12px 0 20px}
+.member-section-fields{padding:16px;border:1px solid var(--line);border-radius:6px;margin:24px 0 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;min-width:0}
+.member-section-fields legend{padding:0 8px;font-size:16px}
+.member-section-fields p{grid-column:1/-1;margin:0 0 12px;line-height:1.7}
+#member-form .field-check{font-size:16px;min-height:44px;line-height:1.6;margin:0;overflow-wrap:anywhere}
+#member-form .field-check input{width:20px;height:20px;min-height:20px;flex:none;margin:0}
+#member-form .field-check:has(input:disabled){color:var(--muted)}
+.member-key-panel{margin-top:24px;min-width:0}
+.member-key-panel textarea{font:16px/1.7 'IBM Plex Mono',monospace;overflow-wrap:anywhere;resize:vertical;margin-bottom:16px}
+.member-key-panel p,.revoke-explanation{line-height:1.8;overflow-wrap:anywhere}
+@media(max-width:480px){
+  .team-member{padding:18px}
+  .member-access{grid-template-columns:1fr}
+  .member-actions .btn{width:100%}
+  .member-section-fields{grid-template-columns:1fr;padding:12px}
+  .team-dialog .dialog-actions .btn{width:100%}
+}
