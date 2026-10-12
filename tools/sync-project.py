@@ -173,6 +173,18 @@ def razbivka_push(slug, draft=None):
     f = pathlib.Path(draft) if draft else latest_draft(proj)[0]
     if not f or not f.exists(): sys.exit("нет драфта: укажите --draft <файл.fountain>")
     d = razbivka.parse(f.read_text(encoding="utf-8"))
+    # имена героев/локаций на сервере — «Первая заглавная», а не капс сценария (21.c): «ГОЛОС МАТЕРИ» → «Голос матери»
+    def krasivo(name):
+        if not name.isupper(): return name
+        out, first = [], True
+        for w in name.split():
+            if w.isalpha() and first: out.append(w[:1].upper() + w[1:].lower()); first = False
+            elif w.isalpha(): out.append(w.lower())
+            else: out.append(w)
+        return " ".join(out)
+    for c in d["characters"]: c["name"] = krasivo(c["name"])
+    for L in d["locations"]: L["name"] = krasivo(L["name"]); L["parent"] = krasivo(L["parent"])
+    for sc in d["scenes"]: sc["chars"] = [krasivo(n) for n in sc["chars"]]; sc["location"] = krasivo(sc["location"])
     st, r = api("POST", f"/api/projects/{slug}/breakdown", d)
     if st == 404: sys.exit("сервер ещё не умеет /breakdown (№21.a у Codex)")
     if st not in (200, 201): sys.exit(f"разбивка: {st} {r}")

@@ -46,6 +46,32 @@ body{font-size:16px;line-height:1.5}
 .workspace .stats>*,.workspace .stat,.workspace .overview-grid>*{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px}
 /* карта: технический id объекта (ULID) не показываем, имя достаточно */
 .production-map .map-object-id{display:none}
+/* хлопушка */
+.slate{display:flex;align-items:stretch;gap:0;margin:-8px 0 20px;border-bottom:1px solid var(--line-soft);overflow-x:auto;scrollbar-width:none}
+.slate .cell{display:flex;flex-direction:column;justify-content:center;padding:6px 16px 10px 0;margin-right:16px;border-right:1px solid var(--line-soft);white-space:nowrap}
+.slate .cell:last-child{border-right:0}
+.slate .cell span{font:400 .6875rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.slate .cell b{font:500 .875rem/1.2 var(--mono);letter-spacing:.02em;margin-top:5px;max-width:28ch;overflow:hidden;text-overflow:ellipsis}
+/* меню аккаунта */
+.menu{position:relative;margin-top:auto;padding-top:8px;border-top:1px solid var(--line-soft)}
+.menu summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px;border-radius:6px;cursor:pointer;color:var(--text)}
+.menu summary::-webkit-details-marker{display:none}.menu summary:hover,.menu[open] summary{background:var(--surface)}
+.menu .ava{width:28px;height:28px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font:500 .75rem/1 var(--mono);flex:none}
+.menu .who{display:flex;flex-direction:column;min-width:0}.menu .who b{font-weight:500;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.menu .who small{font-size:13px;color:var(--dim)}
+.menu .pop{position:absolute;left:0;right:0;bottom:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:5;display:grid;gap:2px}
+.menu .pop a,.menu .pop button{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:6px;color:var(--text);background:none;border:0;font:inherit;font-size:15px;text-align:left;cursor:pointer;width:100%}
+.menu .pop a:hover,.menu .pop button:hover{background:var(--surface2)}
+.menu .pop .icon{width:18px;height:18px;color:var(--muted)}
+.sidebar{display:flex;flex-direction:column;position:sticky;top:56px;height:calc(100vh - 56px);overflow:auto}
+/* нижняя панель на телефоне */
+.tabbar{display:none}
+@media(max-width:768px){
+  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;height:60px;background:var(--bg-side);border-top:1px solid var(--line-soft);padding-bottom:env(safe-area-inset-bottom);z-index:4}
+  .tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 .65rem/1 var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--dim);min-height:44px}
+  .tabbar a[aria-current]{color:var(--text)}.tabbar .icon{width:20px;height:20px}
+  .sidebar{position:static;height:auto;overflow:visible}.menu{display:none}
+  .helper-stub{bottom:60px}.work-main{padding-bottom:220px}
+}
 /* рабочее поле */
 .work-main{max-width:940px;padding:36px 24px 160px}
 .prototype-note{font:400 .8125rem/1.4 var(--mono);letter-spacing:.04em;color:var(--dim);margin-bottom:24px}
@@ -73,3 +99,4 @@ dialog input,dialog select,dialog textarea{background:var(--bg);border:1px solid
   .helper-stub{left:0}.workspace .btn,.workspace .langs button,.workspace .work-controls #project-switch,.workspace .work-header .brand{min-height:44px}.helper-stub .q{font-size:14px;min-height:36px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.passport-card .passport-empty{color:var(--dim)}

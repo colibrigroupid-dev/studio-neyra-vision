@@ -20,7 +20,7 @@ function modeControl(locale, mode) {
   return `<label class='cinema-mode-control' for='cinema-mode'>${text(locale, 'Бумага', 'Қағаз')}<select id='cinema-mode' data-cinema-mode><option value='graphite'${mode !== 'light' ? ' selected' : ''}>${text(locale, 'Графит', 'Графит')}</option><option value='light'${mode === 'light' ? ' selected' : ''}>${text(locale, 'Светлая', 'Ашық')}</option></select></label>`;
 }
 function pages(scene) {
-  if (scene.page_from == null && scene.page_to == null) return '—';
+  if (scene.page_from == null && scene.page_to == null) return '';
   if (scene.page_from == null) return String(scene.page_to);
   if (scene.page_to == null || scene.page_to === scene.page_from) return String(scene.page_from);
   return `${scene.page_from}–${scene.page_to}`;
@@ -31,18 +31,20 @@ function sceneTable(scenes, locale) {
   const sorted = [...scenes].sort((a, b) => (Number(a.n) || Infinity) - (Number(b.n) || Infinity));
   return `<p id='breakdown-scroll-hint' class='cinema-scroll-hint'>${text(locale, 'На узком экране таблицу можно прокрутить в сторону.', 'Тар экранда кестені көлденең айналдыруға болады.')}</p><div class='breakdown-scroll' role='region' tabindex='0' aria-label='${text(locale, 'Таблица сцен', 'Көріністер кестесі')}' aria-describedby='breakdown-scroll-hint'><table class='breakdown-table'><caption>${text(locale, 'Разбивка по сценам', 'Көріністер бойынша талдау')}</caption><thead><tr>${columns.map(label => `<th scope='col'>${label}</th>`).join('')}</tr></thead><tbody>${sorted.map(scene => `<tr data-scene-id='${escape(scene.id)}'><th scope='row'>${escape(scene.n ?? '—')}</th><td>${escape(scene.type || '—')}</td><td>${escape(scene.location || '—')}</td><td>${escape(scene.time || '—')}</td><td>${escape(pages(scene))}</td><td>${list(scene.chars).length ? list(scene.chars).map(escape).join(', ') : '—'}</td></tr>`).join('')}</tbody></table></div>`;
 }
+let fieldLocale = 'ru';
 function passportField(label, value, className = '') {
-  return `<div${className ? ` class='${className}'` : ''}><dt>${label}</dt><dd>${escape(value || '—')}</dd></div>`;
+  return `<div${className ? ` class='${className}'` : ''}><dt>${label}</dt><dd class='${value ? '' : 'passport-empty'}'>${value ? escape(value) : text(fieldLocale, 'не заполнено', 'толтырылмаған')}</dd></div>`;
 }
 function passportCard(record, collection, locale, canEdit) {
   const value = key => passportValue(record, key, locale);
   const taboo = list(value('taboo'));
   const status = record.status === 'locked' ? 'locked' : 'draft';
   const statusLabel = status === 'locked' ? text(locale, 'Замок утверждён', 'Бекітілген') : text(locale, 'Черновик', 'Нобай');
-  return `<article class='passport-card' data-passport-id='${escape(record.id)}' data-passport-collection='${collection}'><div class='passport-card-heading'><h2>${escape(value('name') || '—')}</h2><span class='passport-status' data-status='${status}'>${statusLabel} · ${status}</span></div><dl class='passport-fields'>${passportField(text(locale, 'Роль', 'Рөлі'), value('role'))}${passportField(text(locale, 'Замок внешности', 'Тұрақты сыртқы келбет'), value('identity'), 'passport-identity')}<div class='passport-taboo'><dt>${text(locale, 'Табу-детали', 'Тыйым салынған бөлшектер')}</dt><dd>${taboo.length ? `<ul>${taboo.map(item => `<li>${escape(item)}</li>`).join('')}</ul>` : '—'}</dd></div>${passportField(text(locale, 'Рост', 'Бойы'), value('height'))}${passportField(text(locale, 'В каких сценах', 'Қай көріністерде'), list(record.scenes).join(', '), 'passport-scenes')}</dl>${canEdit ? `<button type='button' class='btn' data-action='edit-passport' data-passport-id='${escape(record.id)}' data-passport-collection='${collection}'>${text(locale, 'Изменить паспорт', 'Паспортты өзгерту')}</button>` : ''}</article>`;
+  return `<article class='passport-card' data-passport-id='${escape(record.id)}' data-passport-collection='${collection}'><div class='passport-card-heading'><h2>${escape(value('name') || '—')}</h2><span class='passport-status' data-status='${status}'>${statusLabel} · ${status}</span></div><dl class='passport-fields'>${passportField(text(locale, 'Роль', 'Рөлі'), value('role'))}${passportField(text(locale, 'Замок внешности', 'Тұрақты сыртқы келбет'), value('identity'), 'passport-identity')}<div class='passport-taboo'><dt>${text(locale, 'Табу-детали', 'Тыйым салынған бөлшектер')}</dt><dd>${taboo.length ? `<ul>${taboo.map(item => `<li>${escape(item)}</li>`).join('')}</ul>` : `<span class='passport-empty'>${text(locale, 'не заполнено', 'толтырылмаған')}</span>`}</dd></div>${passportField(text(locale, 'Рост', 'Бойы'), value('height'))}${passportField(text(locale, 'В каких сценах', 'Қай көріністерде'), list(record.scenes).join(', '), 'passport-scenes')}</dl>${canEdit ? `<button type='button' class='btn' data-action='edit-passport' data-passport-id='${escape(record.id)}' data-passport-collection='${collection}'>${text(locale, 'Изменить паспорт', 'Паспортты өзгерту')}</button>` : ''}</article>`;
 }
 
 export function renderBreakdownSection({ section = 'breakdown', snapshot, locale = 'ru', mode = 'graphite', loading = false, error = '', connected = false, canImport = false, canEdit = false } = {}) {
+  fieldLocale = locale;
   const currentSection = Object.hasOwn(sectionNames, section) ? section : 'breakdown';
   const collection = sectionCollection[currentSection];
   const denied = deniedCollection(snapshot, currentSection, collection);
