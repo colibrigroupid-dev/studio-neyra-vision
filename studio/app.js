@@ -266,7 +266,7 @@ function landing() {
 function pageHeading(title, description, actions = '') { return `<div class='page-heading'><div><h1>${title}</h1>${description ? `<p>${description}</p>` : ''}</div><div class='row'>${actions}</div></div>`; }
 function overview() {
   const p = project();
-  return `${pageHeading(t('Обзор проекта', 'Жобаға шолу'), t('Ваша история и работа команды — в одном месте.', 'Оқиғаңыз бен команданың жұмысы — бір кеңістікте.'), btn(t('К сценарию', 'Сценарийге'), 'script', true, 'arrow'))}<div class='project-hero'><img src='assets/hero.jpg' alt='${t('Визуальный референс проекта', 'Жобаның визуалды референсі')}'><div class='project-hero-copy'><div class='row wrap'>${status(p.scriptStatus)}<span class='badge'>${t('Визуальный референс', 'Визуалды референс')}</span></div><h2>${e(local(p.title))}</h2></div></div><div class='stat-row'><div class='stat'><strong>${p.scenes.length}</strong><small>${t('Сцен в сценарии', 'Сценарийдегі көріністер')}</small></div><div class='stat'><strong>${p.shots.length}</strong><small>${t('Кадров в проекте', 'Жобадағы кадрлар')}</small></div><div class='stat'><strong>${p.members.length}</strong><small>${t('Участников команды', 'Командадағы қатысушылар')}</small></div><div class='stat'><strong>${String(totalDuration(p.shots)).padStart(2, '0')} <small>${t('сек', 'сек')}</small></strong><small>${t('Хронометраж ИИматика', 'ЖИ-аниматик хронометражы')}</small></div></div><div class='two-cols'><section class='panel'><h2>${t('Путь проекта', 'Жобаның кезеңдері')}</h2><ol class='stage-list'>${stages().map((s, i) => `<li><a href='#/studio/${s.id}'><span><span class='num'>0${i + 1}</span>${s.title}</span>${i === 0 ? status(p.scriptStatus) : icon('arrow')}</a></li>`).join('')}</ol></section><div><section class='panel'><h2>${t('История', 'Оқиға')}</h2><p>${e(local(p.synopsis) || t('Добавьте историю через сценарий.', 'Оқиғаны сценарий арқылы жазыңыз.'))}</p><div class='scene-minis'>${p.scenes.slice(0, 3).map((s, i) => `<a class='scene-mini' href='#/studio/script' data-scene='${e(s.id)}'><span class='mono'>0${i + 1}</span>${e(s.title[state.scriptLang])}</a>`).join('')}</div></section><section class='panel' style='margin-top:24px'><div class='row between'><h2>${t('Команда', 'Команда')}</h2><a href='#/studio/team' aria-label='${t('Открыть команду', 'Команданы ашу')}'>${icon('arrow')}</a></div><div class='avatars'>${p.members.map(m => `<span class='avatar' title='${e(m.name)}'>${e(m.name.slice(0, 1))}</span>`).join('')}</div><p>${t('Творческий процесс начинается с общего замысла.', 'Шығармашылық үдеріс ортақ ойдан басталады.')}</p></section></div></div>`;
+  return `${awaitingSheet()}${pageHeading(t('Обзор проекта', 'Жобаға шолу'), t('Ваша история и работа команды — в одном месте.', 'Оқиғаңыз бен команданың жұмысы — бір кеңістікте.'), btn(t('К сценарию', 'Сценарийге'), 'script', true, 'arrow'))}<div class='project-hero'><img src='assets/hero.jpg' alt='${t('Визуальный референс проекта', 'Жобаның визуалды референсі')}'><div class='project-hero-copy'><div class='row wrap'>${status(p.scriptStatus)}<span class='badge'>${t('Визуальный референс', 'Визуалды референс')}</span></div><h2>${e(local(p.title))}</h2></div></div><div class='stat-row'><div class='stat'><strong>${p.scenes.length}</strong><small>${t('Сцен в сценарии', 'Сценарийдегі көріністер')}</small></div><div class='stat'><strong>${p.shots.length}</strong><small>${t('Кадров в проекте', 'Жобадағы кадрлар')}</small></div><div class='stat'><strong>${p.members.length}</strong><small>${t('Участников команды', 'Командадағы қатысушылар')}</small></div><div class='stat'><strong>${String(totalDuration(p.shots)).padStart(2, '0')} <small>${t('сек', 'сек')}</small></strong><small>${t('Хронометраж ИИматика', 'ЖИ-аниматик хронометражы')}</small></div></div><div class='two-cols'><section class='panel'><h2>${t('Путь проекта', 'Жобаның кезеңдері')}</h2><ol class='stage-list'>${stages().map((s, i) => `<li><a href='#/studio/${s.id}'><span><span class='num'>0${i + 1}</span>${s.title}</span>${i === 0 ? status(p.scriptStatus) : icon('arrow')}</a></li>`).join('')}</ol></section><div><section class='panel'><h2>${t('История', 'Оқиға')}</h2><p>${e(local(p.synopsis) || t('Добавьте историю через сценарий.', 'Оқиғаны сценарий арқылы жазыңыз.'))}</p><div class='scene-minis'>${p.scenes.slice(0, 3).map((s, i) => `<a class='scene-mini' href='#/studio/script' data-scene='${e(s.id)}'><span class='mono'>0${i + 1}</span>${e(s.title[state.scriptLang])}</a>`).join('')}</div></section><section class='panel' style='margin-top:24px'><div class='row between'><h2>${t('Команда', 'Команда')}</h2><a href='#/studio/team' aria-label='${t('Открыть команду', 'Команданы ашу')}'>${icon('arrow')}</a></div><div class='avatars'>${p.members.map(m => `<span class='avatar' title='${e(m.name)}'>${e(m.name.slice(0, 1))}</span>`).join('')}</div><p>${t('Творческий процесс начинается с общего замысла.', 'Шығармашылық үдеріс ортақ ойдан басталады.')}</p></section></div></div>`;
 }
 function scriptPage() {
   const p = project();
@@ -305,11 +305,24 @@ function teamPage() {
 }
 const postInfo = () => ({ edit: [t('Монтаж', 'Монтаж'), t('Собрать утверждённые планы в последовательность фильма.', 'Бекітілген кадрларды фильмнің ретімен монтаждау.')], color: [t('Цвет', 'Түс'), t('Согласовать общий визуальный характер и цвет кадров.', 'Кадрлардың ортақ визуалды сипаты мен түсін келісу.')], sound: [t('Звук', 'Дыбыс'), t('Подготовить диалоги, атмосферу, музыку и финальный микс.', 'Диалогтарды, атмосфераны, музыканы және соңғы миксті дайындау.')], vfx: [t('VFX и графика', 'VFX және графика'), t('Проверить эффекты, титры и финальные правки.', 'Эффектілерді, титрлерді және соңғы түзетулерді тексеру.')] });
 function postPage() { const p = project(); if (!p.post.length) p.post = ['edit', 'color', 'sound', 'vfx'].map(id => ({ id, done: false })); return `${pageHeading(t('План постпродакшена', 'Постпродакшн жоспары'), t('Список работ для завершения фильма.', 'Фильмді аяқтауға арналған жұмыстар тізімі.'), `<span class='badge'>${p.post.filter(v => v.done).length} / ${p.post.length}</span>`)}<div class='post-list'>${p.post.map(task => `<div class='post-task ${task.done ? 'completed' : ''}'><input id='post-${task.id}' data-post='${task.id}' type='checkbox' ${task.done ? 'checked' : ''}><label for='post-${task.id}'><h2>${postInfo()[task.id][0]}</h2><p>${postInfo()[task.id][1]}</p></label>${status(task.done ? 'approved' : 'draft')}</div>`).join('')}</div><div class='access-note'>${t('В этом разделе планируем работу. Монтажные инструменты, звук, цветокоррекция и экспорт мастер-файла пока не подключены.', 'Бұл бөлімде жұмысты жоспарлаймыз. Монтаж құралдары, дыбыс, түс түзету және мастер-файл экспорты әлі қосылмаған.')}</div>`; }
-function productionMapPage() {
+function ensureMapState() {
   if (mapState.client !== serverClient || mapState.slug !== state.activeId) {
     mapState = { client: serverClient, slug: state.activeId, snapshot: null, loading: false, ready: false, error: '', token: mapState.token + 1 };
     mapFilter = 'all'; mapCard = null;
   }
+}
+function awaitingSheet() {
+  if (!serverClient || !project()) return '';
+  ensureMapState();
+  const map = mapState.snapshot?.map;
+  const head = `<div class='group'><header><h2>${t('Ждёт меня', 'Мені күтеді')}</h2><span class='label'>${map ? `${map.awaitingMe.length} ${t('решений', 'шешім')}` : (mapState.error ? t('карта не загрузилась', 'карта жүктелмеді') : t('загружаю…', 'жүктелуде…'))}</span></header>`;
+  if (!map) return `${head}</div>`;
+  if (!map.awaitingMe.length) return `${head}<div class='sheet'><div class='row'><div class='t'>${t('Решений не ждёт. Всё, что сдали, вы уже разобрали.', 'Шешім күтпейді. Тапсырылғанның бәрін қарадыңыз.')}</div><div class='d'>${t('Новые появятся здесь, когда исполнители сдадут версии.', 'Орындаушылар нұсқа тапсырғанда жаңалары осында шығады.')}</div></div></div></div>`;
+  const rows = map.awaitingMe.slice(0, 6).map(cell => `<a class='row action' href='#/studio/map' data-open-cell='${e(cell.id)}'><div class='t'>${e(productionObjectLabel(cell.object, project(), state.locale))} · ${e(productionStageName(cell.stage, state.locale))}</div><div class='d'>${cell.version ? `${t('версия', 'нұсқа')} ${e(cell.version)}` : ''}${cell.assignee?.name ? ` · ${e(cell.assignee.name)}` : ''}${cell.comment ? ` · ${e(cell.comment)}` : ''}</div><div class='c'><span class='badge awaiting'><span class='dot'></span>${t('ждёт решения', 'шешім күтеді')}</span></div></a>`).join('');
+  return `${head}<div class='sheet'>${rows}${map.awaitingMe.length > 6 ? `<a class='row action' href='#/studio/map'><div class='t'>${t('Все на карте', 'Бәрі картада')} · ${map.awaitingMe.length}</div></a>` : ''}</div></div>`;
+}
+function productionMapPage() {
+  ensureMapState();
   return renderProductionMap({
     map: mapState.snapshot?.map || null, project: project(), locale: state.locale, filter: mapFilter,
     activity: mapState.snapshot?.activity || [], approvals: mapState.snapshot?.approvals || [],
@@ -367,7 +380,7 @@ async function refreshProductionMap() {
   } finally {
     if (client === serverClient && slug === state.activeId && token === mapState.token) {
       mapState.loading = false;
-      if (route() === 'map') render();
+      if (route() === 'map' || route() === 'overview') render();
     }
   }
 }
@@ -640,7 +653,7 @@ function helperStub(p) {
   if (!p) return '';
   const mic = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const micTitle = t('Голос недоступен в этом браузере', 'Бұл браузерде дауыс қолжетімсіз');
-  return `<div class='helper-stub' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'><form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Команда или вопрос: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${t('помощник подключится после ключа модели', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
+  return `<div class='helper-stub' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'><form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Команда или вопрос: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${t('помощник подключится после ключа модели', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
 }
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Введите ключ участника, чтобы открыть проект команды.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ участника', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
@@ -762,6 +775,10 @@ app.addEventListener('submit', event => {
 app.addEventListener('click', async event => {
   if (busy || connecting) return;
   if (event.target.closest("[data-action='voice']")) { listenVoice(); return; }
+  const chip = event.target.closest('[data-cmd]');
+  if (chip) { runCommand(chip.dataset.cmd); return; }
+  const waitRow = event.target.closest('[data-open-cell]');
+  if (waitRow) { event.preventDefault(); mapFilter = 'awaiting'; go('map'); await runOperation(() => mapCellDialog(waitRow.dataset.openCell)); return; }
   const lang = event.target.closest('[data-lang]');
   if (lang) { state.locale = lang.dataset.lang; persistPreferences(); render(); return; }
   const filter = event.target.closest('[data-map-filter]');
@@ -1014,7 +1031,7 @@ function render() {
   app.innerHTML = route() === 'home' ? landing() : workspace(route()); app.inert = busy || connecting;
   if (route() === 'animatic') updatePlayer();
   if (cinemaPages.includes(route()) && serverClient && project() && !connecting && !cinemaState.loading && !cinemaState.ready && !cinemaState.error) void refreshCinema();
-  if (route() === 'map' && serverClient && project() && !connecting && !mapState.loading && !mapState.ready && !mapState.error) void refreshProductionMap();
+  if ((route() === 'map' || route() === 'overview') && serverClient && project() && !connecting && !mapState.loading && !mapState.ready && !mapState.error) void refreshProductionMap();
   if (route() !== 'home' && serverClient && project() && !connecting) void refreshMe();
 }
 window.addEventListener('hashchange', () => {
