@@ -96,6 +96,10 @@ body{font-size:16px;line-height:1.5}
 .assistant-msg.user{background:transparent;border:1px solid var(--line-soft)}
 .assistant-msg .label{font-size:13px;color:var(--dim)}.assistant-msg p{margin:0;font-size:15px;line-height:1.5}
 .assistant-msg.pending p{color:var(--muted)}
+/* встроенный редактор NEYRA на странице «Сценарий» */
+.editor-frame-wrap{margin:0 0 24px;border:1px solid var(--line-soft);border-radius:16px;overflow:hidden;background:var(--surface)}
+.editor-frame{display:block;width:100%;height:min(72vh,820px);border:0;background:var(--surface)}
+@media(max-width:768px){.editor-frame{height:70vh}}
 /* рабочее поле */
 .work-main{max-width:940px;padding:36px 24px 160px}
 .prototype-note{font:400 .8125rem/1.4 var(--mono);letter-spacing:.04em;color:var(--dim);margin-bottom:24px}

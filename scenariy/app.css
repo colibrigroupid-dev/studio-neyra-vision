@@ -183,3 +183,6 @@ a{color:inherit}
   .sp .pb{page-break-after:always;border:0;margin:0}
   @page{size:A4;margin:1in 1in 1in 1.5in}
 }
+/* встроенный в окно проекта режим: шапка компактнее, бренд и список проектов скрыты (ими управляет окно) */
+body.embed .top .brand,body.embed .top #btnProjects{display:none!important}
+body.embed .top{min-height:44px}

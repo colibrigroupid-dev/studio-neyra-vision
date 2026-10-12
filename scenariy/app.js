@@ -71,14 +71,15 @@ Draft date: 13.10.2026
     const title = (meta.data && (typeof meta.data.title === 'string' ? meta.data.title : (meta.data.title && meta.data.title.ru))) || serverMode.slug;
     if (!projects[id]) projects[id] = { id, title, text, created: Date.now(), updated: Date.now(), beats: {}, meta: { logline: '', genre: '', synopsis: '', notes: '' }, chat: [] };
     projects[id].title = title; projects[id].text = text; projects[id].server = serverMode.slug;
-    currentId = id; serverMode.loaded = true; save(); open(id);
+    currentId = id; serverMode.lastText = text; serverMode.loaded = true; save(); open(id);
     $('#saveState').textContent = 'сценарий с сервера · ' + text.length + ' зн.';
   }
   function serverSave() {
     if (!serverMode || !serverMode.loaded || currentId !== 'srv:' + serverMode.slug) return;
+    if (cur().text === serverMode.lastText) return; // ничего не менялось — на сервер не ходим, ревизию не трогаем
     clearTimeout(serverMode.timer);
     serverMode.timer = setTimeout(async () => {
-      try { await serverFetch('/api/projects/' + encodeURIComponent(serverMode.slug) + '/script', 'PUT', { text: cur().text }); $('#saveState').textContent = 'сохранено на сервере'; }
+      try { const text = cur().text; await serverFetch('/api/projects/' + encodeURIComponent(serverMode.slug) + '/script', 'PUT', { text }); serverMode.lastText = text; $('#saveState').textContent = 'сохранено на сервере'; }
       catch (e) { $('#saveState').textContent = 'сервер не принял: ' + e.message; }
     }, 1200);
   }
@@ -400,6 +401,8 @@ Draft date: 13.10.2026
   }
   document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); cur().text = src.value; save(); if (serverMode && serverMode.loaded) serverVersion().then(() => toast('Версия сценария зафиксирована на сервере')).catch((err) => toast('Сервер не принял версию: ' + err.message)); else toast('Сохранено в браузере'); } });
 
+  // ---------- встраивание в окно проекта (№43 шаг 1.5) ----------
+  if (new URLSearchParams(location.search).get('embed') === '1') document.body.classList.add('embed');
   // ---------- старт ----------
   if (!Object.keys(projects).length) newProject('Последний поезд (пример)', DEMO);
   if (!projects[currentId]) currentId = Object.keys(projects)[0];
