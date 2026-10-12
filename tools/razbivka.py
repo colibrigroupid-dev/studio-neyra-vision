@@ -188,13 +188,19 @@ def kartochki(d, out):
         p.parent.mkdir(parents=True, exist_ok=True)
         rol = "главный" if c["lines"] >= 20 else ("второстепенный" if c["lines"] >= 5 else "эпизод")
         p.write_text(KARTA_GEROY.format(name=c["name"], rol=rol, age=c["age"] or "", scenes=", ".join(map(str, c["scenes"])), lines=c["lines"], first_scene=c["first_scene"]), encoding="utf-8"); made += 1
+    groups = OrderedDict()
     for L in d["locations"]:
-        if L["name"] != L["parent"]:  # паспорт — у основного места; суб-локации перечисляются в нём
-            continue
-        p = out / "lokacii" / translit(L["name"]) / "KARTOCHKA.md"
+        groups.setdefault(L["parent"], []).append(L)
+    for parent, Ls in groups.items():  # паспорт — у основного места; суб-локации перечисляются в нём
+        p = out / "lokacii" / translit(parent) / "KARTOCHKA.md"
         if p.exists(): continue
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(KARTA_LOK.format(name=L["name"], types="/".join(L["types"]), times=", ".join(L["times"]), scenes=", ".join(map(str, L["scenes"]))), encoding="utf-8"); made += 1
+        types = sorted({t for L in Ls for t in L["types"]}); times = sorted({t for L in Ls for t in L["times"]})
+        scenes = sorted({n for L in Ls for n in L["scenes"]})
+        subs = ", ".join(L["name"][len(parent):].strip(" —") for L in Ls if L["name"] != parent)
+        txt = KARTA_LOK.format(name=parent, types="/".join(types), times=", ".join(times), scenes=", ".join(map(str, scenes)))
+        if subs: txt = txt.replace("**План площадки / суб-локации:** [заполнить]", f"**План площадки / суб-локации:** {subs} — [заполнить]")
+        p.write_text(txt, encoding="utf-8"); made += 1
     return made
 
 if __name__ == "__main__":
