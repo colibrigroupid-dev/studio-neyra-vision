@@ -34,7 +34,7 @@ let writeQueue = Promise.resolve();
 let draftTimer;
 let draftProjectId;
 let busy = false;
-const storageLabel = () => connecting ? t('подключение к серверу…', 'серверге қосылу…') : serverClient ? storageError ? t('ошибка сохранения', 'сақтау қатесі') : pendingWrites || draftTimer ? t('сохраняется на сервере…', 'серверде сақталуда…') : t('сохранено на сервере', 'серверде сақталды') : t('только в этом браузере', 'тек осы браузерде');
+const storageLabel = () => connecting ? t('подключение к серверу…', 'серверге қосылу…') : serverClient ? storageError ? t('ошибка сохранения', 'сақтау қатесі') : pendingWrites || draftTimer || busy ? t('сохраняется на сервере…', 'серверде сақталуда…') : t('сохранено на сервере', 'серверде сақталды') : t('только в этом браузере', 'тек осы браузерде');
 function updateStorageLabel() {
   document.querySelectorAll('[data-storage-label]').forEach(el => { el.textContent = storageLabel(); });
   document.querySelectorAll('[data-storage-error]').forEach(el => { el.textContent = storageError; el.hidden = !storageError; });
@@ -54,6 +54,15 @@ function useLocal(keepCurrent = false) {
         const draftText = { ru: copy._scriptTranslations?.ru || '', kk: copy._scriptTranslations?.kk || '' };
         draftText[copy._language] = copy._scriptText;
         copy.scenes.push({ id: `recovery-${crypto.randomUUID()}`, title: { ru: 'Сохранённый черновик', kk: 'Сақталған жұмыс нұсқасы' }, text: draftText });
+      }
+      for (const snapshot of copy.snapshots) {
+        const lang = snapshot.scriptLanguage || copy._language;
+        const source = snapshot.scenes.map(s => `${s.title[lang]}\n\n${s.text[lang]}`).join('\n\n');
+        if (snapshot.scriptText && snapshot.scriptText !== source) {
+          const text = { ru: snapshot.scriptTranslations?.ru || '', kk: snapshot.scriptTranslations?.kk || '' };
+          text[lang] = snapshot.scriptText;
+          snapshot.scenes.push({ id: `recovery-${crypto.randomUUID()}`, title: { ru: 'Сохранённый черновик', kk: 'Сақталған жұмыс нұсқасы' }, text });
+        }
       }
       for (const key of Object.keys(copy)) if (key.startsWith('_')) delete copy[key];
       const target = localWorkspace.projects[id] ? `server-${id}-${crypto.randomUUID()}` : id;
@@ -205,7 +214,7 @@ function animaticPage() {
 }
 function teamPage() { const p = project(); return `${pageHeading(t('Команда проекта', 'Жоба командасы'), t('Участники, роли и разделы рабочего пространства.', 'Жұмыс кеңістігінің қатысушылары, рөлдері және бөлімдері.'), btn(t('Добавить участника', 'Қатысушы қосу'), 'member', true, 'plus'))}<div class='panel'><table class='team-table'><thead><tr><th>${t('УЧАСТНИК', 'ҚАТЫСУШЫ')}</th><th>${t('РОЛЬ', 'РӨЛ')}</th><th>${t('РАЗДЕЛЫ', 'БӨЛІМДЕР')}</th></tr></thead><tbody>${p.members.map(m => `<tr><td><div class='member-info'><span class='avatar'>${e(m.name.slice(0, 1))}</span>${e(m.name)}</div></td><td>${roles()[m.role] || e(m.role)}</td><td><div class='sections'>${m.sections.map(id => `<span class='badge'>${stages().find(s => s.id === id)?.title || e(id)}</span>`).join('')}</div></td></tr>`).join('')}</tbody></table></div><div class='access-note'>${serverClient ? t('Добавление участника с keyId открывает доступ по его внешнему ключу и указанным разделам. Значение ключа выдаёт оператор сервера; приглашение автоматически не отправляется.', 'Қатысушыны keyId арқылы қосу оның сыртқы кілті мен көрсетілген бөлімдері бойынша қолжетімділік ашады. Кілтті сервер операторы береді; шақыру автоматты түрде жіберілмейді.') : t('Локальная модель команды. Добавление участника не открывает доступ другому человеку.', 'Команданың жергілікті үлгісі. Қатысушыны қосу басқа адамға қолжетімділік бермейді.')}</div>`; }
 const postInfo = () => ({ edit: [t('Монтаж', 'Монтаж'), t('Собрать утверждённые планы в последовательность фильма.', 'Бекітілген кадрларды фильмнің ретімен монтаждау.')], color: [t('Цвет', 'Түс'), t('Согласовать общий визуальный характер и цвет кадров.', 'Кадрлардың ортақ визуалды сипаты мен түсін келісу.')], sound: [t('Звук', 'Дыбыс'), t('Подготовить диалоги, атмосферу, музыку и финальный микс.', 'Диалогтарды, атмосфераны, музыканы және соңғы миксті дайындау.')], vfx: [t('VFX и графика', 'VFX және графика'), t('Проверить эффекты, титры и финальные правки.', 'Эффектілерді, титрлерді және соңғы түзетулерді тексеру.')] });
-function postPage() { const p = project(); return `${pageHeading(t('План постпродакшена', 'Постпродакшн жоспары'), t('Список работ для завершения фильма.', 'Фильмді аяқтауға арналған жұмыстар тізімі.'), `<span class='badge'>${p.post.filter(v => v.done).length} / ${p.post.length}</span>`)}<div class='post-list'>${p.post.map(task => `<div class='post-task ${task.done ? 'completed' : ''}'><input id='post-${task.id}' data-post='${task.id}' type='checkbox' ${task.done ? 'checked' : ''}><label for='post-${task.id}'><h2>${postInfo()[task.id][0]}</h2><p>${postInfo()[task.id][1]}</p></label>${status(task.done ? 'approved' : 'draft')}</div>`).join('')}</div><div class='access-note'>${t('В этом разделе планируем работу. Монтажные инструменты, звук, цветокоррекция и экспорт мастер-файла пока не подключены.', 'Бұл бөлімде жұмысты жоспарлаймыз. Монтаж құралдары, дыбыс, түс түзету және мастер-файл экспорты әлі қосылмаған.')}</div>`; }
+function postPage() { const p = project(); if (!p.post.length) p.post = ['edit', 'color', 'sound', 'vfx'].map(id => ({ id, done: false })); return `${pageHeading(t('План постпродакшена', 'Постпродакшн жоспары'), t('Список работ для завершения фильма.', 'Фильмді аяқтауға арналған жұмыстар тізімі.'), `<span class='badge'>${p.post.filter(v => v.done).length} / ${p.post.length}</span>`)}<div class='post-list'>${p.post.map(task => `<div class='post-task ${task.done ? 'completed' : ''}'><input id='post-${task.id}' data-post='${task.id}' type='checkbox' ${task.done ? 'checked' : ''}><label for='post-${task.id}'><h2>${postInfo()[task.id][0]}</h2><p>${postInfo()[task.id][1]}</p></label>${status(task.done ? 'approved' : 'draft')}</div>`).join('')}</div><div class='access-note'>${t('В этом разделе планируем работу. Монтажные инструменты, звук, цветокоррекция и экспорт мастер-файла пока не подключены.', 'Бұл бөлімде жұмысты жоспарлаймыз. Монтаж құралдары, дыбыс, түс түзету және мастер-файл экспорты әлі қосылмаған.')}</div>`; }
 function workspace(page) {
   const p = project();
   const pages = { overview, script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
@@ -242,6 +251,7 @@ function togglePlay() { if (playback) stopPlayback(); else { if (playTime >= tot
 async function runOperation(action) {
   if (busy || connecting) return;
   busy = true; app.inert = true; dialog.inert = true;
+  updateStorageLabel();
   try { await action(); } catch (error) { reportStorageError(error); }
   finally { busy = false; app.inert = false; dialog.inert = false; updateStorageLabel(); }
 }
@@ -353,7 +363,7 @@ dialog.addEventListener('click', async event => {
     const input = document.querySelector('#comment-text'); const text = input.value.trim(); if (!text) return;
     const shot = project().shots.find(s => s.id === comment.dataset.commentShot);
     shot.comments.push({ author: t('Вы', 'Сіз'), text, date: new Date().toISOString() });
-    if (!await persist()) return;
+    if (!await persist()) { shot.comments.pop(); return; }
     // Rerendering uses the same escaping as stored and freshly entered comments.
     dialog.close(); shotDialog(shot.id); toast(t('Комментарий сохранён.', 'Пікір сақталды.'));
   });
@@ -385,7 +395,10 @@ dialog.addEventListener('submit', async event => {
     } else if (form.id === 'member-form') {
       const name = data.get('name').trim(); if (!name) return;
       const sections = data.getAll('sections'); if (!sections.length) { toast(t('Выберите хотя бы один раздел.', 'Кемінде бір бөлімді таңдаңыз.')); return; }
-      project().members.push({ id: crypto.randomUUID(), name, role: data.get('role'), sections, ...(serverClient ? { keyId: data.get('keyId').trim() } : {}) });
+      const keyId = serverClient ? data.get('keyId').trim() : '';
+      const previous = keyId ? project().members.find(m => m.keyId === keyId) : undefined;
+      if (previous) Object.assign(previous, { name, role: data.get('role'), sections });
+      else project().members.push({ id: crypto.randomUUID(), name, role: data.get('role'), sections, ...(serverClient ? { keyId } : {}) });
       if (!await persist()) return;
       dialog.close(); render(); toast(serverClient ? t('Участник добавлен на сервер. Доступ открыт по его ключу.', 'Қатысушы серверге қосылды. Кілті бойынша қолжетімділік ашылды.') : t('Участник добавлен в локальный прототип.', 'Қатысушы жергілікті прототипке қосылды.'));
     } else if (form.id === 'shot-form') {
