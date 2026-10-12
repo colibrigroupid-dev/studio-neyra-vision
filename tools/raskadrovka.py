@@ -166,6 +166,8 @@ def main():
                 prompt, krefs = kanon.sobrat(K, "karandash", {"id": sid, "size_en": SIZE_EN.get(sh["size"], "medium shot"), "move_en": MOVE_EN.get(sh["move"].split(" (")[0], "static camera"), "chars": list(dict.fromkeys(sh["chars"])), "loc_name": sc["location"], "vo": sh["vo"]}, action_en=action_en, time_en=(sc["time"] or "day").lower())
             else:
                 prompt, krefs = build_prompt(sh, heroes, loc, sc["location"], sc["time"]), []
+            if K:  # псевдонимы и капс-имена сводятся к имени из канона, без дублей
+                sh["chars"] = list(dict.fromkeys((kanon.hero_by_name(K, n) or {"imya": n})["imya"] for n in sh["chars"]))
             who = ", ".join(dict.fromkeys(sh["chars"]))
             vo = " ".join(f"[{n}: {r}]" for n, r in sh["vo"])
             action = sh["text"] + ((" " + vo) if vo else "")
