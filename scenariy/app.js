@@ -1,4 +1,4 @@
-/* Сценарная studio.neyra.vision — блок 1. Проекты в localStorage, ассистент через /api/ask. */
+/* Сценарная studio.neyra.vision — блок 1. Проекты в localStorage; с ?project=<slug> и ключом окна — черновик и помощник на сервере команды (№43 шаг 1). */
 (function () {
   'use strict';
   const $ = (s, r) => (r || document).querySelector(s);
@@ -48,10 +48,44 @@ Draft date: 13.10.2026
   let parsed = Fountain.parse('');
   let apiBase = localStorage.getItem(LS.api) || '';
   let busy = false;
+  // ---------- режим сервера (№43 шаг 1): редактор работает с черновиком проекта на сервере команды ----------
+  const serverMode = (() => {
+    try {
+      const slug = new URLSearchParams(location.search).get('project');
+      const settings = JSON.parse(localStorage.getItem('neyra-vision-server-settings-v1') || 'null');
+      if (!slug || !settings || !settings.key || !settings.url) return null;
+      return { slug, url: String(settings.url).replace(/\/+$/, ''), key: settings.key, loaded: false, timer: null };
+    } catch (e) { return null; }
+  })();
+  async function serverFetch(path, method, body) {
+    const r = await fetch(serverMode.url + path, { method: method || 'GET', headers: { 'X-Key': serverMode.key, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, credentials: 'omit', cache: 'no-store' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j.error && j.error.message) || ('ошибка ' + r.status));
+    return j;
+  }
+  async function serverOpen() {
+    const id = 'srv:' + serverMode.slug;
+    const meta = await serverFetch('/api/projects/' + encodeURIComponent(serverMode.slug));
+    const script = await serverFetch('/api/projects/' + encodeURIComponent(serverMode.slug) + '/script');
+    const text = (script.data && script.data.text) || '';
+    const title = (meta.data && (typeof meta.data.title === 'string' ? meta.data.title : (meta.data.title && meta.data.title.ru))) || serverMode.slug;
+    if (!projects[id]) projects[id] = { id, title, text, created: Date.now(), updated: Date.now(), beats: {}, meta: { logline: '', genre: '', synopsis: '', notes: '' }, chat: [] };
+    projects[id].title = title; projects[id].text = text; projects[id].server = serverMode.slug;
+    currentId = id; serverMode.loaded = true; save(); open(id);
+    $('#saveState').textContent = 'сценарий с сервера · ' + text.length + ' зн.';
+  }
+  function serverSave() {
+    if (!serverMode || !serverMode.loaded || currentId !== 'srv:' + serverMode.slug) return;
+    clearTimeout(serverMode.timer);
+    serverMode.timer = setTimeout(async () => {
+      try { await serverFetch('/api/projects/' + encodeURIComponent(serverMode.slug) + '/script', 'PUT', { text: cur().text }); $('#saveState').textContent = 'сохранено на сервере'; }
+      catch (e) { $('#saveState').textContent = 'сервер не принял: ' + e.message; }
+    }, 1200);
+  }
 
   function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
   function save() {
-    try { localStorage.setItem(LS.projects, JSON.stringify(projects)); localStorage.setItem(LS.current, currentId); $('#saveState').textContent = 'сохранено'; }
+    try { localStorage.setItem(LS.projects, JSON.stringify(projects)); localStorage.setItem(LS.current, currentId); $('#saveState').textContent = 'сохранено'; serverSave(); }
     catch (e) { $('#saveState').textContent = 'не сохраняется: ' + e.message; }
   }
   function uid() { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36); }
@@ -281,10 +315,17 @@ Draft date: 13.10.2026
       // короткая память последних ответов, чтобы можно было переспросить
       if (history.length && info.free) { messages.push({ role: 'user', content: 'Напоминание о предыдущих ответах по этому сценарию.' }); messages.push({ role: 'assistant', content: history.map((h) => h.content).join('\n---\n') }); }
       messages.push({ role: 'user', content: prompt });
-      const r = await fetch(apiBase + '/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, max_tokens: info.scope && info.scope.kind === 'all' ? 6000 : 3000 }) });
-      const j = await r.json();
+      let j;
+      if (serverMode && serverMode.loaded) {
+        const hist = history.map((m) => ({ role: 'assistant', content: m.content }));
+        j = await serverFetch('/api/projects/' + encodeURIComponent(serverMode.slug) + '/assistant', 'POST', { question: prompt, section: 'script', history: hist });
+        j = { text: (j.data && j.data.answer) || '' };
+      } else {
+        const r = await fetch(apiBase + '/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, max_tokens: info.scope && info.scope.kind === 'all' ? 6000 : 3000 }) });
+        j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || ('ошибка ' + r.status));
+      }
       wait.remove();
-      if (!r.ok || j.error) throw new Error(j.error || ('ошибка ' + r.status));
       const text = (j.text || '').trim();
       p.chat.push({ role: 'assistant', label: label, text, key: info.key, rewrite: !!(info.act && info.act.rewrite), scope: info.scope ? { kind: info.scope.kind, start: info.scope.start, end: info.scope.end, label: info.scope.label } : null, ts: Date.now() });
       if (p.chat.length > 40) p.chat = p.chat.slice(-40);
@@ -336,6 +377,10 @@ Draft date: 13.10.2026
   }
 
   async function checkApi() {
+    if (serverMode) {
+      try { await serverFetch('/api/me'); $('#aiDot').className = 'dot on'; $('#aiState').textContent = 'сервер проекта · ' + serverMode.slug; } catch (e) { $('#aiDot').className = 'dot off'; $('#aiState').textContent = 'сервер: ' + e.message; }
+      return;
+    }
     try { const r = await fetch(apiBase + '/api/status'); const j = await r.json(); $('#aiDot').className = 'dot ' + (j.key ? 'on' : 'off'); $('#aiState').textContent = j.key ? 'на связи' : 'ключ не задан на сервере'; }
     catch (e) { $('#aiDot').className = 'dot off'; $('#aiState').textContent = 'нет сервера станции'; }
   }
@@ -349,4 +394,5 @@ Draft date: 13.10.2026
   if (!Object.keys(projects).length) newProject('Последний поезд (пример)', DEMO);
   if (!projects[currentId]) currentId = Object.keys(projects)[0];
   open(currentId); checkApi();
+  if (serverMode) serverOpen().catch((e) => { $('#saveState').textContent = 'сервер: ' + e.message; toast('Не удалось открыть сценарий с сервера: ' + e.message); });
 })();

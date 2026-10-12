@@ -1076,7 +1076,7 @@ class Handler(SimpleHTTPRequestHandler):
             authorize(principal, slug, "overview", project)
             body = self.body()
             fields(body, ("question", "section", "history"), ("question",))
-            question = text(body["question"], "question", 4000, required=True)
+            question = text(body["question"], "question", 60000, required=True)
             mode_section = body.get("section", "")
             if not isinstance(mode_section, str) or len(mode_section) > 40:
                 raise ApiError(422, "VALIDATION", "Поле section — короткая строка.")

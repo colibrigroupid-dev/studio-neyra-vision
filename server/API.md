@@ -289,7 +289,7 @@ HTTP(S) `Origin`, имеет `Vary: Origin` и открывает чтение `
 
 | Метод и путь | Назначение | Успех |
 |---|---|---|
-| `POST /api/projects/<slug>/assistant` | Вопрос помощнику с памятью всего проекта: тело `question` (до 4000), необязательно `section` (режим: script, breakdown, heroes, locations, storyboard, shots, map, team) и `history` (до 20 реплик `{role, content}` — диалог хранит клиент). Ответ `answer`, `model`, `usage`, `context` (сколько знаков/сцен/героев/локаций ушло в контекст) | 200 |
+| `POST /api/projects/<slug>/assistant` | Вопрос помощнику с памятью всего проекта: тело `question` (до 60 000 знаков — редактор может прислать сцену или весь драфт), необязательно `section` (режим: script, breakdown, heroes, locations, storyboard, shots, map, team) и `history` (до 20 реплик `{role, content}` — диалог хранит клиент). Ответ `answer`, `model`, `usage`, `context` (сколько знаков/сцен/героев/локаций ушло в контекст) | 200 |
 
 Права: чтение проекта (раздел `overview`). Сервер собирает контекст из проекта (метаданные, синопсис, сценарий до 6000 знаков, сцены, паспорта с табу, карта и «ждёт меня» для этого ключа, последние события) и обращается к модели по ключу `ANTHROPIC_API_KEY` или файлу `~/.config/neyra-studio/key` (путь переопределяется `NEYRA_ASSISTANT_KEY_FILE`). Без ключа — 503 `ASSISTANT_KEY_MISSING`; ошибка модели — 502 `ASSISTANT_UPSTREAM`. `NEYRA_ASSISTANT_FAKE=1` — проба без модели (тесты). Помощник ничего не изменяет в проекте и не запускает платные генерации.
 
