@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { frameAt, totalDuration } from './timeline.js';
 import { makeDemo } from './data.js';
+import { mapStages, cellPermissions, renderMapPage, renderCellCard } from './blocks/production-map/view.js';
 
 const shots = [{ duration: 4 }, { duration: 3 }, { duration: 5 }];
 assert.equal(totalDuration(shots), 12);
@@ -19,6 +20,135 @@ assert.notEqual(a.scenes[0].text.ru, b.scenes[0].text.ru);
 assert.equal(a.scenes[0].text.kk, b.scenes[0].text.kk);
 assert.ok(a.shots.every(shot => a.scenes.some(scene => scene.id === shot.sceneId)));
 console.log('Timeline boundaries, independent project drafts and bilingual text: passed.');
+
+// The production map uses real block renderers. Its fixtures deliberately
+// contain different object levels and untrusted text from another client.
+const stageIds = ['script', 'breakdown', 'heroes', 'locations', 'storyboard', 'shots', 'video', 'sound', 'edit'];
+const mapProject = ({ role = 'writer', id = 'writer-local', sections: granted = ['overview', 'script'], source = 'external', accessStatus = 'active', projects = ['film'] } = {}) => ({
+  slug: 'film', _server: true, _revision: 1,
+  _principal: { id, role, sections: granted, projects },
+  members: [{ id: 'member-one', keyId: id, name: 'Исполнитель', role, sections: granted, keySource: source, accessStatus }],
+  scenes: [{ id: 's1', title: { ru: 'ИНТ. КОМНАТА — ДЕНЬ', kk: 'ІШКІ. ҮЙ — КҮН' }, text: { ru: '', kk: '' } }]
+});
+const mapCell = (overrides = {}) => ({
+  id: 'cell-one', project: 'film', object: { type: 'scene', id: 's1' }, stage: 'script',
+  assignee: { keyId: 'writer-local', name: 'Исполнитель' }, approverRole: 'producer',
+  status: 'working', dueAt: '2026-10-15', comment: 'Рабочий комментарий', version: 'draft-2', variant: null,
+  ...overrides
+});
+const mapData = (cells = [mapCell()]) => {
+  const objects = [{ type: 'scene', id: 's1' }, { type: 'teaser', id: 'teaser-one' }, { type: 'shot', id: 'shot-only' }, { type: 'episode', id: 'episode-only' }];
+  return {
+    project: 'film', stages: [...stageIds], objects,
+    grid: objects.map(object => ({ object, stages: Object.fromEntries(stageIds.map(stage => [stage, cells.find(cell => cell.stage === stage && cell.object.type === object.type && cell.object.id === object.id) || null])) })),
+    cells, myTasks: cells.filter(cell => cell.assignee.keyId === 'writer-local'), awaitingMe: [],
+    approvals: [], activity: [], _revision: 1, revision: 1
+  };
+};
+const gridMarkup = html => /<table\b[\s\S]*?<\/table>/.exec(html)?.[0] || '';
+const workButton = (html, intent) => new RegExp(`<button\\b[^>]*\\bvalue=['"]${intent}['"]`).test(html);
+const verdictButton = (html, verdict) => new RegExp(`<button\\b[^>]*\\bdata-map-verdict=['"]${verdict}['"]`).test(html);
+
+{
+  const p = mapProject();
+  const cells = ['empty', 'working', 'done', 'awaiting', 'approved', 'returned'].map((status, index) => mapCell({ id: `cell-${index}`, stage: stageIds[index], status }));
+  const data = mapData(cells);
+  const ru = renderMapPage({ p, data, locale: 'ru' });
+  const grid = gridMarkup(ru);
+  assert.ok(grid, 'The production grid is a semantic table');
+  assert.equal((grid.match(/<tr\b/g) || []).length, 3, 'Film scale contains one scene and one teaser plus the header');
+  assert.equal((grid.match(/data-map-stage=/g) || []).length, 18, 'Two film objects have all nine clickable stages');
+  assert.ok(!grid.includes('shot-only') && !grid.includes('episode-only'), 'Shot and episode rows belong to later scales');
+  for (const title of ['Сценарий', 'Разбивка', 'Герои', 'Локации', 'Раскадровка', 'Кадры', 'Видео', 'Звук', 'Монтаж']) assert.ok(grid.includes(title), `Russian grid labels ${title}`);
+  for (const symbol of ['○', '●', '✓', '◆']) assert.ok(grid.includes(symbol), `Status symbol ${symbol} has a visible rendering`);
+  assert.ok(grid.includes('Исполнитель'), 'A working cell identifies its assignee');
+  assert.ok(ru.includes('Мои задачи') && ru.includes('Ждёт меня'));
+  assert.ok(ru.includes('map-grid-scroll'), 'Only the production table opts into horizontal scrolling');
+  assert.deepEqual(mapStages('ru').map(stage => stage.id), stageIds);
+  const kk = renderMapPage({ p, data, locale: 'kk' });
+  assert.ok(gridMarkup(kk).includes('ІШКІ. ҮЙ — КҮН'), 'The scene title follows the interface locale');
+  assert.deepEqual(mapStages('kk').map(stage => stage.id), stageIds);
+  assert.ok(mapStages('kk').some(stage => /[ӘҒҚҢӨҰҮҺІәғқңөұүһі]/.test(stage.title)), 'Kazakh stage labels are real translations');
+  assert.ok(!kk.includes('Мои задачи') && !kk.includes('Ждёт меня'), 'Personal lists are translated');
+
+  const filtered = gridMarkup(renderMapPage({ p, data, locale: 'ru', stage: 'storyboard' }));
+  assert.equal((filtered.match(/data-map-stage=/g) || []).length, 2, 'Stage filtering retains the rows and one stage');
+  assert.ok(filtered.includes('Раскадровка') && !filtered.includes('Монтаж'));
+  const art = gridMarkup(renderMapPage({ p, data, locale: 'kk', department: 'art' }));
+  assert.equal((art.match(/data-map-stage=/g) || []).length, 4, 'The art department contains heroes and locations');
+  assert.ok(!art.includes("data-map-stage='script'"));
+
+  for (const locale of ['ru', 'kk']) {
+    const unavailable = renderMapPage({ p: { ...p, _server: false }, data: null, locale });
+    assert.equal(gridMarkup(unavailable), '', 'No server produces an explanatory empty state rather than demo cells');
+    assert.match(unavailable, locale === 'ru' ? /сервер/ : /сервер/);
+    assert.ok(!unavailable.includes('data-map-stage='), 'Offline map exposes no cell actions');
+  }
+}
+console.log('Production map film rows, nine stages, symbols, filters, bilingual labels and offline empty state: passed.');
+
+{
+  const cell = mapCell();
+  const card = p => renderCellCard({ p, data: mapData([cell]), object: cell.object, stage: cell.stage, locale: 'ru' });
+  const own = mapProject();
+  assert.deepEqual(cellPermissions(cell, own), { manage: false, work: true, approve: false });
+  assert.ok(workButton(card(own), 'done'), 'The assigned executor can finish their cell');
+  assert.ok(workButton(card(own), 'awaiting'), 'The executor can request approval separately from done');
+  assert.ok(!verdictButton(card(own), 'approved'), 'Finishing a task cannot approve it');
+
+  for (const role of ['admin', 'director', 'producer']) {
+    const manager = mapProject({ role, id: `${role}-local`, sections: ['overview', 'script'] });
+    if (role === 'admin') manager.members = [];
+    assert.equal(cellPermissions(cell, manager).manage, true, `${role} can create and assign a cell`);
+    assert.equal(cellPermissions(cell, manager).work, false, 'Management does not impersonate an assigned executor');
+    assert.ok(!workButton(card(manager), 'done'));
+    const empty = renderCellCard({ p: manager, data: mapData([]), object: cell.object, stage: cell.stage, locale: 'ru' });
+    assert.ok(workButton(empty, 'save'), `${role} can create an empty stage assignment`);
+  }
+
+  const awaiting = mapCell({ status: 'awaiting', approverRole: 'director' });
+  for (const role of ['director', 'admin', 'producer']) {
+    const p = mapProject({ role, id: `${role}-local`, sections: ['overview', 'script'] });
+    if (role === 'admin') p.members = [];
+    assert.equal(cellPermissions(awaiting, p).approve, true, `${role} can issue the awaited verdict`);
+    const html = renderCellCard({ p, data: mapData([awaiting]), object: awaiting.object, stage: awaiting.stage, locale: 'ru' });
+    assert.ok(verdictButton(html, 'approved') && verdictButton(html, 'returned'));
+    const done = renderCellCard({ p, data: mapData([{ ...awaiting, status: 'done' }]), object: awaiting.object, stage: awaiting.stage, locale: 'ru' });
+    assert.ok(!verdictButton(done, 'approved'), 'Ready is distinct from awaiting approval');
+    const unversioned = renderCellCard({ p, data: mapData([{ ...awaiting, version: null, variant: null }]), object: awaiting.object, stage: awaiting.stage, locale: 'ru' });
+    assert.ok(!verdictButton(unversioned, 'approved'), 'A verdict needs the presented version or variant');
+  }
+
+  for (const p of [
+    mapProject({ role: 'viewer', sections: ['overview', 'script'] }),
+    mapProject({ id: 'unassigned-local' }),
+    mapProject({ sections: ['overview'] }),
+    mapProject({ accessStatus: 'revoked' }),
+    mapProject({ projects: ['another-film'] }),
+    { ...mapProject(), _server: false },
+    { ...mapProject(), members: [] },
+    { ...mapProject(), members: [{ ...mapProject().members[0], role: 'viewer' }] }
+  ]) {
+    assert.equal(cellPermissions(cell, p).work, false, 'A wrong key, scope, section, revoked membership or role cannot work');
+    const html = card(p);
+    assert.ok(!workButton(html, 'done') && !workButton(html, 'awaiting'), 'Unavailable rights expose no executor controls');
+    assert.ok(!verdictButton(html, 'approved') && !verdictButton(html, 'returned'), 'Unavailable rights expose no verdict controls');
+  }
+
+  const breakdown = mapCell({ stage: 'breakdown' });
+  const externalWriter = mapProject({ sections: ['overview', 'script'], source: 'external' });
+  assert.equal(cellPermissions(breakdown, externalWriter).work, true, 'Legacy external keys write breakdown through script');
+  const issuedWriter = mapProject({ id: 'member-writer', sections: ['overview', 'script', 'breakdown'], source: 'issued' });
+  assert.equal(cellPermissions({ ...breakdown, assignee: { keyId: 'member-writer', name: 'Сценарист' } }, issuedWriter).work, false, 'Issued writer has read-only breakdown even when the section is granted');
+  const issuedArtist = mapProject({ role: 'artist', id: 'member-artist', sections: ['overview', 'heroes'], source: 'issued' });
+  assert.equal(cellPermissions(mapCell({ stage: 'heroes', assignee: { keyId: 'member-artist', name: 'Художник' } }), issuedArtist).work, true, 'Issued artist can work heroes without storyboard');
+  const externalArtist = mapProject({ role: 'artist', sections: ['overview', 'heroes'], source: 'external' });
+  assert.equal(cellPermissions(mapCell({ stage: 'heroes' }), externalArtist).work, false, 'Legacy heroes rights require storyboard rather than the issued-key stage section');
+  const issuedEditor = mapProject({ role: 'editor', id: 'member-editor', sections: ['overview', 'sound', 'edit'], source: 'issued' });
+  assert.equal(cellPermissions(mapCell({ stage: 'sound', assignee: { keyId: 'member-editor', name: 'Монтажёр' } }), issuedEditor).work, false, 'Issued editor sees sound but cannot perform it');
+  assert.equal(cellPermissions(mapCell({ stage: 'edit', assignee: { keyId: 'member-editor', name: 'Монтажёр' } }), issuedEditor).work, true);
+}
+console.log('Production cell executor, creator, approver, viewer, revoked scopes and issued/external department rights: passed.');
 
 // API double follows the public routes and persists native server objects. It has
 // deliberately small pages and rejects stale revisions, secrets in bodies,
@@ -457,7 +587,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   const scheme = { media: '(prefers-color-scheme: dark)', matches: systemDark, addEventListener(type, handler) { if (type === 'change') schemeListeners.add(handler); } };
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler), matchMedia: () => scheme };
   const context = vm.createContext({
-    makeDemo, frameAt, totalDuration, StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
+    makeDemo, frameAt, totalDuration, mapStages, cellPermissions, renderMapPage, renderCellCard, StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
     location: { hash }, crypto: globalThis.crypto, console, navigator: { clipboard: { writeText: async text => { clipboard.push(text); } } }, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),

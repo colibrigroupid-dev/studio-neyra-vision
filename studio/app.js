@@ -1,6 +1,7 @@
 import { makeDemo } from './data.js';
 import { frameAt, totalDuration } from './timeline.js';
 import { StudioServer } from './storage.js';
+import { mapStages, cellPermissions, renderMapPage, renderCellCard } from './blocks/production-map/view.js';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -47,6 +48,11 @@ let writeQueue = Promise.resolve();
 let draftTimer;
 let draftProjectId;
 let busy = false;
+// Server map state stays outside local drafts and the saveProject baseline.
+let productionMap = { client: null, id: '', data: null, error: '', loading: false, requested: false };
+let mapStageFilter = 'all';
+let mapDepartmentFilter = 'all';
+let mapCellContext = null;
 const storageLabel = () => connecting ? t('подключение к серверу…', 'серверге қосылу…') : serverClient ? storageError ? t('ошибка сохранения', 'сақтау қатесі') : pendingWrites || draftTimer || busy ? t('сохраняется на сервере…', 'серверде сақталуда…') : t('сохранено на сервере', 'серверде сақталды') : t('только в этом браузере', 'тек осы браузерде');
 function updateStorageLabel() {
   document.querySelectorAll('[data-storage-label]').forEach(el => { el.textContent = storageLabel(); });
@@ -171,6 +177,7 @@ async function connectServer() {
 }
 const svgPaths = { arrow: 'M4 10h12M11 4l6 6-6 6', plus: 'M10 3v14M3 10h14', close: 'M4 4l12 12M16 4L4 16', check: 'M3 10l5 5L17 5', overview: 'M3 3h6v6H3zM12 3h5v6h-5zM3 12h6v5H3zM12 12h5v5h-5z', script: 'M5 2h8l3 3v13H5zM8 8h5M8 11h5M8 14h3', storyboard: 'M2 4h16v12H2zM7 4v12M13 4v12', animatic: 'M7 4l9 6-9 6z', shots: 'M2 5h16v12H2zM2 5l3-3h13v3M5 2l3 3M10 2l3 3', team: 'M7 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 18v-2a5 5 0 0 1 10 0v2M13 5a3 3 0 0 1 0 6M16 18v-2a5 5 0 0 0-2-4', post: 'M3 5h14M3 10h14M3 15h14M7 2v6M13 7v6M8 12v6', download: 'M10 2v10M6 8l4 4 4-4M3 14v4h14v-4', save: 'M3 3h12l2 2v12H3zM6 3v5h7V3M6 17v-6h8v6', back: 'M16 10H4M9 4l-6 6 6 6', pause: 'M6 4v12M14 4v12', upload: 'M10 13V3M6 7l4-4 4 4M3 13v4h14v-4' };
 const icon = name => `<svg class='icon' viewBox='0 0 20 20' aria-hidden='true'><path d='${svgPaths[name] || svgPaths.arrow}' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
+svgPaths.map = 'M2 3h16v14H2zM2 8h16M2 13h16M7 3v14M12 3v14';
 const btn = (label, action, primary = false, ico = '') => `<button class='btn ${primary ? 'primary' : ''}' data-action='${action}'>${e(label)}${ico ? icon(ico) : ''}</button>`;
 const brand = () => `<a class='brand' href='#/' aria-label='neyra.vision'>neyra<span>.vision</span></a>`;
 const langs = () => `<div class='langs' aria-label='${t('Язык интерфейса', 'Интерфейс тілі')}'><button data-lang='ru' class='${state.locale === 'ru' ? 'active' : ''}' aria-pressed='${state.locale === 'ru'}'>РУС</button><button data-lang='kk' class='${state.locale === 'kk' ? 'active' : ''}' aria-pressed='${state.locale === 'kk'}'>ҚАЗ</button></div>`;
@@ -220,7 +227,7 @@ const stages = () => [
   { id: 'team', title: t('Команда', 'Команда'), short: t('Один проект для всех', 'Бәріне ортақ бір жоба'), description: t('Режиссёр, сценарист, художник и продюсер работают в разделах одного проекта. У каждого понятная роль и зона ответственности.', 'Режиссер, сценарист, суретші мен продюсер бір жобаның бөлімдерінде жұмыс істейді. Әркімнің рөлі мен міндеті айқын.'), result: t('Участники · роли · доступ к разделам', 'Қатысушылар · рөлдер · бөлімдерге қолжетімділік') },
   { id: 'post', title: t('Постпродакшен', 'Постпродакшн'), short: t('Фильм становится целым', 'Фильм біртұтас туындыға айналады'), description: t('Планируйте монтаж, цвет, звук и VFX. Соберите работу отделов в один процесс завершения фильма.', 'Монтажды, түсті, дыбысты және VFX жұмыстарын жоспарлаңыз. Бөлімдердің жұмысын фильмді аяқтаудың ортақ үдерісіне біріктіріңіз.'), result: t('Монтаж · звук · цвет · VFX', 'Монтаж · дыбыс · түс · VFX') }
 ];
-const navItems = () => [{ id: 'overview', title: t('Обзор проекта', 'Жобаға шолу') }, ...stages()];
+const navItems = () => [{ id: 'overview', title: t('Обзор проекта', 'Жобаға шолу') }, { id: 'map', title: t('Карта', 'Карта') }, ...stages()];
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 4000); }
 function download(name, value, type = 'text/plain;charset=utf-8') { const url = URL.createObjectURL(new Blob(['\uFEFF', value], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function demoOpen() { if (!serverClient && state.projects.demo) state.activeId = 'demo'; go('overview'); }
@@ -286,9 +293,150 @@ function teamPage() {
 }
 const postInfo = () => ({ edit: [t('Монтаж', 'Монтаж'), t('Собрать утверждённые планы в последовательность фильма.', 'Бекітілген кадрларды фильмнің ретімен монтаждау.')], color: [t('Цвет', 'Түс'), t('Согласовать общий визуальный характер и цвет кадров.', 'Кадрлардың ортақ визуалды сипаты мен түсін келісу.')], sound: [t('Звук', 'Дыбыс'), t('Подготовить диалоги, атмосферу, музыку и финальный микс.', 'Диалогтарды, атмосфераны, музыканы және соңғы миксті дайындау.')], vfx: [t('VFX и графика', 'VFX және графика'), t('Проверить эффекты, титры и финальные правки.', 'Эффектілерді, титрлерді және соңғы түзетулерді тексеру.')] });
 function postPage() { const p = project(); if (!p.post.length) p.post = ['edit', 'color', 'sound', 'vfx'].map(id => ({ id, done: false })); return `${pageHeading(t('План постпродакшена', 'Постпродакшн жоспары'), t('Список работ для завершения фильма.', 'Фильмді аяқтауға арналған жұмыстар тізімі.'), `<span class='badge'>${p.post.filter(v => v.done).length} / ${p.post.length}</span>`)}<div class='post-list'>${p.post.map(task => `<div class='post-task ${task.done ? 'completed' : ''}'><input id='post-${task.id}' data-post='${task.id}' type='checkbox' ${task.done ? 'checked' : ''}><label for='post-${task.id}'><h2>${postInfo()[task.id][0]}</h2><p>${postInfo()[task.id][1]}</p></label>${status(task.done ? 'approved' : 'draft')}</div>`).join('')}</div><div class='access-note'>${t('В этом разделе планируем работу. Монтажные инструменты, звук, цветокоррекция и экспорт мастер-файла пока не подключены.', 'Бұл бөлімде жұмысты жоспарлаймыз. Монтаж құралдары, дыбыс, түс түзету және мастер-файл экспорты әлі қосылмаған.')}</div>`; }
+function mapPage() {
+  if (productionMap.client !== serverClient || productionMap.id !== state.activeId) {
+    productionMap = { client: serverClient, id: state.activeId, data: null, error: '', loading: false, requested: false };
+    mapStageFilter = 'all'; mapDepartmentFilter = 'all';
+  }
+  return renderMapPage({ p: project(), data: serverClient ? productionMap.data : null, locale: state.locale,
+    stage: mapStageFilter, department: mapDepartmentFilter,
+    loading: Boolean(serverClient && (!productionMap.requested || productionMap.loading)), error: productionMap.error });
+}
+async function loadProductionMap() {
+  const client = serverClient; const id = state.activeId;
+  if (!client || !project()) return;
+  productionMap = { client, id, data: null, loading: true, requested: true, error: '' };
+  render();
+  try {
+    if (!await flushDraft() || client !== serverClient) return;
+    // Reload the full baseline before accepting someone else's new revision.
+    // Updating only its revision would make later author edits unsafe.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const p = await client.loadProject(id);
+        if (client !== serverClient || id !== state.activeId) return;
+        state.projects[id] = p;
+        const reads = await Promise.allSettled([client.loadMap(id, p), client.loadApprovals(id, p), client.loadActivity(id, p)]);
+        const failure = reads.find(result => result.status === 'rejected');
+        if (failure) throw failure.reason;
+        const [data, approvals, activity] = reads.map(result => result.value);
+        client.checkReadRevision(await client.request('GET', `/api/projects/${encodeURIComponent(id)}`), p._revision);
+        if (client !== serverClient || id !== state.activeId) return;
+        productionMap.data = { ...data, approvals, activity, revision: data._revision ?? p._revision };
+        break;
+      } catch (error) {
+        if (error.code !== 'REVISION_CONFLICT' || attempt === 2) throw error;
+      }
+    }
+  } catch (error) {
+    productionMap.error = mapErrorMessage(error);
+  } finally {
+    if (productionMap.client === client && productionMap.id === id) productionMap.loading = false;
+    render();
+  }
+}
+function mapErrorMessage(error) {
+  if (error.code === 'DEPENDENCY_CONFLICT') {
+    let message = error.message;
+    if (state.locale === 'kk') {
+      const labels = { 'Сценарий': 'Сценарий', 'Разбивка': 'Сценарийді талдау', 'Герои': 'Кейіпкерлер', 'Локации': 'Локациялар', 'Раскадровка': 'Кадрлық жоспар', 'Кадры': 'Кадрлар', 'Видео': 'Бейне', 'Звук': 'Дыбыс', 'Монтаж': 'Монтаж' };
+      message = message.replace(/«([^»]+)»/g, (_, title) => `«${labels[title] || title}»`)
+        .replace('Этап ', 'Кезең ').replace(' заблокирован: ', ' басталмайды: ')
+        .replaceAll('не утверждён этап ', 'кезең бекітілмеген ')
+        .replaceAll('сцена отсутствует в текущей версии', 'қазіргі нұсқада көрініс жоқ')
+        .replaceAll('в проекте ещё нет сцен с утверждённым видео', 'жобада бейнесі бекітілген көріністер әлі жоқ')
+        .replaceAll(': сцена ', ': көрініс ').replaceAll(': тизер ', ': тизер ');
+    }
+    return `${message} ${t('Сначала утвердите указанные этапы, затем повторите действие.', 'Алдымен көрсетілген кезеңдерді бекітіп, әрекетті қайталаңыз.')}`;
+  }
+  if (error.status === 409) return t('Данные проекта изменились. Закройте карточку и нажмите «Обновить карту», затем повторите действие.', 'Жоба деректері өзгерді. Карточканы жауып, «Картаны жаңарту» батырмасын басыңыз да, әрекетті қайталаңыз.');
+  if (error.status === 403) return t('Нет права на это действие. Попросите руководителя проверить вашу роль и разделы.', 'Бұл әрекетке құқық жоқ. Жетекшіден рөліңіз бен бөлімдеріңізді тексеруді сұраңыз.');
+  if (error.status === 401) return t('Ключ недействителен. Подключитесь через «Сервер» с действующим ключом.', 'Кілт жарамсыз. «Сервер» арқылы жарамды кілтпен қосылыңыз.');
+  if (error.status === 0) return t('Сервер недоступен. Изменение не подтверждено; подключитесь и обновите карту перед повтором.', 'Сервер қолжетімсіз. Өзгеріс расталмады; қайталаудан бұрын қосылып, картаны жаңартыңыз.');
+  return error.message || t('Не удалось загрузить карту.', 'Картаны жүктеу мүмкін болмады.');
+}
+function mapCellDialog(object, stage) {
+  const data = productionMap.data;
+  if (!serverClient || productionMap.loading || !data || !mapStages(state.locale).some(item => item.id === stage)
+      || !['scene', 'teaser'].includes(object.type) || !data.objects.some(item => item.type === object.type && item.id === object.id)) return;
+  openDialog(`${dialogHead(t('Задача производства', 'Өндіріс тапсырмасы'))}${renderCellCard({ p: project(), data, object, stage, locale: state.locale })}`);
+  dialog.classList.add('map-dialog');
+  mapCellContext = { client: serverClient, id: state.activeId, revision: data.revision, object: { ...object }, stage };
+}
+function mapActionContext() {
+  const context = mapCellContext;
+  if (!context || context.client !== serverClient || context.id !== state.activeId) throw new Error(t('Откройте карточку заново.', 'Карточканы қайта ашыңыз.'));
+  const p = project();
+  if (p._revision !== context.revision) {
+    const error = new Error('Stale map'); error.status = 409; throw error;
+  }
+  const cell = productionMap.data?.cells.find(item => item.object.type === context.object.type && item.object.id === context.object.id && item.stage === context.stage);
+  const target = cell || { object: context.object, stage: context.stage };
+  return { context, p, cell, permissions: cellPermissions(target, p) };
+}
+function showMapCellError(error) {
+  const message = mapErrorMessage(error);
+  const field = document.querySelector('#map-cell-error');
+  if (field) { field.textContent = message; field.hidden = false; }
+  toast(message);
+}
+async function handleMapCellSubmit(form, data, intent = 'save') {
+  await runOperation(async () => {
+    try {
+      const { context, p, cell, permissions } = mapActionContext();
+      if (!permissions.work && !permissions.manage || !cell && !permissions.manage) return;
+      if (['done', 'awaiting'].includes(intent) && !permissions.work) return;
+      const payload = {};
+      if (permissions.work || permissions.manage) {
+        for (const name of ['comment', 'version', 'variant']) {
+          const value = data.get(name);
+          if (value !== null) payload[name] = name === 'comment' ? value : value.trim() || null;
+        }
+        const nextStatus = intent === 'done' ? 'done' : intent === 'awaiting' ? 'awaiting' : data.get('status');
+        if (nextStatus && nextStatus !== cell?.status && ['empty', 'working', 'done', 'awaiting'].includes(nextStatus)) payload.status = nextStatus;
+      }
+      if (permissions.manage) {
+        const assignee = data.get('assignee');
+        if (assignee !== null && assignee !== (cell?.assignee?.keyId || '')) {
+          const member = p.members.find(item => item.keyId === assignee && item.accessStatus !== 'revoked');
+          if (assignee && !member) throw new Error(t('Исполнитель больше не доступен. Обновите карту.', 'Орындаушы қолжетімсіз. Картаны жаңартыңыз.'));
+          payload.assignee = { keyId: assignee || null, name: member?.name || '' };
+        }
+        if (data.get('approverRole') !== null) payload.approverRole = data.get('approverRole');
+        if (data.get('dueAt') !== null) payload.dueAt = data.get('dueAt').trim() || null;
+      }
+      const version = Object.hasOwn(payload, 'version') ? payload.version : cell?.version;
+      const variant = Object.hasOwn(payload, 'variant') ? payload.variant : cell?.variant;
+      if (payload.status === 'awaiting' && !version && !variant) {
+        throw new Error(t('Укажите версию или вариант результата перед отправкой на утверждение.', 'Бекітуге жібермес бұрын нәтиженің нұсқасын немесе вариантын көрсетіңіз.'));
+      }
+      if (cell) await context.client.updateCell(context.id, cell.id, payload, p);
+      else await context.client.createCell(context.id, { object: context.object, stage: context.stage, ...payload }, p);
+      storageError = ''; dialog.close(); await loadProductionMap();
+      toast(t('Задача сохранена на сервере.', 'Тапсырма серверде сақталды.'));
+    } catch (error) { showMapCellError(error); }
+  });
+}
+async function handleMapVerdict(verdict) {
+  await runOperation(async () => {
+    try {
+      if (!['approved', 'returned'].includes(verdict)) return;
+      const { context, p, cell, permissions } = mapActionContext();
+      if (!permissions.approve || cell?.status !== 'awaiting' || !(cell.version || cell.variant)) return;
+      const comment = document.querySelector('#map-return-comment')?.value.trim() || '';
+      if (verdict === 'returned' && (!comment || /[\r\n]/.test(comment))) {
+        throw new Error(t('Напишите замечание одной строкой, чтобы вернуть работу.', 'Жұмысты қайтару үшін ескертуді бір жолға жазыңыз.'));
+      }
+      await context.client.createApproval(context.id, { object: context.object, stage: context.stage,
+        version: cell.version, variant: cell.variant, verdict, comment }, p);
+      storageError = ''; dialog.close(); await loadProductionMap();
+      toast(verdict === 'approved' ? t('Работа принята.', 'Жұмыс қабылданды.') : t('Работа возвращена с замечанием.', 'Жұмыс ескертумен қайтарылды.'));
+    } catch (error) { showMapCellError(error); }
+  });
+}
 function workspace(page) {
   const p = project();
-  const pages = { overview, script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
+  const pages = { overview, map: mapPage, script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
   if (!pages[page]) page = 'overview';
   const section = ['storyboard', 'shots', 'animatic'].includes(page) ? 'shots' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
   const denied = p?._denied?.includes(section);
@@ -296,7 +444,7 @@ function workspace(page) {
   return `<div class='workspace'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('РАБОЧЕЕ ПРОСТРАНСТВО', 'ЖҰМЫС КЕҢІСТІГІ')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}</a>`).join('')}</nav><div class='side-foot'>studio.neyra.vision<br>${t('СЦЕНАРИЙ → КАДР → ФИЛЬМ', 'СЦЕНАРИЙ → КАДР → ФИЛЬМ')}</div></aside><main class='work-main'><div class='prototype-note'>${t('ПРОТОТИП · Генерация изображений и видео пока не подключена.', 'ПРОТОТИП · Сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${content}</main></div></div>`;
 }
 
-function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog'); dialog.innerHTML = html; dialog.showModal(); }
+function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; mapCellContext = null; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog', 'map-dialog'); dialog.innerHTML = html; dialog.showModal(); }
 const dialogHead = (title, subtitle = '') => `<div class='dialog-header'><div><div class='eyebrow'>NEYRA.VISION / STUDIO</div><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div><button class='icon-btn' data-close aria-label='${t('Закрыть', 'Жабу')}'>${icon('close')}</button></div>`;
 const dialogActions = label => `<div class='dialog-actions'><button type='button' class='btn' data-close>${t('Отмена', 'Бас тарту')}</button><button type='submit' class='btn primary'>${label}${icon('arrow')}</button></div>`;
 function createDialog() { openDialog(`${dialogHead(t('Начнём новую историю.', 'Жаңа оқиғаны бастайық.'), t('Ваш текущий проект останется в списке проектов.', 'Қазіргі жобаңыз жобалар тізімінде сақталады.'))}<form id='create-form'>${serverClient ? `<label for='project-slug'>${t('Код проекта (латиница)', 'Жоба коды (латынша)')}</label><input id='project-slug' name='slug' maxlength='64'><small>${t('Необязательно. Этот код задаёт проект в правах ключа; пустое поле создаст новый код автоматически.', 'Міндетті емес. Бұл код кілт құқықтарындағы жобаны белгілейді; бос өріс жаңа кодты автоматты түрде жасайды.')}</small>` : ''}<label for='project-title'>${t('Название проекта', 'Жоба атауы')}</label><input id='project-title' name='title' required maxlength='120' placeholder='${t('Название вашего фильма', 'Фильміңіздің атауы')}'><label for='project-synopsis'>${t('О чём ваша история?', 'Оқиғаңыз не туралы?')}</label><textarea id='project-synopsis' name='synopsis' rows='3' maxlength='4000'></textarea>${dialogActions(t('Создать проект', 'Жоба құру'))}</form>`); }
@@ -380,6 +528,10 @@ function persistPreferences() {
   catch { toast(t('Не удалось сохранить настройки в браузере.', 'Браузерде параметрлерді сақтау мүмкін болмады.')); }
 }
 app.addEventListener('click', async event => {
+  const mapTarget = event.target.closest('[data-map-stage]');
+  if (mapTarget) {
+    mapCellDialog({ type: mapTarget.dataset.mapObjectType, id: mapTarget.dataset.mapObjectId }, mapTarget.dataset.mapStage); return;
+  }
   const lang = event.target.closest('[data-lang]');
   if (lang) { state.locale = lang.dataset.lang; persistPreferences(); render(); return; }
   const step = event.target.closest('[data-step]');
@@ -397,6 +549,7 @@ app.addEventListener('click', async event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
   const p = project();
   if (action === 'server') serverDialog();
+  else if (action === 'map-refresh') await runOperation(loadProductionMap);
   else if (action === 'demo') demoOpen();
   else if (action === 'create') createDialog();
   else if (['script', 'storyboard', 'team'].includes(action)) go(action);
@@ -444,6 +597,11 @@ app.addEventListener('input', event => {
   if (event.target.id === 'play-seek') { playTime = Number(event.target.value); updatePlayer(); }
 });
 app.addEventListener('change', async event => {
+  if (event.target.id === 'map-stage-filter' || event.target.id === 'map-department-filter') {
+    if (event.target.id === 'map-stage-filter') mapStageFilter = event.target.value;
+    else mapDepartmentFilter = event.target.value;
+    render(); document.querySelector(`#${event.target.id}`)?.focus(); return;
+  }
   if (event.target.id === 'script-paper-mode') {
     if (!['light', 'graphite'].includes(event.target.value)) return;
     paperPreference = event.target.value;
@@ -486,6 +644,8 @@ dialog.addEventListener('change', event => {
   });
 });
 dialog.addEventListener('click', async event => {
+  const verdict = event.target.closest('[data-map-verdict]');
+  if (verdict) { await handleMapVerdict(verdict.dataset.mapVerdict); return; }
   if (event.target.closest('[data-close]')) dialog.close();
   if (event.target.closest('[data-copy-member-key]')) {
     const field = document.querySelector('#issued-member-key');
@@ -527,6 +687,7 @@ dialog.addEventListener('click', async event => {
 dialog.addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.target; const data = new FormData(form);
+  if (form.id === 'map-cell-form') { await handleMapCellSubmit(form, data, event.submitter?.value || 'save'); return; }
   await runOperation(async () => {
     if (form.id === 'server-form') {
       await flushDraft(); await writeQueue;
@@ -595,12 +756,19 @@ dialog.addEventListener('submit', async event => {
 dialog.addEventListener('close', () => {
   // A close event can arrive after this native dialog has already reopened.
   if (dialog.open) return;
+  mapCellContext = null;
   const issued = Boolean(dialog.dataset.memberKey);
   if (issued) { dialog.innerHTML = ''; delete dialog.dataset.memberKey; }
   if (lastFocus?.isConnected) lastFocus.focus();
   else if (issued) document.querySelector("[data-action='member']")?.focus();
 });
-function render() { stopPlayback(); document.documentElement.lang = state.locale; document.title = t('neyra.vision — от истории к кадру', 'neyra.vision — оқиғадан кадрға'); app.innerHTML = route() === 'home' ? landing() : workspace(route()); app.inert = busy || connecting; if (route() === 'animatic') updatePlayer(); }
+function render() {
+  stopPlayback(); document.documentElement.lang = state.locale;
+  document.title = t('neyra.vision — от истории к кадру', 'neyra.vision — оқиғадан кадрға');
+  app.innerHTML = route() === 'home' ? landing() : workspace(route()); app.inert = busy || connecting;
+  if (route() === 'animatic') updatePlayer();
+  if (route() === 'map' && serverClient && project() && !busy && !connecting && !productionMap.requested) void runOperation(loadProductionMap);
+}
 window.addEventListener('hashchange', () => { render(); const hash = location.hash; if (['#process', '#project', '#about'].includes(hash)) document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' }); else window.scrollTo(0, 0); });
 applyPaperMode();
 render();
