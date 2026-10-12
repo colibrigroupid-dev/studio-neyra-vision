@@ -76,6 +76,14 @@ p{margin:0;text-wrap:pretty}.wrap{width:min(100% - 2*var(--gutter),1200px);margi
 .board__st{position:absolute;right:.5rem;top:.5rem;padding:.35em .6em;background:rgb(0 0 0/.7);font:500 .8rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;border-radius:3px;border:1px solid transparent}
 .board__st.g{color:var(--ok);border-color:color-mix(in oklch,var(--ok) 50%,transparent)}.board__st.y{color:var(--accent);border-color:color-mix(in oklch,var(--accent) 50%,transparent)}.board__st.r{color:var(--bad);border-color:color-mix(in oklch,var(--bad) 60%,transparent)}.board__st.d{color:var(--dim);border-color:var(--line)}
 .board__specs{display:flex;flex-wrap:wrap;gap:.3rem .9rem;font:.8rem var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.board__action{color:var(--muted)}.board__note{color:var(--accent)}.board__who{color:var(--dim);font-size:.95rem}
+/* паспорта героев и локаций */
+.passes{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.5rem 1.25rem;margin-top:.8rem}
+.pass{display:grid;gap:.5rem;border:1px solid var(--line-soft);border-radius:10px;padding:1rem;background:var(--bg-2)}
+.pass__frame{position:relative;aspect-ratio:16/9;background:var(--surface);border:1px solid var(--line);border-radius:4px;overflow:hidden;display:grid;place-items:center}
+.pass__frame img{width:100%;height:100%;object-fit:cover}.pass__empty{color:var(--dim);font-size:.9rem;padding:1rem;text-align:center}
+.pass h3{margin:.4rem 0 0;font-size:var(--step-1)}.pass .caps{font-size:.74rem}
+.pass__doc{max-width:none;font-size:.95rem}.pass__doc p{margin:0 0 .6em}.pass__doc .red{color:var(--accent)}
+.pass details{margin:.4rem 0 .8rem}.pass summary{cursor:pointer;color:var(--dim);font-size:.9rem}.pass .promt{display:block;margin-top:.5rem;font:.85rem/1.5 var(--mono);color:var(--muted);white-space:pre-wrap}
 /* команда */
 .creds{display:grid;gap:.4rem;max-width:60ch}.cred{display:grid;grid-template-columns:1fr 1fr;gap:1rem;padding:.6rem 0;border-bottom:1px solid var(--line-soft)}.cred__rol{color:var(--dim)}.cred__imya{color:var(--text)}.kontakt{margin-top:2rem;color:var(--muted)}
 @media (max-width:600px){.cred{grid-template-columns:1fr;gap:.1rem}}

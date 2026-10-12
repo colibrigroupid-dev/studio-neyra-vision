@@ -216,6 +216,47 @@ def build(slug, proekty, outdir):
             rows.append(f'<li class="{cls}"><span class="n">0{n}</span><span class="t"><b>{name}</b><small>{what}</small></span>{v}</li>')
         return f'<section id="put"><div class="wrap"><p class="caps">Путь проекта</p><h2>Этап {etap} из 6.</h2><ol class="put">{"".join(rows)}</ol></div></section>'
 
+    def read_passports(kind):
+        out = []
+        for f in sorted((proj / "03-vizual" / kind).glob("*/KARTOCHKA.md")):
+            t = f.read_text(encoding="utf-8"); meta = {}; body = t
+            if t.startswith("---"):
+                parts = t.split("---", 2)
+                if len(parts) >= 3:
+                    for ln in parts[1].splitlines():
+                        if ":" in ln:
+                            k, v = ln.split(":", 1); meta[k.strip()] = v.strip().strip('"')
+                    body = parts[2]
+            body = re.sub(r"^#\s+.*$", "", body, count=1, flags=re.M)
+            # промпт в <details>
+            body = re.sub(r"\*\*Промпт[^*]*\*\*\s*\n`([^`]+)`", lambda m: f"<details><summary>Показать, что уйдёт в генерацию</summary><code class='promt'>{html.escape(m.group(1))}</code></details>", body)
+            img = None
+            for ext in (".jpg", ".jpeg", ".png", ".webp"):
+                c = f.parent / ("portret" + ext) if kind == "geroi" else f.parent / ("plastina" + ext)
+                if c.exists(): img = c; break
+            src = None
+            if img:
+                dst = copy_img(img, imgdir, f"{kind[0]}-{f.parent.name}", 1280); src = "img/" + dst.name
+            out.append({"slug": f.parent.name, "meta": meta, "body": body.strip(), "src": src})
+        return out
+
+    def passports_html():
+        geroi, lok = read_passports("geroi"), read_passports("lokacii")
+        if not geroi and not lok: return ""
+        def card(p, kind):
+            m = p["meta"]; st = m.get("status", "chernovik")
+            st_ru = {"chernovik": "черновик", "utverzhden": "принят", "zamok": "замок"}.get(st, st)
+            if p["src"]:
+                inner = '<img src="' + p["src"] + '" width="1280" height="720" alt="" loading="lazy">'
+            else:
+                inner = '<span class="pass__empty">' + ("портрет появится после выбора ⭐" if kind == "geroi" else "мастер-пластина появится после выбора ⭐") + '</span>'
+            stcls = "g" if st != "chernovik" else "d"
+            head = '<div class="pass__frame">' + inner + '<span class="board__st ' + stcls + '">' + st_ru + '</span></div>'
+            sub = " · ".join(x for x in (m.get("rol", ""), (m.get("vozrast") and (m.get("vozrast") + " лет")) or "", m.get("tip", ""), m.get("vremya", "")) if x)
+            return f'<article class="pass">{head}<h3>{E(m.get("imya", p["slug"]))}</h3><p class="caps">{E(sub)}</p><div class="doc pass__doc">{md(p["body"])}</div></article>'
+        g = "".join(card(p, "geroi") for p in geroi); l = "".join(card(p, "lokacii") for p in lok)
+        return f'<section id="pasporta"><div class="wrap"><p class="caps">Паспорта · герои {len(geroi)} · локации {len(lok)}</p><h2>Кто и где — что никогда не меняется.</h2><p class="muted">Текст «что никогда не меняется» и промпты — черновики редактора; принимает автор. Портреты и пластины появятся после выбора варианта ⭐ — это и будет замок.</p>{("<h3 class=caps style=margin-top:2rem>Герои</h3><div class=passes>" + g + "</div>") if g else ""}{("<h3 class=caps style=margin-top:2rem>Локации</h3><div class=passes>" + l + "</div>") if l else ""}</div></section>'
+
     def karta_html():
         sec = section(proekt, "Карта производства")
         if not sec: return ""
@@ -270,6 +311,7 @@ def build(slug, proekty, outdir):
   <div><p class="caps">Решено</p><div class="doc">{md(resheno)}</div>{obs_html}</div>
 </div></section>
 {lenta_html()}
+{passports_html()}
 <section id="sinopsis"><div class="wrap"><p class="caps">Синопсис</p><h2>История.</h2><div class="doc cols">{md(sinopsis)}</div></div></section>
 {"<section id='razbivka'><div class='wrap'><p class='caps'>Разбивка сценария</p><h2>Сцены, герои, локации — из драфта.</h2><div class='doc' style='max-width:none'>"+md(razbivka)+"</div></div></section>" if razbivka else ""}
 <section id="geroi"><div class="wrap"><p class="caps">Герои</p><h2>Кто есть кто.</h2><div class="doc">{md(personazhi)}</div></div></section>
