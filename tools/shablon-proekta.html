@@ -51,6 +51,13 @@ p{margin:0;text-wrap:pretty}.wrap{width:min(100% - 2*var(--gutter),1200px);margi
 .put li .n{font-family:var(--mono)}.put li .t b{display:block;color:var(--muted);font-weight:500}.put li .t small{color:var(--dim)}
 .put li.done{color:var(--ok)}.put li.done .t b{color:var(--text)}.put li.now .t b{color:var(--text)}.put li.now .n{color:var(--accent)}.put li.now{background:color-mix(in oklch,var(--accent) 6%,transparent);margin-inline:-1rem;padding-inline:1rem}
 .gate{font-family:var(--mono);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}.put .gate{font-family:var(--mono)}
+/* карта производства */
+.karta{overflow-x:auto;margin-top:1.5rem;border:1px solid var(--line);border-radius:8px}.karta table{border-collapse:collapse;min-width:900px;width:100%;font-size:.92rem}
+.karta th{font-family:var(--mono);font-weight:400;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:.7rem .6rem;border-bottom:1px solid var(--line);text-align:left;background:var(--bg-2)}
+.karta th[scope=row]{font-family:var(--body);font-size:.95rem;letter-spacing:0;text-transform:none;color:var(--text);background:transparent;white-space:nowrap}
+.karta td{padding:.6rem .6rem;border-bottom:1px solid var(--line-soft);border-left:1px solid var(--line-soft);vertical-align:top;color:var(--muted);min-width:7.5rem}
+.karta tr:last-child td{border-bottom:0}.karta .k__sym{display:inline-block;width:1.3em;font-family:var(--mono)}.karta .k__txt{font-size:.88rem}
+.karta td.e{color:var(--dim)}.karta td.w{color:var(--text);background:color-mix(in oklch,var(--accent) 7%,transparent)}.karta td.w .k__sym{color:var(--accent)}.karta td.d{color:var(--text)}.karta td.d .k__sym,.karta td.a .k__sym{color:var(--ok)}.karta td.a{color:var(--text);background:color-mix(in oklch,var(--ok) 6%,transparent)}.karta td.r{color:var(--text);background:color-mix(in oklch,var(--bad) 10%,transparent)}.karta td.r .k__sym{color:var(--bad)}
 /* документы */
 .grid2{display:grid;gap:3rem;grid-template-columns:1fr}@media (min-width:900px){.grid2{grid-template-columns:7fr 5fr}}
 .doc{max-width:72ch}.doc p{margin:0 0 1em;color:var(--muted)}.doc b{color:var(--text);font-weight:500}.doc ul,.doc ol{margin:0 0 1em;padding-left:1.2em;color:var(--muted)}.doc li{margin:.25em 0}

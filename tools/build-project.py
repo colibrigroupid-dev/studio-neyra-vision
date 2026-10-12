@@ -215,6 +215,23 @@ def build(slug, proekty, outdir):
             rows.append(f'<li class="{cls}"><span class="n">0{n}</span><span class="t"><b>{name}</b><small>{what}</small></span>{v}</li>')
         return f'<section id="put"><div class="wrap"><p class="caps">Путь проекта</p><h2>Этап {etap} из 6.</h2><ol class="put">{"".join(rows)}</ol></div></section>'
 
+    def karta_html():
+        sec = section(proekt, "Карта производства")
+        if not sec: return ""
+        lines = [l for l in sec.splitlines() if l.startswith("|")]
+        if len(lines) < 3: return ""
+        head = [c.strip() for c in lines[0].strip("|").split("|")]
+        rows = [[c.strip() for c in l.strip("|").split("|")] for l in lines[2:]]
+        def cell(v):
+            ch = v[:1]
+            cls = {"○": "e", "●": "w", "✓": "d", "◆": "a", "✗": "r"}.get(ch, "e")
+            txt = v[1:].strip()
+            return f'<td class="k {cls}"><span class="k__sym">{E(ch) if ch in "○●✓◆✗" else ""}</span><span class="k__txt">{E(txt if ch in "○●✓◆✗" else v)}</span></td>'
+        thead = "".join(f"<th>{E(h)}</th>" for h in head)
+        tbody = "".join("<tr>" + f"<th scope='row'>{E(r[0])}</th>" + "".join(cell(c) for c in r[1:]) + "</tr>" for r in rows)
+        note = first_italic(sec)
+        return f'<section id="karta"><div class="wrap"><p class="caps">Карта производства</p><h2>Кто над чем работает сейчас.</h2>{"<p class=muted>"+inline(note)+"</p>" if note else ""}<div class="karta"><table><thead><tr>{thead}</tr></thead><tbody>{tbody}</tbody></table></div></div></section>'
+
     def people_html():
         rows = "".join(f'<div class="cred"><span class="cred__rol">{E(p["rol"])}</span><span class="cred__imya">{E(p["imya"])}</span></div>' for p in cfg.get("lyudi", []))
         k = cfg.get("kontakt", {})
@@ -246,6 +263,7 @@ def build(slug, proekty, outdir):
   </div>
 </header>
 {path_html()}
+{karta_html()}
 <section id="zamysel"><div class="wrap grid2">
   <div><p class="caps">Замысел</p><h2>О чём на самом деле.</h2><div class="doc big">{md(o_chyom)}</div>{podzag_html}</div>
   <div><p class="caps">Решено</p><div class="doc">{md(resheno)}</div>{obs_html}</div>
