@@ -86,13 +86,16 @@ class ApiTests(unittest.TestCase):
             self.httpd = None
 
     def request(self, method, path, payload=None, key="temporary-admin", headers=None,
-                include_headers=False):
+                include_headers=False, raw_body=None):
         headers = dict(headers or {})
         if key is not None:
             headers["X-Key"] = key
         body = None
         if payload is not None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        if raw_body is not None:
+            body = raw_body
             headers["Content-Type"] = "application/json"
         if self.transport == "inprocess":
             headers["Content-Length"] = str(len(body or b""))
@@ -176,6 +179,150 @@ class ApiTests(unittest.TestCase):
                 self.assertIn("code", result["error"])
                 self.api("POST", "/api/projects", {"slug": "film", "title": "Нет ключа"}, 401, key)
         self.assertFalse((self.data / "film" / "project.json").exists())
+
+    def test_restore_accepts_empty_post_with_or_without_content_length(self):
+        self.create()
+        self.api("PUT", "/api/projects/film/script", {"text": "Первая"})
+        version = self.api("POST", "/api/projects/film/versions", {}, 201)["data"]
+        path = f"/api/projects/film/versions/{version['id']}/restore"
+        self.api("PUT", "/api/projects/film/script", {"text": "Черновик с Content-Length"})
+        self.api("POST", path, status=201)
+        self.assertEqual(self.api("GET", "/api/projects/film/script")["data"]["text"], "Первая")
+        self.api("PUT", "/api/projects/film/script", {"text": "Черновик без Content-Length"})
+        incoming = (f"POST {path} HTTP/1.0\r\nX-Key: temporary-admin\r\n\r\n").encode("ascii")
+        connection = MemorySocket(incoming)
+        self.httpd.RequestHandlerClass(connection, ("127.0.0.1", 12345), self.httpd)
+        response = http.client.HTTPResponse(MemorySocket(bytes(connection.outgoing)))
+        response.begin()
+        status, restored, _ = self.read_response(response, False)
+        self.assertEqual(status, 201)
+        backup = self.api("GET", f"/api/projects/film/versions/{restored['data']['backupVersionId']}")["data"]
+        self.assertEqual(backup["script"]["text"], "Черновик без Content-Length")
+        self.assertEqual(self.api("GET", "/api/projects/film/script")["data"]["text"], "Первая")
+
+    def test_json_syntax_and_top_level_shape_have_documented_errors(self):
+        for payload in ([], [1], "text", True, 1, 1.5):
+            with self.subTest(payload=payload):
+                result = self.api("POST", "/api/projects", payload, 400)
+                self.assertEqual(result["error"]["code"], "BAD_REQUEST")
+        status, result, _ = self.request("POST", "/api/projects", raw_body=b"null")
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"]["code"], "BAD_REQUEST")
+        for raw in (b"{broken", b'{"slug":"a","slug":"b"}', b'{"n":NaN}', b"\xff"):
+            with self.subTest(raw=raw):
+                status, result, _ = self.request("POST", "/api/projects", raw_body=raw)
+                self.assertEqual(status, 400)
+                self.assertEqual(result["error"]["code"], "INVALID_JSON")
+        self.api("POST", "/api/projects", {}, 422)
+        self.assertFalse((self.data / "film" / "project.json").exists())
+
+    def test_cors_preflight_allows_role_headers_and_actual_errors_are_readable(self):
+        for origin in ("http://127.0.0.1:8769", "https://studio.example.org"):
+            with self.subTest(origin=origin):
+                status, _, raw, headers = self.request("OPTIONS", "/api/projects", key=None,
+                    headers={"Origin": origin, "Access-Control-Request-Method": "PATCH",
+                             "Access-Control-Request-Headers": "x-key, content-type, if-match"},
+                    include_headers=True)
+                self.assertEqual(status, 204)
+                self.assertEqual(raw, b"")
+                self.assertEqual(headers["Access-Control-Allow-Origin"], origin)
+                self.assertIn("X-Key", headers["Access-Control-Allow-Headers"])
+                self.assertIn("If-Match", headers["Access-Control-Allow-Headers"])
+                status, _, _, headers = self.request("GET", "/api/projects", key=None,
+                    headers={"Origin": origin}, include_headers=True)
+                self.assertEqual(status, 401)
+                self.assertEqual(headers["Access-Control-Allow-Origin"], origin)
+                self.assertEqual(headers["Access-Control-Expose-Headers"], "ETag")
+        for origin in ("null", "file://local", "https://example.org/path", "https://user@example.org"):
+            with self.subTest(origin=origin):
+                status, _, _, headers = self.request("OPTIONS", "/api/projects", key=None,
+                    headers={"Origin": origin}, include_headers=True)
+                self.assertEqual(status, 400)
+                self.assertNotIn("Access-Control-Allow-Origin", headers)
+        self.api("OPTIONS", "/api/projects", status=400, key=None,
+                 headers={"Origin": "https://example.org", "Access-Control-Request-Headers": "Authorization"})
+
+    def test_translations_comments_and_post_survive_round_trip_and_versions(self):
+        project_translations = {"ru": {"title": "Фильм", "synopsis": "Замысел"},
+                                "kk": {"title": "Фильм Ә", "synopsis": "Ғ Қ Ң Ө Ұ Ү Һ І"}}
+        created = self.api("POST", "/api/projects", {
+            "slug": "film", "title": "Фильм", "translations": project_translations}, 201)["data"]
+        self.assertEqual(created["translations"], project_translations)
+        self.api("PATCH", "/api/projects/film", {"synopsis": "Исправленный замысел"})
+        self.assertEqual(self.api("GET", "/api/projects/film")["data"]["translations"], project_translations)
+        scene_translations = {"ru": {"title": "Комната", "text": "Начало"},
+                              "kk": {"title": "Бөлме", "text": "Ә Ғ Қ"}}
+        scene = self.api("POST", "/api/projects/film/scenes", {
+            "id": "one", "title": "Комната", "translations": scene_translations}, 201)["data"]
+        self.assertEqual(scene["translations"], scene_translations)
+        self.api("PATCH", "/api/projects/film/scenes/one", {"text": "Авторский текст"})
+        shot_translations = {"ru": {"title": "Кадр", "description": "Описание", "prompt": "Свет", "movement": "Вперёд"},
+                             "kk": {"title": "Кадр Ә", "description": "Ғ", "prompt": "Қ", "movement": "Ң"}}
+        comments = [{"author": "<b>Автор</b>", "text": "<script>текст &</script>", "date": "13.10.2026"}]
+        shot = self.api("POST", "/api/projects/film/shots", {
+            "id": "shot-one", "sceneId": "one", "title": "Кадр",
+            "translations": shot_translations, "comments": comments}, 201)["data"]
+        self.assertEqual(shot["translations"], shot_translations)
+        self.assertEqual(shot["comments"], comments)
+        self.api("PATCH", "/api/projects/film/shots/shot-one", {"status": "review"})
+        self.assertEqual(self.api("GET", "/api/projects/film/shots/shot-one")["data"]["comments"], comments)
+        _, _, raw = self.request("GET", "/api/projects/film/shots/shot-one")
+        self.assertNotIn(b"<", raw)
+        self.assertNotIn(b"&", raw)
+        draft = self.api("PUT", "/api/projects/film/script", {
+            "text": "Русский", "translations": {"ru": "Исходный", "kk": "Қазақша"}})["data"]
+        self.assertEqual(draft["translations"], {"ru": "Русский", "kk": "Қазақша"})
+        version = self.api("POST", "/api/projects/film/versions", {}, 201)["data"]
+        changed = self.api("PUT", "/api/projects/film/script", {"text": "Новый русский"})["data"]
+        self.assertEqual(changed["translations"], {"ru": "Новый русский", "kk": "Қазақша"})
+        self.api("PATCH", "/api/projects/film/scenes/one", {
+            "translations": {"kk": {"title": "Жаңа бөлме"}}})
+        self.api("POST", f"/api/projects/film/versions/{version['id']}/restore", {}, 201)
+        restored = self.api("GET", "/api/projects/film/script")["data"]
+        self.assertEqual(restored["translations"], draft["translations"])
+        self.assertEqual(self.api("GET", "/api/projects/film/scenes/one")["data"]["translations"], scene_translations)
+        # Файл прежнего сервера не обязан содержать новое поле post.
+        project_path = self.data / "film" / "project.json"
+        persisted = json.loads(project_path.read_text(encoding="utf-8"))
+        persisted.pop("post")
+        project_path.write_text(json.dumps(persisted, ensure_ascii=False), encoding="utf-8")
+        self.assertEqual(self.api("GET", "/api/projects/film/post")["data"], {"tasks": []})
+        tasks = [{"id": "edit", "done": True}, {"id": "sound", "done": False}]
+        self.assertEqual(self.api("PUT", "/api/projects/film/post", {"tasks": tasks})["data"], {"tasks": tasks})
+        self.stop_server()
+        self.start_server()
+        self.assertEqual(self.api("GET", "/api/projects/film/post")["data"], {"tasks": tasks})
+        self.assertEqual(self.api("GET", "/api/projects/film/shots/shot-one")["data"]["translations"], shot_translations)
+
+    def test_new_fields_validate_shape_and_post_checks_section_and_write_role(self):
+        self.create()
+        for translations in ([], {"en": {}}, {"kk": []}, {"ru": {"secret": "Нет"}}):
+            with self.subTest(translations=translations):
+                self.api("PATCH", "/api/projects/film", {"translations": translations}, 422)
+        self.api("POST", "/api/projects/film/scenes", {"id": "one", "title": "Комната"}, 201)
+        for comments in ({}, [{"author": "A", "text": "B"}], [{"author": "A", "text": 5, "date": ""}],
+                         [{"author": "A", "text": "B", "date": "", "key": "secret"}]):
+            with self.subTest(comments=comments):
+                self.api("POST", "/api/projects/film/shots", {
+                    "sceneId": "one", "title": "Кадр", "comments": comments}, 422)
+        for tasks in ({}, [{"id": "unknown", "done": False}], [{"id": "edit", "done": 1}],
+                      [{"id": "edit", "done": True}, {"id": "edit", "done": False}]):
+            with self.subTest(tasks=tasks):
+                self.api("PUT", "/api/projects/film/post", {"tasks": tasks}, 422)
+        self.member("writer", ["overview", "script"])
+        self.api("GET", "/api/projects/film/post", status=403, key="temporary-writer")
+        config = json.loads(self.keys.read_text(encoding="utf-8"))
+        config["keys"].append({"id": "editor", "key": "temporary-editor", "role": "editor",
+                               "projects": ["film"], "sections": ["overview", "post"]})
+        config["keys"][3]["sections"].append("post")
+        self.keys.write_text(json.dumps(config), encoding="utf-8")
+        self.member("editor", ["overview", "post"])
+        self.member("viewer", ["overview", "post"])
+        self.api("PUT", "/api/projects/film/post", {"tasks": [{"id": "color", "done": True}]}, key="temporary-editor")
+        self.api("GET", "/api/projects/film/post", key="temporary-viewer")
+        self.api("PUT", "/api/projects/film/post", {"tasks": []}, 403, key="temporary-viewer")
+        self.assertEqual(self.api("GET", "/api/projects/film/post")["data"],
+                         {"tasks": [{"id": "color", "done": True}]})
 
     def test_role_membership_and_project_scope_are_checked(self):
         self.create()

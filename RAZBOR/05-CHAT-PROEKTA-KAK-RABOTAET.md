@@ -70,3 +70,14 @@
 **Печать.** `@media print`: раскадровка в две колонки на белом, hero и ленты скрыты — страницу можно отдать как PDF на встречу.
 
 **Как это проверяется.** По `PROVERKA.md` плюс чек-лист веб-мастера `priyomka.md`: пять секунд, 375 px, худшие данные (длинное имя, пустое поле «нет фото»), казахские буквы, консоль. Первый проект для сборки — «Ер Төстік»: есть синопсис, персонажи, поэпизодник, кадры героев.
+
+## 7. Что выложил Higgsfield на GitHub и что из этого брать (проверено поиском 13.10.2026)
+
+Сама платформа и модели Higgsfield закрыты, вирусная новость «CEO открыл всю компанию» — неточность. Открыто три вещи:
+- `higgsfield-ai/higgsfield` — инфраструктура для обучения больших моделей на GPU (Apache 2.0). Нам не нужно.
+- `higgsfield-ai/cli` — командная строка `higgsfield` / `hf` (MIT): вход через устройство без API-ключа, генерация из терминала. Это путь для Claude Code и Codex без коннектора.
+- `higgsfield-ai/skills` — навыки для агентов: `generate` (картинки и видео через несколько моделей), `soul` (обучение героя по фотографиям), `product-photoshoot`. Ставятся `npx skills add higgsfield-ai/skills`.
+
+Что берём: (1) **CLI + навык `generate`** как второй канал к Nano Banana и Seedance для членов команды без своих ключей — но только после того, как Александр посмотрит, что именно ставится (сторонний установщик запускает чужой код, правило навыка веб-мастера); (2) **идею `soul`** — «герой из 5–20 фото» — это наш замок внешности героя в карточке; (3) формат их навыков как образец для наших `nano-banana`/`seedance` в Киностанции. Что не берём: клоны «Open-Higgsfield» (anil-matcha, Autom8AI) — это витрины поверх чужих платных API, не инструмент.
+
+Источники: [Higgsfield Inc. · GitHub](https://github.com/higgsfield-ai), [репозитории](https://github.com/orgs/higgsfield-ai/repositories), [справка о CLI](https://higgsfield.ai/creator-hub/help-center/mcp-cli/how-do-i-access-higgsfield-via-cli), [разбор заявления об open source](https://nowrap.ai/news/higgsfield-open-source-claim-github), [Open-Higgsfield-AI (клон)](https://github.com/Autom8AI/Open-Higgsfield-AI).

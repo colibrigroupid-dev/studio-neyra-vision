@@ -180,8 +180,11 @@ def authorize(principal, slug, section, project=None, write=False, manager=False
 
 
 def metadata(project):
-    return {field: project[field] for field in
-            ("slug", "title", "synopsis", "language", "createdAt", "updatedAt", "revision")}
+    result = {field: project[field] for field in
+              ("slug", "title", "synopsis", "language", "createdAt", "updatedAt", "revision")}
+    if "translations" in project:
+        result["translations"] = project["translations"]
+    return result
 
 
 def get_item(items, item_id):
@@ -191,23 +194,47 @@ def get_item(items, item_id):
     raise ApiError(404, "NOT_FOUND", "Объект не найден.")
 
 
+def translations_input(value, names=None):
+    if not isinstance(value, dict) or set(value) - {"ru", "kk"}:
+        invalid("translations должен быть объектом с языками ru и kk.")
+    result = {}
+    for language, translation in value.items():
+        if names is None:
+            result[language] = text(translation, "translations." + language)
+            continue
+        if not isinstance(translation, dict):
+            invalid("Перевод должен быть объектом JSON.")
+        fields(translation, names)
+        result[language] = {name: text(item, "translations." + language + "." + name,
+                                      names[name])
+                            for name, item in translation.items()}
+    return result
+
+
 def script_input(body, current):
-    fields(body, ("text", "language", "status"), ("text",))
-    return {
+    fields(body, ("text", "language", "status", "translations"), ("text",))
+    result = {
         "text": text(body["text"], "text"),
         "language": enum(body.get("language", current["language"]), ("ru", "kk"), "language"),
         "status": enum(body.get("status", "draft"), STATUSES, "status"),
         "updatedAt": timestamp(),
     }
+    if "translations" in body or "translations" in current:
+        result["translations"] = (translations_input(body["translations"])
+                                  if "translations" in body else copy.deepcopy(current["translations"]))
+        result["translations"][result["language"]] = result["text"]
+    return result
 
 
 def scene_input(body, create=False):
-    fields(body, ("id", "title", "text") if create else ("title", "text"),
+    fields(body, ("id", "title", "text", "translations") if create else ("title", "text", "translations"),
            ("title",) if create else ())
     result = {}
     for name, limit in (("title", 240), ("text", 1000000)):
         if name in body:
             result[name] = text(body[name], name, limit, required=(name == "title"))
+    if "translations" in body:
+        result["translations"] = translations_input(body["translations"], {"title": 240, "text": 1000000})
     if create:
         result.update(id=identifier(body.get("id", uuid.uuid4().hex)))
         result.setdefault("text", "")
@@ -229,7 +256,7 @@ def media_url(value, name):
 
 def shot_input(body, project, create=False):
     names = ("sceneId", "title", "description", "prompt", "duration", "status",
-             "owner", "lens", "movement", "imageUrl", "videoUrl")
+             "owner", "lens", "movement", "imageUrl", "videoUrl", "translations", "comments")
     fields(body, names + (("id",) if create else ()), ("sceneId", "title") if create else ())
     result = {}
     for name in ("title", "description", "prompt", "owner", "lens", "movement"):
@@ -250,12 +277,47 @@ def shot_input(body, project, create=False):
     for name in ("imageUrl", "videoUrl"):
         if name in body:
             result[name] = media_url(body[name], name)
+    if "translations" in body:
+        result["translations"] = translations_input(body["translations"], {
+            "title": 240, "description": 8000, "prompt": 8000, "movement": 8000})
+    if "comments" in body:
+        comments = body["comments"]
+        if not isinstance(comments, list) or len(comments) > 500:
+            invalid("comments должен быть списком не более 500 комментариев.")
+        result["comments"] = []
+        for comment in comments:
+            if not isinstance(comment, dict):
+                invalid("Комментарий должен быть объектом JSON.")
+            fields(comment, ("author", "text", "date"), ("author", "text", "date"))
+            result["comments"].append({
+                "author": text(comment["author"], "author", 240, required=True),
+                "text": text(comment["text"], "comment.text", 8000),
+                "date": text(comment["date"], "date", 80),
+            })
     if create:
         result.update(id=identifier(body.get("id", uuid.uuid4().hex)), aspectRatio="16:9", needsReview=False)
         for name in ("description", "prompt", "owner", "lens", "movement", "imageUrl", "videoUrl"):
             result.setdefault(name, "")
         result.setdefault("duration", 5)
         result.setdefault("status", "draft")
+    return result
+
+
+def post_input(body):
+    fields(body, ("tasks",), ("tasks",))
+    tasks = body["tasks"]
+    if not isinstance(tasks, list) or len(tasks) > 4:
+        invalid("tasks должен быть списком не более четырёх задач.")
+    result, ids = [], set()
+    for task in tasks:
+        if not isinstance(task, dict):
+            invalid("Задача поста должна быть объектом JSON.")
+        fields(task, ("id", "done"), ("id", "done"))
+        task_id = enum(task["id"], ("edit", "color", "sound", "vfx"), "task.id")
+        if task_id in ids or not isinstance(task["done"], bool):
+            invalid("ID задач не повторяются; done должен быть boolean.")
+        ids.add(task_id)
+        result.append({"id": task_id, "done": task["done"]})
     return result
 
 
@@ -353,7 +415,27 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
+        if getattr(self, "api_response", False):
+            self.send_header("Vary", "Origin")
+            origin = self.cors_origin()
+            if origin is not None:
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Access-Control-Expose-Headers", "ETag")
         super().end_headers()
+
+    def cors_origin(self):
+        origins = self.headers.get_all("Origin", [])
+        if len(origins) != 1:
+            return None
+        try:
+            origin = urlsplit(origins[0])
+            if (origin.scheme in ("http", "https") and origin.hostname and origin.port != 0
+                    and origin.username is None and origin.password is None
+                    and not origin.path and not origin.query and not origin.fragment):
+                return origins[0]
+        except ValueError:
+            pass
+        return None
 
     def send_json(self, status, payload, revision=None, head=False):
         # Экранирование на проводе сохраняет текст автора после JSON.parse.
@@ -371,15 +453,19 @@ class Handler(SimpleHTTPRequestHandler):
         if not head:
             self.wfile.write(data)
 
-    def body(self):
+    def body(self, allow_empty=False):
         if self.headers.get("Transfer-Encoding") is not None:
             raise ApiError(400, "BAD_REQUEST", "Transfer-Encoding не поддерживается.")
         lengths = self.headers.get_all("Content-Length", [])
+        if allow_empty and not lengths:
+            return {}
         if len(lengths) != 1 or not re.fullmatch(r"[0-9]{1,10}", lengths[0]):
             raise ApiError(400, "BAD_REQUEST", "Нужен корректный Content-Length.")
         size = int(lengths[0])
         if size > MAX_BODY:
             raise ApiError(413, "PAYLOAD_TOO_LARGE", "Размер JSON превышает 2 МиБ.")
+        if allow_empty and size == 0:
+            return {}
         if self.headers.get_content_type() != "application/json":
             raise ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Нужен Content-Type: application/json.")
         try:
@@ -390,7 +476,7 @@ class Handler(SimpleHTTPRequestHandler):
         except (ValueError, RecursionError):
             raise ApiError(400, "INVALID_JSON", "Некорректный JSON в кодировке UTF-8.") from None
         if not isinstance(value, dict):
-            invalid("Тело запроса должно быть объектом JSON.")
+            raise ApiError(400, "BAD_REQUEST", "Тело запроса должно быть объектом JSON.")
         return value
 
     def principal(self):
@@ -453,7 +539,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return 200, self.listing(projects, query), None
             if method == "POST":
                 body = self.body()
-                fields(body, ("slug", "title", "synopsis", "language"), ("slug", "title"))
+                fields(body, ("slug", "title", "synopsis", "language", "translations"), ("slug", "title"))
                 slug = identifier(body["slug"], slug=True)
                 authorize(principal, slug, "overview", write=True, manager=True)
                 if store.path(slug).exists():
@@ -464,13 +550,15 @@ class Handler(SimpleHTTPRequestHandler):
                     "synopsis": text(body.get("synopsis", ""), "synopsis", 8000),
                     "language": enum(body.get("language", "ru"), ("ru", "kk"), "language"),
                     "createdAt": date, "updatedAt": date, "revision": 1,
-                    "scenes": [], "shots": [], "versions": [],
+                    "scenes": [], "shots": [], "versions": [], "post": [],
                     "members": [{"id": uuid.uuid4().hex, "name": "Создатель проекта",
                                  "role": principal["role"], "keyId": principal["id"],
                                  "sections": sorted(principal["sections"])}],
                 }
                 project["script"] = {"text": "", "language": project["language"],
                                      "status": "draft", "updatedAt": date}
+                if "translations" in body:
+                    project["translations"] = translations_input(body["translations"], {"title": 240, "synopsis": 8000})
                 store.save(project)
                 return 201, {"data": metadata(project)}, 1
             raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
@@ -494,12 +582,14 @@ class Handler(SimpleHTTPRequestHandler):
             if method != "PATCH":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
             body = self.body()
-            fields(body, ("title", "synopsis", "language"))
+            fields(body, ("title", "synopsis", "language", "translations"))
             for name, limit in (("title", 240), ("synopsis", 8000)):
                 if name in body:
                     project[name] = text(body[name], name, limit, required=(name == "title"))
             if "language" in body:
                 project["language"] = enum(body["language"], ("ru", "kk"), "language")
+            if "translations" in body:
+                project["translations"] = translations_input(body["translations"], {"title": 240, "synopsis": 8000})
             data, status = metadata(project), 200
         elif parts[3] == "script" and len(parts) == 4:
             if method == "GET":
@@ -507,11 +597,19 @@ class Handler(SimpleHTTPRequestHandler):
             if method != "PUT":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
             draft = script_input(self.body(), project["script"])
-            if draft["text"] != project["script"]["text"]:
+            if (draft["text"] != project["script"]["text"]
+                    or draft.get("translations") != project["script"].get("translations")):
                 for shot in project["shots"]:
                     shot["needsReview"] = True
             project["script"] = draft
             data, status = draft, 200
+        elif parts[3] == "post" and len(parts) == 4:
+            if method == "GET":
+                return 200, {"data": {"tasks": project.get("post", [])}}, project["revision"]
+            if method != "PUT":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
+            project["post"] = post_input(self.body())
+            data, status = {"tasks": project["post"]}, 200
         elif parts[3] == "versions":
             if method == "GET" and len(parts) == 4:
                 # Тексты и сцены — только в GET отдельной версии.
@@ -525,7 +623,7 @@ class Handler(SimpleHTTPRequestHandler):
                 fields(body, ("label",))
                 data = snapshot(project, principal, "saved", text(body.get("label", ""), "label", 240))
             elif method == "POST" and len(parts) == 6 and parts[5] == "restore":
-                fields(self.body(), ())
+                fields(self.body(allow_empty=True), ())
                 source = get_item(project["versions"], parts[4])
                 backup = snapshot(project, principal, "backup")
                 project["script"] = copy.deepcopy(source["script"])
@@ -640,6 +738,22 @@ class Handler(SimpleHTTPRequestHandler):
                     or any(p in (".", "..") for p in path.split("/"))):
                 raise ApiError(400, "BAD_REQUEST", "Некорректный путь.")
             if path == "/api" or path.startswith("/api/"):
+                self.api_response = True
+                if self.command == "OPTIONS":
+                    requested_method = self.headers.get("Access-Control-Request-Method", "GET")
+                    requested_headers = {name.strip().lower() for name in
+                                         self.headers.get("Access-Control-Request-Headers", "").split(",") if name.strip()}
+                    if (requested_method not in ("GET", "POST", "PUT", "PATCH", "DELETE")
+                            or requested_headers - {"x-key", "content-type", "if-match"}
+                            or (self.headers.get("Origin") is not None and self.cors_origin() is None)):
+                        raise ApiError(400, "BAD_REQUEST", "Некорректный CORS preflight.")
+                    self.send_response(204)
+                    self.send_header("Content-Length", "0")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+                    self.send_header("Access-Control-Allow-Headers", "X-Key, Content-Type, If-Match")
+                    self.end_headers()
+                    return
                 principal, keys = self.principal()
                 if head or self.command not in ("GET", "POST", "PUT", "PATCH", "DELETE"):
                     raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
