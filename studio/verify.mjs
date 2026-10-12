@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { frameAt, totalDuration } from './timeline.js';
 import { makeDemo } from './data.js';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js';
 
 const shots = [{ duration: 4 }, { duration: 3 }, { duration: 5 }];
 assert.equal(totalDuration(shots), 12);
@@ -26,6 +28,8 @@ console.log('Timeline boundaries, independent project drafts and bilingual text:
 const clone = value => structuredClone(value);
 const date = '2026-10-13T00:00:00Z';
 const sections = ['overview', 'script', 'breakdown', 'heroes', 'locations', 'world', 'storyboard', 'shots', 'continuity', 'sound', 'edit', 'plan', 'journal', 'animatic', 'team', 'post'];
+const productionStages = ['script', 'breakdown', 'heroes', 'locations', 'storyboard', 'shots', 'video', 'sound', 'edit'];
+const legacyStageSections = { script: 'script', breakdown: 'script', heroes: 'storyboard', locations: 'storyboard', storyboard: 'storyboard', shots: 'shots', video: 'animatic', sound: 'post', edit: 'post' };
 const secrets = {
   'admin-secret': { id: 'admin-local', role: 'admin', sections },
   'writer-secret': { id: 'writer-local', role: 'writer', sections: ['overview', 'script'] },
@@ -37,7 +41,7 @@ const baseProject = slug => ({
   slug, title: `Проект ${slug}`, synopsis: '', language: 'ru', createdAt: date, updatedAt: date, revision: 1,
   translations: { ru: { title: `Проект ${slug}`, synopsis: '' }, kk: { title: `Жоба ${slug}`, synopsis: '' } },
   script: { text: '', language: 'ru', status: 'draft', updatedAt: date, translations: { ru: '', kk: '' } },
-  scenes: [], shots: [], versions: [], members: [], post: []
+  scenes: [], shots: [], versions: [], members: [], post: [], cells: [], approvals: [], activity: []
 });
 const metadata = p => Object.fromEntries(['slug', 'title', 'synopsis', 'language', 'createdAt', 'updatedAt', 'revision', 'translations'].filter(k => k in p).map(k => [k, clone(p[k])]));
 const reply = (status, data, revision) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...(revision ? { ETag: `"${revision}"` } : {}) } });
@@ -51,6 +55,19 @@ function nativeApi(slugs = ['film']) {
   let fail = null;
   const manageTeam = (principal, p) => ['admin', 'producer', 'director'].includes(principal.role) && (principal.role === 'admin' || p.members.some(m => (principal.memberId ? m.id === principal.memberId : m.keyId === principal.id) && m.accessStatus !== 'revoked'));
   const allowed = (principal, p, section) => principal.sections.includes(section) && (principal.role === 'admin' || p.members.some(m => (principal.memberId ? m.id === principal.memberId && principal.slug === p.slug : m.keyId === principal.id) && m.accessStatus !== 'revoked' && m.sections.includes(section)));
+  const approvalAllowed = (principal, p, cell) => {
+    const section = principal.memberId ? cell.stage === 'video' ? 'animatic' : cell.stage : legacyStageSections[cell.stage];
+    return principal.role !== 'viewer' && allowed(principal, p, 'overview') && allowed(principal, p, section)
+      && !({ writer: ['breakdown'], editor: ['sound'] })[principal.role]?.includes(section)
+      && ['admin', 'producer', cell.approverRole].includes(principal.role);
+  };
+  const productionMap = (p, principal) => {
+    const objects = [...p.scenes.map(s => ({ type: 'scene', id: s.id })), ...p.shots.map(s => ({ type: 'shot', id: s.id }))];
+    for (const cell of p.cells) if (!objects.some(o => o.type === cell.object.type && o.id === cell.object.id)) objects.push(clone(cell.object));
+    return { project: p.slug, stages: productionStages, objects, cells: p.cells,
+      grid: objects.map(object => ({ object, stages: Object.fromEntries(productionStages.map(stage => [stage, p.cells.find(c => c.stage === stage && c.object.type === object.type && c.object.id === object.id) || null])) })),
+      myTasks: p.cells.filter(c => c.assignee.keyId === principal.id), awaitingMe: p.cells.filter(c => c.status === 'awaiting' && approvalAllowed(principal, p, c)) };
+  };
   const publicMember = member => ({ ...clone(member), keySource: member.keyId?.startsWith('member-') ? 'issued' : 'external', accessStatus: member.accessStatus || (member.keyId ? 'active' : 'unavailable') });
   const paginate = (items, url) => {
     const offset = Number(url.searchParams.get('offset') || 0);
@@ -83,7 +100,7 @@ function nativeApi(slugs = ['film']) {
     const issuedMember = issued && projects.get(issued.slug)?.members.find(m => m.id === issued.memberId && m.accessStatus === 'active');
     const principal = secrets[key] || (issuedMember && { id: issuedMember.keyId, memberId: issuedMember.id, slug: issued.slug, role: issuedMember.role, sections: issuedMember.sections });
     if (!principal) return errorReply(401, 'UNAUTHORIZED');
-    if (fail?.(call)) { fail = null; return errorReply(500, 'STORAGE_WRITE_FAILED'); }
+    if (fail?.matcher(call)) { const failure = fail; fail = null; return errorReply(failure.status, failure.code); }
     const parts = url.pathname.split('/').filter(Boolean);
     if (parts[0] !== 'api' || parts[1] !== 'projects') return errorReply(404, 'NOT_FOUND');
     if (parts.length === 2) {
@@ -102,7 +119,7 @@ function nativeApi(slugs = ['film']) {
     const p = projects.get(parts[2]);
     if (!p) return errorReply(404, 'NOT_FOUND');
     const collection = parts[3];
-    const section = ({ scenes: 'script', versions: 'script', members: 'team' })[collection] || collection || 'overview';
+    const section = ({ scenes: 'script', versions: 'script', members: 'team', map: 'overview', cells: 'overview', approvals: 'overview', activity: 'overview' })[collection] || collection || 'overview';
     if (!allowed(principal, p, section) && !(collection === 'members' && manageTeam(principal, p))) return errorReply(403, 'FORBIDDEN');
     if (collection === 'members' && method !== 'GET' && !manageTeam(principal, p)) return errorReply(403, 'FORBIDDEN');
     if (method !== 'GET') {
@@ -112,10 +129,36 @@ function nativeApi(slugs = ['film']) {
     let data;
     let status = 200;
     if (!collection) {
-      if (method === 'GET') return reply(200, { data: { ...metadata(p), capabilities: { manageTeam: manageTeam(principal, p) }, principal: { id: principal.id, role: principal.role, sections: clone(principal.sections) } } }, p.revision);
+      if (method === 'GET') return reply(200, { data: { ...metadata(p), capabilities: { manageTeam: manageTeam(principal, p) }, principal: { id: principal.id, role: principal.role, projects: principal.slug ? [principal.slug] : ['*'], sections: clone(principal.sections) } } }, p.revision);
       checkFields(body, ['title', 'synopsis', 'language', 'translations']);
       Object.assign(p, clone(body));
       data = metadata(p);
+    } else if (collection === 'map') {
+      assert.equal(method, 'GET');
+      assert.equal(url.search, '', '/map does not accept pagination parameters');
+      return reply(200, { data: clone(productionMap(p, principal)) }, p.revision);
+    } else if (collection === 'cells') {
+      assert.equal(method, 'GET');
+      return reply(200, parts[4] ? { data: clone(p.cells.find(c => c.id === parts[4])) } : paginate(p.cells, url), p.revision);
+    } else if (collection === 'activity') {
+      assert.equal(method, 'GET');
+      return reply(200, paginate(p.activity, url), p.revision);
+    } else if (collection === 'approvals') {
+      if (method === 'GET') return reply(200, paginate(p.approvals, url), p.revision);
+      assert.equal(method, 'POST');
+      checkFields(body, ['object', 'stage', 'version', 'variant', 'verdict', 'comment']);
+      const cell = p.cells.find(c => c.stage === body.stage && c.object.type === body.object.type && c.object.id === body.object.id);
+      if (!cell) return errorReply(404, 'NOT_FOUND');
+      if (!approvalAllowed(principal, p, cell)) return errorReply(403, 'FORBIDDEN');
+      if (body.version !== cell.version || body.variant !== cell.variant) return errorReply(409, 'APPROVAL_CONFLICT');
+      if (cell.status !== 'awaiting') return errorReply(409, 'CELL_NOT_AWAITING');
+      assert.ok(['approved', 'returned'].includes(body.verdict));
+      assert.ok(body.version || body.variant);
+      data = { ...clone(body), id: `approval-${++sequence}`, project: p.slug, cellId: cell.id, keyId: principal.id, createdAt: date };
+      p.approvals.push(data);
+      Object.assign(cell, { status: body.verdict, comment: body.comment, updatedAt: date });
+      p.activity.push({ id: `activity-${sequence}`, sequence: p.activity.length + 1, action: `approval.${body.verdict}`, object: clone(body.object), stage: body.stage, cellId: cell.id, version: body.version, variant: body.variant, status: body.verdict, approvalId: data.id, keyId: principal.id, name: principal.id, createdAt: date });
+      status = 201;
     } else if (collection === 'script') {
       if (method === 'GET') return reply(200, { data: clone(p.script) }, p.revision);
       assert.equal(method, 'PUT');
@@ -219,7 +262,7 @@ function nativeApi(slugs = ['film']) {
     if (!collection) data = metadata(p);
     return reply(status, { data: clone(data) }, p.revision);
   };
-  return { projects, calls, fetchImpl, failOnce: matcher => { fail = matcher; } };
+  return { projects, calls, fetchImpl, failOnce: (matcher, status = 500, code = 'STORAGE_WRITE_FAILED') => { fail = { matcher, status, code }; } };
 }
 
 const { StudioServer } = await import('./storage.js');
@@ -420,22 +463,26 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   const storageErrorNode = { textContent: '', hidden: true };
   const element = () => ({
     listeners: new Map(), innerHTML: '', textContent: '', value: '', dataset: {}, inert: false, open: false,
-    classList: { add() {}, remove() {}, toggle() {} }, style: {}, isConnected: true,
+    classList: { values: new Set(), add(...names) { names.forEach(name => this.values.add(name)); }, remove(...names) { names.forEach(name => this.values.delete(name)); }, toggle(name, force) { const enabled = force ?? !this.values.has(name); enabled ? this.values.add(name) : this.values.delete(name); return enabled; }, contains(name) { return this.values.has(name); } }, style: {}, isConnected: true,
     addEventListener(type, callback) { this.listeners.set(type, callback); },
     showModal() { this.open = true; }, close() { this.open = false; this.listeners.get('close')?.({}); },
     focus() {}, select() {}, click() {}, setAttribute() {}, querySelector() { return null; }, querySelectorAll() { return []; }
   });
-  const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element();
+  const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element(), mapControl = element(), mapSurface = element(), mapErrorNode = element();
   if (queuedDialogClose) dialog.close = function () { this.open = false; queueMicrotask(() => this.listeners.get('close')?.({})); };
   const memberRoleHint = element(), issuedMemberKey = element();
   let memberSections = [];
-  dialog.querySelectorAll = selector => selector === "input[name='sections']" ? memberSections : [];
+  let mapSubmitButtons = [];
+  dialog.querySelector = selector => selector === '[data-map-error]' ? mapErrorNode : null;
+  dialog.querySelectorAll = selector => selector === "input[name='sections']" ? memberSections : selector === '#map-approval-form button[type="submit"]' ? mapSubmitButtons : [];
   let dialogMarkup = '';
   Object.defineProperty(dialog, 'innerHTML', { get: () => dialogMarkup, set: value => {
     dialogMarkup = value;
     issuedMemberKey.value = /<textarea\b[^>]*id=['"]issued-member-key['"][^>]*>([\s\S]*?)<\/textarea>/.exec(value)?.[1] || '';
     memberRoleHint.textContent = /id=['"]member-role-hint['"][^>]*>([^<]*)/.exec(value)?.[1] || '';
     memberSections = [...value.matchAll(/<input\b[^>]*name=['"]sections['"][^>]*>/g)].map(([tag]) => ({ value: /value=['"]([^'"]*)['"]/.exec(tag)?.[1] || '', checked: /\bchecked\b/.test(tag), disabled: /\bdisabled\b/.test(tag) }));
+    mapSubmitButtons = [...value.matchAll(/<button\b[^>]*type=['"]submit['"][^>]*name=['"]verdict['"][^>]*>/g)].map(([tag]) => ({ value: /value=['"]([^'"]*)['"]/.exec(tag)?.[1] || '', disabled: /\bdisabled\b/.test(tag) }));
+    mapErrorNode.textContent = ''; mapErrorNode.hidden = true;
   } });
   paperControl.id = 'script-paper-mode'; paperControl.dataset.paperMode = '';
   let markup = '', markupWrites = 0;
@@ -444,20 +491,24 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     label.textContent = /data-storage-label[^>]*>([^<]*)/.exec(value)?.[1] || '';
     const options = /<select\b[^>]*id=['"]script-paper-mode['"][^>]*>([\s\S]*?)<\/select>/.exec(value)?.[1];
     paperControl.value = options ? /<option\b[^>]*value=['"]([^'"]+)['"][^>]*\bselected\b/.exec(options)?.[1] || 'light' : '';
+    const mapOptions = /<select\b[^>]*id=['"]production-map-mode['"][^>]*>([\s\S]*?)<\/select>/.exec(value)?.[1];
+    mapControl.value = mapOptions ? /<option\b[^>]*value=['"]([^'"]+)['"][^>]*\bselected\b/.exec(mapOptions)?.[1] || 'graphite' : '';
+    mapSurface.dataset.mapMode = /<section\b[^>]*class=['"]production-map['"][^>]*data-map-mode=['"]([^'"]*)['"]/.exec(value)?.[1] || '';
   } });
   const localStorage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => { if (failStorage) throw new Error('Quota exceeded'); stored.set(key, value); } };
   class TestServer extends StudioServer { constructor(settings) { super({ ...settings, fetchImpl: fetchImpl || api?.fetchImpl || (async () => { throw new TypeError('Offline'); }) }); } }
   const document = {
     documentElement: { dataset: {} }, activeElement: null, title: '',
-    querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft, '#script-paper-mode': paperControl.value ? paperControl : null, '#member-role-hint': memberRoleHint, '#issued-member-key': issuedMemberKey })[selector] || (selector.startsWith('.') ? element() : null); },
-    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : selector === '[data-paper-mode]' && paperControl.value ? [paperControl] : []; },
+    querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft, '#script-paper-mode': paperControl.value ? paperControl : null, '#production-map-mode': mapControl.value ? mapControl : null, '#member-role-hint': memberRoleHint, '#issued-member-key': issuedMemberKey })[selector] || (selector.startsWith('.') ? element() : null); },
+    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : selector === '[data-paper-mode]' && paperControl.value ? [paperControl] : selector === '.production-map, .map-dialog' ? [...(mapControl.value ? [mapSurface] : []), ...(dialog.classList.contains('map-dialog') ? [dialog] : [])] : []; },
     createElement() { return element(); }
   };
   const schemeListeners = new Set();
   const scheme = { media: '(prefers-color-scheme: dark)', matches: systemDark, addEventListener(type, handler) { if (type === 'change') schemeListeners.add(handler); } };
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler), matchMedia: () => scheme };
   const context = vm.createContext({
-    makeDemo, frameAt, totalDuration, StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
+    makeDemo, frameAt, totalDuration, ProductionMapApi, canApproveCell, renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName,
+    StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
     location: { hash }, crypto: globalThis.crypto, console, navigator: { clipboard: { writeText: async text => { clipboard.push(text); } } }, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
@@ -465,10 +516,11 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   });
   vm.runInContext(appSource, context, { filename: 'studio/app.js' });
   const settle = async () => {
-    for (let i = 0; i < 300 && vm.runInContext('connecting || pendingWrites || busy', context); i += 1) await Promise.resolve();
-    assert.equal(vm.runInContext('connecting || pendingWrites || busy', context), false, 'App asynchronous operation must finish');
+    const pending = 'connecting || pendingWrites || busy || (typeof mapState !== "undefined" && mapState.loading)';
+    for (let i = 0; i < 300 && vm.runInContext(pending, context); i += 1) await Promise.resolve();
+    assert.equal(Boolean(vm.runInContext(pending, context)), false, 'App asynchronous operation must finish');
   };
-  const dispatch = async (surface, type, target) => surface.listeners.get(type)?.({ target, preventDefault() {} });
+  const dispatch = async (surface, type, target, extra = {}) => surface.listeners.get(type)?.({ target, preventDefault() {}, ...extra });
   const dataAttribute = name => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
   const click = action => dispatch(app, 'click', { closest: selector => selector === '[data-action]' ? { dataset: { action } } : null });
   const clickData = (attribute, value) => dispatch(app, 'click', { closest: selector => selector === `[data-${attribute}]` ? { dataset: { [dataAttribute(attribute)]: value } } : null });
@@ -476,10 +528,11 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   const dialogChange = (id, value) => dispatch(dialog, 'change', { id, value });
   const input = (id, value) => dispatch(app, 'input', { id, value });
   const change = (id, value) => dispatch(app, 'change', { id, value, dataset: id === paperControl.id ? paperControl.dataset : {} });
-  const submit = (id, fields, dataset = {}) => dispatch(dialog, 'submit', { id, fields, dataset });
+  const submit = (id, fields, dataset = {}, submitterValue) => dispatch(dialog, 'submit', { id, fields, dataset }, submitterValue ? { submitter: { value: submitterValue } } : {});
   const flushInput = async () => { for (const [id, timer] of [...timers]) if (timer.delay === 350) { timers.delete(id); timer.callback(); } await settle(); };
   await settle();
-  return { app, dialog, toast, label, storageErrorNode, stored, context, document, paperControl, memberRoleHint, issuedMemberKey, clipboard, click, clickData, dialogClickData, dialogChange, input, change, submit, flushInput, settle, timers, downloads,
+  return { app, dialog, toast, label, storageErrorNode, stored, context, document, paperControl, mapControl, mapSurface, mapErrorNode, memberRoleHint, issuedMemberKey, clipboard, click, clickData, dialogClickData, dialogChange, input, change, submit, flushInput, settle, timers, downloads,
+    get mapSubmitButtons() { return mapSubmitButtons; },
     get markupWrites() { return markupWrites; },
     navigate: async page => { context.location.hash = `#/studio/${page}`; await handlers.get('hashchange')?.(); },
     setSystemDark: async value => { scheme.matches = value; for (const listener of schemeListeners) await listener({ matches: value, media: scheme.media }); },
@@ -949,3 +1002,435 @@ console.log('Actual app producer/director management and read-only participant c
   assert.equal(api.calls.filter(c => c.method !== 'GET').length, before, 'Cached management actions do not survive a self downgrade');
 }
 console.log('Actual app self role change immediately refreshes server rights and removes management controls: passed.');
+
+function productionFixture() {
+  const cell = (id, object, stage, status, extra = {}) => ({ id, project: 'film', object, stage, status,
+    assignee: { keyId: 'director-local', name: 'Режиссёр <img src=x onerror=alert(1)>' }, approverRole: 'director',
+    dueAt: '2026-10-16', version: 'draft-2', variant: null, comment: '<script>Замечание</script> & "текст"', createdAt: date, updatedAt: date, ...extra });
+  const objects = [{ type: 'scene', id: 'scene-1' }, { type: 'scene', id: 'scene-2' }, { type: 'shot', id: 'shot-1' }, { type: 'teaser', id: 'teaser-1' }, { type: 'episode', id: 'episode-1' }, { type: 'scene', id: 'restored-scene' }];
+  const cells = ['empty', 'working', 'done', 'awaiting', 'approved', 'returned'].map((status, i) => cell(`cell-${status}`, objects[0], productionStages[i], status));
+  cells.push(cell('cell-variant', objects[2], 'video', 'awaiting', { version: null, variant: 'Ә нұсқа <b>2</b>' }));
+  cells.push(cell('cell-teaser', objects[3], 'sound', 'done', { assignee: { keyId: null, name: 'Режиссёр <img src=x onerror=alert(1)>' } }));
+  cells.push(cell('cell-episode', objects[4], 'edit', 'working'));
+  cells.push(cell('cell-restored', objects[5], 'script', 'empty'));
+  const project = { slug: 'film', scenes: [
+    { id: 'scene-1', title: { ru: 'Аул <script>Название</script>', kk: 'Ә Ғ Қ Ң Ө Ұ Ү Һ І ауылы' } },
+    { id: 'scene-2', title: { ru: 'Не начатая сцена', kk: 'Басталмаған көрініс' } }
+  ], shots: [{ id: 'shot-1', sceneId: 'scene-1', title: { ru: 'Кадр & "1"', kk: 'Кадр Ә' } }],
+    _principal: { id: 'director-local', role: 'director', projects: ['film'], sections: ['overview', 'storyboard', 'animatic', 'script', 'post'] },
+    members: [{ id: 'director', keyId: 'director-local', role: 'director', name: 'Режиссёр', sections: ['overview', 'storyboard', 'animatic', 'script', 'post'], keySource: 'external', accessStatus: 'active' }], _denied: [] };
+  const map = { project: 'film', stages: productionStages, objects, cells,
+    grid: objects.map(object => ({ object, stages: Object.fromEntries(productionStages.map(stage => [stage, cells.find(c => c.stage === stage && c.object.type === object.type && c.object.id === object.id) || null])) })),
+    myTasks: [cells[1], cells[5]], awaitingMe: [cells[3], cells[6]] };
+  const approvals = [{ id: 'old-approval', cellId: cells[3].id, object: cells[3].object, stage: cells[3].stage, version: 'draft-1', variant: null, verdict: 'returned', comment: '<svg onload=alert(1)>Правка</svg>', keyId: 'director-local', createdAt: date }];
+  const activity = [{ id: 'event-1', sequence: 1, action: 'approval.returned', object: cells[3].object, stage: cells[3].stage, cellId: cells[3].id, version: 'draft-1', variant: null, status: 'returned', name: '<script>Автор</script>', createdAt: date }];
+  return { map, project, approvals, activity };
+}
+
+// A full native /map snapshot includes shots, teasers, episodes and scenes that
+// remain only in the map after restoring a script. Missing cells are not tasks.
+{
+  const fixture = productionFixture();
+  const html = renderProductionMap(fixture);
+  assert.match(html, /<table\b/);
+  assert.match(html, /production-map-scroll/);
+  assert.match(html, /role=['"]region['"]/);
+  assert.match(html, /tabindex=['"]0['"]/);
+  assert.ok(html.includes('Не начатая сцена'), 'Objects with entirely null stages are visible');
+  for (const id of ['cell-empty', 'cell-working', 'cell-done', 'cell-awaiting', 'cell-approved', 'cell-returned', 'cell-variant', 'cell-teaser', 'cell-episode', 'cell-restored']) assert.match(html, new RegExp(`data-map-cell=['"]${id}['"]`), `${id} opens its real server cell`);
+  assert.equal([...html.matchAll(/data-map-cell=['"][^'"]+['"]/g)].length, fixture.map.cells.length, 'Null intersections cannot open an invented cell');
+  for (const text of ['Аул &lt;script&gt;Название&lt;/script&gt;', 'Режиссёр &lt;img src=x onerror=alert(1)&gt;', '&lt;script&gt;Автор&lt;/script&gt;']) assert.ok(html.includes(text), `Escaped server text: ${text}`);
+  assert.ok(!/<script>|<img\s+src=x|<svg\s+onload/.test(html));
+  const clockChanged = renderProductionMap({ ...fixture, activity: [
+    { ...fixture.activity[0], name: 'Earlier operation', sequence: 1, createdAt: '2026-10-14T00:00:00Z' },
+    { ...fixture.activity[0], name: 'Latest operation', sequence: 2, createdAt: '2026-10-13T00:00:00Z' }
+  ] });
+  assert.ok(clockChanged.indexOf('Latest operation') < clockChanged.indexOf('Earlier operation'), 'Activity follows server append order even after a clock change');
+  const kk = renderProductionMap({ ...fixture, locale: 'kk', mode: 'light' });
+  assert.ok(kk.includes('Ә Ғ Қ Ң Ө Ұ Ү Һ І ауылы'));
+  assert.ok(kk.includes('Басталмаған көрініс'));
+  assert.notEqual(kk, html, 'Kazakh interface and titles are rendered independently');
+  assert.match(kk, /data-map-mode=['"]light['"]/);
+  const mine = renderProductionMap({ ...fixture, filter: 'mine' });
+  assert.match(mine, /data-map-cell=['"]cell-working['"]/);
+  assert.match(mine, /data-map-cell=['"]cell-returned['"]/);
+  assert.ok(!/data-map-cell=['"]cell-teaser['"]/.test(mine), 'Matching displayed names never make an unassigned cell mine');
+  const awaiting = renderProductionMap({ ...fixture, filter: 'awaiting' });
+  assert.match(awaiting, /data-map-cell=['"]cell-awaiting['"]/);
+  assert.match(awaiting, /data-map-cell=['"]cell-variant['"]/);
+  assert.ok(!/data-map-cell=['"]cell-working['"]/.test(awaiting));
+  const idsOnly = renderProductionMap({ ...fixture, map: { ...fixture.map, myTasks: ['cell-returned'], awaitingMe: ['cell-variant'] }, filter: 'mine' });
+  assert.match(idsOnly, /data-map-cell=['"]cell-returned['"]/);
+  assert.ok(!/data-map-cell=['"]cell-working['"]/.test(idsOnly));
+  const stale = renderProductionMap({ ...fixture, map: { ...fixture.map, myTasks: ['absent'] }, filter: 'mine' });
+  assert.equal([...stale.matchAll(/data-map-cell=['"][^'"]+['"]/g)].length, 0, 'Unknown personal-list IDs cannot fabricate cells');
+  for (const status of ['empty', 'working', 'done', 'awaiting', 'approved', 'returned']) {
+    const cell = fixture.map.cells.find(c => c.status === status);
+    const card = renderProductionCell({ ...fixture, cell, canApprove: true });
+    assert.match(card, new RegExp(`data-status=['"]${status}['"]`));
+    assert.ok(card.includes('&lt;script&gt;Замечание&lt;/script&gt; &amp; &quot;текст&quot;'));
+    assert.equal(/map-approval-form/.test(card), status === 'awaiting', `Only awaiting result exposes verdicts: ${status}`);
+  }
+  const cell = fixture.map.cells[3];
+  const readonly = renderProductionCell({ ...fixture, cell, canApprove: false });
+  assert.ok(!/map-approval-form/.test(readonly));
+  assert.ok(readonly.includes('&lt;svg onload=alert(1)&gt;Правка&lt;/svg&gt;'), 'Earlier verdict and comment remain visible');
+  const actionable = renderProductionCell({ ...fixture, cell, canApprove: true });
+  assert.match(actionable, /data-cell-id=['"]cell-awaiting['"]/);
+  assert.match(actionable, /name=['"]comment['"]/);
+  assert.match(actionable, /value=['"]approved['"]/);
+  assert.match(actionable, /value=['"]returned['"]/);
+  assert.ok(!/map-approval-form/.test(renderProductionCell({ ...fixture, cell: { ...cell, version: null, variant: null }, canApprove: true })), 'A result must identify a version or variant');
+  assert.match(renderProductionMap({ map: null, project: fixture.project }), /сервер|Сервер/);
+  assert.ok(!/data-map-cell=/.test(renderProductionMap({ map: null, project: fixture.project })), 'Disconnected screen never creates demo production cells');
+  assert.ok(renderProductionMap({ ...fixture, error: '<img src=x onerror=alert(1)>' }).includes('&lt;img src=x onerror=alert(1)&gt;'));
+}
+console.log('Production map matrix, server ID filters, null cells, safe cards/history and RU/KK: passed.');
+
+// awaitingMe is a server hint, not a substitute for role, section, scope and
+// member checks. Explicit issued keys use cinema sections; external keys retain
+// the №31 scopes. Writer breakdown and editor sound are read-only sections.
+{
+  const { map, project } = productionFixture();
+  const cell = map.cells[3];
+  assert.equal(canApproveCell(cell, map, project), true);
+  const check = (expected, changes, label, changedCell = cell, changedMap = map) => assert.equal(canApproveCell(changedCell, changedMap, { ...clone(project), ...changes }), expected, label);
+  check(false, { _principal: { ...project._principal, role: 'viewer' } }, 'Viewer cannot approve even when maliciously inserted in awaitingMe');
+  check(false, { _principal: { ...project._principal, projects: ['another-film'] } }, 'Different project scope');
+  check(false, { _principal: { ...project._principal, sections: ['storyboard'] } }, 'Map overview scope is also required');
+  check(false, { _principal: { ...project._principal, sections: ['overview'] } }, 'Role alone does not grant stage scope');
+  check(false, { members: [] }, 'Known team has no principal binding');
+  check(false, { members: [{ ...project.members[0], accessStatus: 'revoked' }] }, 'Revoked membership');
+  check(false, { members: [{ ...project.members[0], revokedAt: date }] }, 'Server revokedAt also denies');
+  check(false, { members: [{ ...project.members[0], role: 'viewer' }] }, 'Principal and member roles must agree');
+  check(false, { members: [{ ...project.members[0], sections: ['overview'] }] }, 'Effective scope intersects membership');
+  check(false, { _denied: ['overview'] }, 'Denied overview');
+  check(false, {}, 'Wrong presented version cannot be approved', { ...cell, version: 'draft-3' });
+  check(false, {}, 'Wrong stage cannot borrow awaiting identity', { ...cell, stage: 'heroes' });
+  check(false, {}, 'Missing waiting hint', cell, { ...map, awaitingMe: [] });
+  check(false, {}, 'Done is distinct from submitted and accepted', { ...cell, status: 'done' });
+  for (const [keySource, allowedSection, rejectedSection] of [['issued', 'locations', 'storyboard'], ['external', 'storyboard', 'locations']]) {
+    const member = { ...project.members[0], keySource, sections: ['overview', allowedSection] };
+    check(true, { members: [member], _principal: { ...project._principal, sections: ['overview', allowedSection] } }, `${keySource} uses ${allowedSection}`);
+    check(false, { members: [{ ...member, sections: ['overview', rejectedSection] }], _principal: { ...project._principal, sections: ['overview', rejectedSection] } }, `${keySource} cannot borrow ${rejectedSection}`);
+  }
+  for (const [role, stage, section] of [['writer', 'breakdown', 'breakdown'], ['editor', 'sound', 'sound']]) {
+    const restrictedCell = { ...cell, stage, approverRole: role };
+    const restrictedMap = { ...map, cells: [restrictedCell], awaitingMe: [restrictedCell] };
+    check(false, { _principal: { id: 'member-restricted', role, projects: ['film'], sections: ['overview', section] }, members: [{ keyId: 'member-restricted', role, keySource: 'issued', sections: ['overview', section], accessStatus: 'active' }] }, `${role} cannot write ${section}`, restrictedCell, restrictedMap);
+  }
+  check(true, { _principal: { ...project._principal, id: 'producer-local', role: 'producer' }, members: [{ ...project.members[0], keyId: 'producer-local', role: 'producer' }] }, 'Producer can approve instead of assigned role with stage rights');
+  check(true, { _principal: { ...project._principal, id: 'admin-local', role: 'admin' }, members: [] }, 'Admin retains membership exemption with stage rights');
+  check(true, { members: [], _denied: ['team'] }, 'Hidden team relies on authoritative waiting hint with role and scopes');
+  assert.equal(canApproveCell(map.cells[6], map, project), true, 'A variant without a version is an identified result');
+}
+console.log('Production approval roles, issued/external scopes, membership, read-only and stale-card guards: passed.');
+
+// The map has no paging, while both append-only histories must load every page.
+// A verdict submits the exact presented identity once and uses the snapshot's
+// revision. The server remains responsible for changing state and writing logs.
+{
+  const api = nativeApi();
+  const fixture = productionFixture();
+  const p = api.projects.get('film');
+  p.cells = clone(fixture.map.cells);
+  p.activity = Array.from({ length: 55 }, (_, i) => ({ ...clone(fixture.activity[0]), id: `event-${i}`, sequence: i + 1 }));
+  p.approvals = Array.from({ length: 55 }, (_, i) => ({ ...clone(fixture.approvals[0]), id: `approval-old-${i}` }));
+  const client = connect(api);
+  const service = new ProductionMapApi(client);
+  const loaded = await service.load('film');
+  assert.equal(loaded.revision, 1);
+  assert.equal(loaded.map.cells.length, p.cells.length);
+  assert.equal(loaded.activity.length, 55);
+  assert.equal(loaded.approvals.length, 55);
+  assert.equal(loaded.activity.at(-1).id, 'event-54');
+  assert.equal(loaded.approvals.at(-1).id, 'approval-old-54');
+  assert.ok(api.calls.some(c => c.path.endsWith('/activity') && c.search.includes('offset=54')));
+  assert.ok(api.calls.some(c => c.path.endsWith('/approvals') && c.search.includes('offset=54')));
+  assert.ok(api.calls.filter(c => c.path.endsWith('/map')).every(c => c.search === ''));
+  const cell = loaded.map.cells.find(c => c.id === 'cell-awaiting');
+  assert.deepEqual(await service.cell('film', cell.id, loaded.revision), cell);
+  const comment = '<script>Причина</script> & Ә Ғ Қ Ң Ө Ұ Ү Һ І';
+  const result = await service.approve('film', cell, 'returned', comment, loaded.revision);
+  assert.equal(result.revision, 2);
+  assert.equal(result.approval.cellId, cell.id);
+  assert.equal(result.approval.comment, comment);
+  const verdicts = api.calls.filter(c => c.path.endsWith('/approvals') && c.method === 'POST');
+  assert.equal(verdicts.length, 1);
+  assert.equal(verdicts[0].ifMatch, '"1"');
+  assert.deepEqual(verdicts[0].body, { object: cell.object, stage: cell.stage, version: 'draft-2', variant: null, verdict: 'returned', comment });
+  assert.equal(p.cells.find(c => c.id === cell.id).status, 'returned');
+  assert.equal(p.approvals.length, 56);
+  assert.equal(p.activity.at(-1).status, 'returned');
+  const refreshed = await service.load('film');
+  assert.equal(refreshed.revision, 2);
+  assert.ok(!refreshed.map.awaitingMe.some(c => c.id === cell.id));
+  assert.equal(refreshed.approvals.at(-1).comment, comment);
+  await assert.rejects(service.approve('film', cell, 'approved', '', refreshed.revision), error => error.code === 'CELL_NOT_AWAITING');
+  assert.equal(p.approvals.length, 56, 'Repeated verdict cannot append another history record');
+  const variantCell = refreshed.map.cells.find(c => c.id === 'cell-variant');
+  await service.approve('film', variantCell, 'approved', '', refreshed.revision);
+  assert.deepEqual(api.calls.filter(c => c.method === 'POST').at(-1).body, { object: variantCell.object, stage: 'video', version: null, variant: variantCell.variant, verdict: 'approved', comment: '' });
+}
+console.log('Production API whole-map snapshot, >50 history records, native verdict identity/revision and server refresh: passed.');
+
+{
+  const api = nativeApi();
+  const p = api.projects.get('film');
+  p.cells = clone(productionFixture().map.cells);
+  let changed = false;
+  const client = new StudioServer({ url: 'http://127.0.0.1:8770', key: 'admin-secret', fetchImpl: async (url, options) => {
+    const response = await api.fetchImpl(url, options);
+    if (!changed && new URL(url).pathname.endsWith('/approvals')) { changed = true; p.revision += 1; }
+    return response;
+  } });
+  const loaded = await new ProductionMapApi(client).load('film');
+  assert.equal(loaded.revision, 2, 'Loading retries a read snapshot changed during history pagination');
+  assert.ok(api.calls.filter(c => c.path.endsWith('/map')).length >= 4);
+  assert.ok(api.calls.every(c => c.method === 'GET'), 'Read conflicts never write');
+  const perpetualApi = nativeApi();
+  perpetualApi.projects.get('film').cells = clone(p.cells);
+  const unstableClient = new StudioServer({ url: 'http://127.0.0.1:8770', key: 'admin-secret', fetchImpl: async (url, options) => {
+    const response = await perpetualApi.fetchImpl(url, options);
+    if (new URL(url).pathname.endsWith('/map')) perpetualApi.projects.get('film').revision += 1;
+    return response;
+  } });
+  await assert.rejects(new ProductionMapApi(unstableClient).load('film'), error => error.code === 'REVISION_CONFLICT');
+  assert.ok(perpetualApi.calls.filter(c => c.path.endsWith('/map')).length <= 6, 'Unstable snapshot retry is bounded');
+  const service = new ProductionMapApi(connect(api));
+  const cell = clone(p.cells.find(c => c.status === 'awaiting'));
+  const original = JSON.stringify(p);
+  api.failOnce(c => c.path.endsWith('/approvals') && c.method === 'POST');
+  await assert.rejects(service.approve('film', cell, 'approved', '', p.revision), error => error.code === 'STORAGE_WRITE_FAILED');
+  assert.equal(JSON.stringify(p), original, 'Failed storage never changes a production state or journal');
+  assert.equal(api.calls.filter(c => c.method === 'POST').length, 1, 'POST failure is never retried automatically');
+  await assert.rejects(service.cell('film', cell.id, p.revision - 1), error => error.code === 'REVISION_CONFLICT');
+  await assert.rejects(service.approve('film', cell, 'approved', '', p.revision - 1), error => error.code === 'REVISION_CONFLICT');
+  p.cells.find(c => c.id === cell.id).version = 'draft-new';
+  await assert.rejects(service.approve('film', cell, 'approved', '', p.revision), error => error.code === 'APPROVAL_CONFLICT');
+  assert.equal(p.approvals.length, 0, 'Stale version and revision failures never invent verdicts');
+  api.failOnce(c => c.path.endsWith('/activity'));
+  await assert.rejects(service.load('film'), error => error.code === 'STORAGE_WRITE_FAILED');
+}
+console.log('Production API consistent-read retry, bounded conflicts, failed storage and stale version/card protection: passed.');
+
+{
+  const api = nativeApi();
+  const p = api.projects.get('film');
+  p.cells = clone(productionFixture().map.cells);
+  const client = new StudioServer({ url: 'http://127.0.0.1:8770', key: 'admin-secret', fetchImpl: async (url, options) => {
+    const response = await api.fetchImpl(url, options);
+    if (options?.method === 'POST') throw new TypeError('Response lost after server write');
+    return response;
+  } });
+  const service = new ProductionMapApi(client);
+  const loaded = await service.load('film');
+  await assert.rejects(service.approve('film', loaded.map.cells.find(c => c.status === 'awaiting'), 'approved', '', loaded.revision), error => error.code === 'NETWORK_ERROR');
+  assert.equal(api.calls.filter(c => c.method === 'POST').length, 1, 'Lost response cannot replay a committed verdict');
+  assert.equal(p.approvals.length, 1);
+  assert.equal((await service.load('film')).approvals.length, 1, 'Explicit reread recovers the server truth after uncertain response');
+}
+console.log('Production verdict lost-response recovery without automatic replay: passed.');
+
+function seedProduction(api, slug = 'film') {
+  const fixture = productionFixture();
+  const p = api.projects.get(slug);
+  p.cells = clone(fixture.map.cells).map(c => ({ ...c, project: slug }));
+  p.cells[1].assignee.keyId = 'admin-local'; p.cells[5].assignee.keyId = 'admin-local';
+  p.scenes = fixture.project.scenes.map(s => ({ id: s.id, title: s.title.ru, text: '', translations: { ru: { title: s.title.ru, text: '' }, kk: { title: s.title.kk, text: '' } } }));
+  p.shots = [{ id: 'shot-1', sceneId: 'scene-1', title: 'Кадр & "1"', description: '', prompt: '', duration: 4, status: 'draft', owner: '', lens: '', movement: '', imageUrl: '', videoUrl: '', comments: [] }];
+  p.activity = clone(fixture.activity);
+  p.approvals = clone(fixture.approvals);
+  return p;
+}
+
+// Drive the real app route and controls, rather than testing a parallel model
+// of how the screen ought to work. No map state is written into local drafts.
+{
+  const api = nativeApi();
+  const p = seedProduction(api);
+  const stored = new Map();
+  const local = await appHarness({ api, hash: '#/studio/map', stored, systemDark: true });
+  assert.match(local.app.innerHTML, /Подключите сервер проекта/);
+  assert.ok(!/data-map-cell=/.test(local.app.innerHTML));
+  assert.equal(api.calls.length, 0);
+  await local.click('server');
+  await local.submit('server-form', { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
+  await local.settle();
+  assert.match(local.app.innerHTML, /href=['"]#\/studio\/map['"]/);
+  assert.match(local.app.innerHTML, /Карта производства/);
+  assert.match(local.app.innerHTML, /data-map-cell=['"]cell-awaiting['"]/);
+  assert.ok(api.calls.some(c => c.path === '/api/projects/film/map' && c.search === ''));
+  assert.ok(api.calls.some(c => c.path === '/api/projects/film/activity'));
+  const reads = api.calls.length;
+  await local.clickData('map-filter', 'mine');
+  assert.match(local.app.innerHTML, /data-map-cell=['"]cell-working['"]/);
+  assert.ok(!/data-map-cell=['"]cell-variant['"]/.test(local.app.innerHTML));
+  await local.clickData('map-filter', 'awaiting');
+  assert.match(local.app.innerHTML, /data-map-cell=['"]cell-variant['"]/);
+  assert.ok(!/data-map-cell=['"]cell-working['"]/.test(local.app.innerHTML));
+  assert.equal(api.calls.length, reads, 'Personal filters are client read views of the same server snapshot');
+  await local.clickData('lang', 'kk');
+  assert.match(local.app.innerHTML, /Өндіріс картасы/);
+  assert.ok(local.app.innerHTML.includes('Ә Ғ Қ Ң Ө Ұ Ү Һ І ауылы'));
+  assert.equal(local.mapControl.value, 'graphite');
+  await local.change('production-map-mode', 'light');
+  assert.equal(local.document.documentElement.dataset.scriptPaper, 'light');
+  assert.equal(local.mapSurface.dataset.mapMode, 'light');
+  assert.equal(local.mapControl.value, 'light');
+  assert.equal(stored.get(paperStorageKey), 'light');
+  assert.equal(api.calls.length, reads, 'Device paper choice does not write production or project records');
+  await local.navigate('script');
+  await local.settle();
+  assert.equal(local.paperControl.value, 'light', 'Production mode is the shared script paper preference');
+  await local.navigate('map');
+  await local.settle();
+  assert.equal(local.mapControl.value, 'light');
+  await local.clickData('lang', 'ru');
+  await local.clickData('map-cell', 'cell-awaiting');
+  assert.equal(local.dialog.open, true);
+  assert.match(local.dialog.innerHTML, /map-approval-form/);
+  assert.match(local.dialog.innerHTML, /draft-2/);
+  assert.ok(api.calls.some(c => c.path.endsWith('/cells/cell-awaiting')));
+  assert.equal(local.dialog.dataset.mapMode, 'light');
+  const beforeVerdicts = api.calls.filter(c => c.method === 'POST').length;
+  await local.submit('map-approval-form', { comment: '   ' }, { cellId: 'cell-awaiting' }, 'returned');
+  assert.equal(api.calls.filter(c => c.method === 'POST').length, beforeVerdicts, 'Returning requires a human reason before API mutation');
+  assert.match(local.mapErrorNode.textContent, /Укажите/);
+  const comment = 'Свет не совпадает <script>автор</script> & Ә';
+  await local.submit('map-approval-form', { comment }, { cellId: 'cell-awaiting' }, 'returned');
+  await local.settle();
+  assert.equal(local.dialog.open, false);
+  assert.match(local.toast.textContent, /возвращена/);
+  assert.equal(p.cells.find(c => c.id === 'cell-awaiting').status, 'returned');
+  assert.equal(p.approvals.at(-1).comment, comment);
+  assert.ok(!/data-map-cell=['"]cell-awaiting['"]/.test(local.app.innerHTML), 'Waiting filter removes a server-confirmed verdict');
+  assert.match(local.app.innerHTML, /Вернул на доработку/);
+  assert.equal(vm.runInContext('project()._revision', local.context), p.revision);
+  assert.ok(!JSON.stringify([...stored.values()]).includes('cell-awaiting'), 'Production records never enter device workspace persistence');
+  await local.clickData('map-filter', 'all');
+  await local.clickData('map-cell', 'cell-variant');
+  await local.submit('map-approval-form', { comment: '' }, { cellId: 'cell-variant' }, 'approved');
+  await local.settle();
+  assert.equal(p.cells.find(c => c.id === 'cell-variant').status, 'approved');
+  assert.match(local.toast.textContent, /принята/);
+  const verdict = api.calls.filter(c => c.path.endsWith('/approvals') && c.method === 'POST').at(-1);
+  assert.equal(verdict.body.version, null);
+  assert.equal(verdict.body.variant, 'Ә нұсқа <b>2</b>');
+  assert.equal(verdict.ifMatch, '"2"');
+}
+console.log('Actual app production route, automatic server reads, filters, shared paper, RU/KK and confirmed verdict refresh: passed.');
+
+{
+  const api = nativeApi();
+  const p = seedProduction(api);
+  const ui = await appHarness({ api, hash: '#/studio/map', stored: new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]) });
+  await ui.clickData('map-cell', 'cell-awaiting');
+  const oldRevision = p.revision;
+  p.revision += 1; p.cells.find(c => c.id === 'cell-awaiting').version = 'draft-3';
+  const before = p.approvals.length;
+  await ui.submit('map-approval-form', { comment: 'Принимаю' }, { cellId: 'cell-awaiting' }, 'approved');
+  assert.equal(p.approvals.length, before);
+  assert.match(ui.mapErrorNode.textContent, /изменились/);
+  assert.ok(ui.mapSubmitButtons.every(button => button.disabled));
+  assert.match(ui.dialog.innerHTML, /draft-2/, 'A failed verdict preserves the reviewed card and entered form surface');
+  const postCount = api.calls.filter(c => c.method === 'POST').length;
+  await ui.submit('map-approval-form', { comment: 'Повтор' }, { cellId: 'cell-awaiting' }, 'approved');
+  assert.equal(api.calls.filter(c => c.method === 'POST').length, postCount, 'Failed card cannot silently replay a verdict');
+  await ui.dialogClickData('reopen-map-cell', 'cell-awaiting');
+  assert.match(ui.dialog.innerHTML, /draft-3/);
+  assert.ok(ui.mapSubmitButtons.every(button => !button.disabled));
+  await ui.submit('map-approval-form', { comment: 'Теперь принимаю' }, { cellId: 'cell-awaiting' }, 'approved');
+  await ui.settle();
+  assert.equal(p.approvals.length, before + 1);
+  assert.equal(p.approvals.at(-1).version, 'draft-3');
+  assert.equal(api.calls.filter(c => c.method === 'POST').at(-1).ifMatch, `"${oldRevision + 1}"`);
+  await ui.clickData('map-cell', 'cell-variant');
+  const stateBefore = JSON.stringify(p);
+  api.failOnce(c => c.path.endsWith('/approvals') && c.method === 'POST');
+  await ui.submit('map-approval-form', { comment: '' }, { cellId: 'cell-variant' }, 'approved');
+  assert.equal(JSON.stringify(p), stateBefore);
+  assert.match(ui.mapErrorNode.textContent, /не сохранён/);
+  assert.ok(ui.mapSubmitButtons.every(button => button.disabled));
+  assert.ok(!/принята/.test(ui.toast.textContent), 'Storage failure is never shown as approval success');
+  api.failOnce(c => c.path.endsWith('/activity'));
+  await ui.click('refresh-map');
+  await ui.settle();
+  assert.match(ui.app.innerHTML, /Не удалось загрузить карту/);
+  assert.ok(!/data-map-cell=/.test(ui.app.innerHTML), 'Failed reload cannot keep actionable stale cells');
+}
+console.log('Actual app production stale-card conflict, explicit reopen, save/load failure and no verdict replay: passed.');
+
+{
+  const api = nativeApi();
+  const p = seedProduction(api);
+  p.members = [{ id: 'viewer', keyId: 'viewer-local', name: 'Наблюдатель', role: 'viewer', sections }];
+  const ui = await appHarness({ api, hash: '#/studio/map', stored: new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'viewer-secret' })]]) });
+  assert.match(ui.app.innerHTML, /data-map-cell=['"]cell-awaiting['"]/);
+  await ui.clickData('map-cell', 'cell-awaiting');
+  assert.equal(ui.dialog.open, true);
+  assert.ok(!/map-approval-form/.test(ui.dialog.innerHTML));
+  assert.match(ui.dialog.innerHTML, /просмотр этой задачи/);
+  const calls = api.calls.length;
+  await ui.submit('map-approval-form', { comment: 'Поддельная форма' }, { cellId: 'cell-awaiting' }, 'approved');
+  assert.equal(api.calls.length, calls, 'Read-only role cannot bypass action guards with a forged submit event');
+  assert.equal(p.approvals.length, 1);
+}
+console.log('Actual app production read-only viewer and forged form guard: passed.');
+
+{
+  const api = nativeApi();
+  const p = seedProduction(api);
+  const ui = await appHarness({ api, stored: new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]) });
+  const author = 'Новый несохранённый сценарий Ә Ғ Қ Ң Ө Ұ Ү Һ І';
+  await ui.input('draft-text', author);
+  p.revision += 1;
+  await ui.navigate('map');
+  await ui.settle();
+  assert.equal(vm.runInContext('project()._scriptText', ui.context), author, 'Remote revision during map entry preserves pending author text after save conflict');
+  assert.equal(p.script.text, '');
+  assert.match(ui.app.innerHTML, /Сначала сохраните текущий сценарий/);
+  assert.ok(!/data-map-cell=/.test(ui.app.innerHTML));
+}
+console.log('Actual app map entry preserves pending screenplay across a remote revision conflict: passed.');
+
+{
+  const api = nativeApi();
+  seedProduction(api);
+  let releaseCell, cellReadStarted = false;
+  const gate = new Promise(resolve => { releaseCell = resolve; });
+  const ui = await appHarness({ api, hash: '#/studio/map', stored: new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]), fetchImpl: async (url, options) => {
+    const response = await api.fetchImpl(url, options);
+    if (new URL(url).pathname.endsWith('/cells/cell-awaiting') && !cellReadStarted) { cellReadStarted = true; await gate; }
+    return response;
+  } });
+  const oldCardRead = ui.clickData('map-cell', 'cell-awaiting');
+  for (let i = 0; i < 300 && !cellReadStarted; i += 1) await Promise.resolve();
+  assert.equal(cellReadStarted, true);
+  await ui.navigate('script');
+  await ui.navigate('map');
+  for (let i = 0; i < 300 && vm.runInContext('mapState.loading', ui.context); i += 1) await Promise.resolve();
+  assert.equal(vm.runInContext('mapState.ready', ui.context), true);
+  releaseCell();
+  await oldCardRead;
+  await ui.settle();
+  assert.equal(ui.dialog.open, false, 'Late card reply from a previous map visit must not open over the new visit');
+  assert.equal(vm.runInContext('mapCard === null', ui.context), true);
+  assert.ok(api.calls.every(c => c.method === 'GET'));
+}
+console.log('Actual app production late card response cannot cross navigation snapshots: passed.');
+
+{
+  const api = nativeApi();
+  const p = seedProduction(api);
+  const ui = await appHarness({ api, hash: '#/studio/map', stored: new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]) });
+  await ui.clickData('map-cell', 'cell-variant');
+  const before = JSON.stringify(p);
+  api.failOnce(c => c.path.endsWith('/approvals') && c.method === 'POST', 409, 'DEPENDENCY_CONFLICT');
+  await ui.submit('map-approval-form', { comment: '' }, { cellId: 'cell-variant' }, 'approved');
+  assert.equal(JSON.stringify(p), before);
+  assert.match(ui.mapErrorNode.textContent, /сначала примите предыдущие этапы/);
+  assert.ok(!/Версия или права изменились/.test(ui.mapErrorNode.textContent), 'Dependency failure gives the film-process reason');
+  assert.ok(ui.mapSubmitButtons.every(button => button.disabled));
+}
+console.log('Actual app production blocked dependency gives a truthful reason without mutation: passed.');

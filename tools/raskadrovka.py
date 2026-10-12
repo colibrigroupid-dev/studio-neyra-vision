@@ -210,7 +210,7 @@ def main():
 body{{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 Geologica,Onest,system-ui,sans-serif;padding:24px 16px}}h1{{font-size:1.4rem;margin:0 0 .3rem}}.note{{color:var(--dim);max-width:60ch;margin:0 0 1.5rem}}
 ol{{list-style:none;padding:0;margin:0;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}}li{{border:1px solid var(--line);border-radius:6px;padding:10px}}
 .fr{{aspect-ratio:16/9;border:1px dashed var(--line);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:var(--dim);background:repeating-linear-gradient(45deg,transparent 0 12px,oklch(0.17 0.008 70) 12px 24px)}}
-.fr b{{font:600 1.4rem/1 JetBrains Mono,monospace;color:var(--acc)}}.fr i{{font-style:normal;font-size:.85rem}}.sp{{font:.78rem/1.4 JetBrains Mono,monospace;color:var(--dim);margin:.6rem 0 .3rem}}p{{margin:0;font-size:.95rem}}
+.fr b{{font:600 1.4rem/1 JetBrains Mono,monospace;color:var(--acc)}}.fr i{{font-style:normal;font-size:.85rem}}.sp{{font:.78rem/1.4 JetBrains Mono,monospace;color:var(--dim);margin:.6rem 0 .3rem}}p{{margin:0;font-size:1rem}}
 @media print{{body{{background:#fff;color:#000;padding:0}}li,.fr{{border-color:#999}}.fr{{background:none}}.fr b{{color:#000}}.sp,.note{{color:#444}}}}</style></head>
 <body><h1>{E(d['title'].get('Title', a.slug))} · контактный лист, сцены {", ".join(map(str, want))}</h1>
 <p class="note">Сухой прогон: {len(rows)} кадров, ≈{total_sec:.0f} с хронометража, по {a.variants} варианта на кадр, оценка GPU ≈ {est_usd:.2f} $. Рамки пустые: карандаш рисуется после «да». Режиссёр ставит 🔴🟡🟢 и пишет замечание одной строкой.</p>

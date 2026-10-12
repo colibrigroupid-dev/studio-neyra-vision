@@ -117,7 +117,52 @@ class Seedance(Generator):
     def _run(self, job, out):
         raise RuntimeError("видео — только после принятых кадров и отдельного «да» (правило)")
 
-ADAPTERS = {"karandash": KarandashComfy, "image": NanoBanana, "video": Seedance}
+class HiggsfieldCLI(Generator):
+    """Второе окно к тем же моделям через командную строку Higgsfield (аккаунт Александра, план max, кредиты).
+    Модели: image → nano_banana_flash (Nano Banana 2; 2K 16:9 = 2 кредита), video → seedance_2_5 (5 с 720p = 35 кредитов) —
+    оценки `higgsfield generate cost` от 13.10.2026. Курс кредита в $ — params['usd_per_credit'] или NV_USD_PER_CREDIT
+    (по тарифу плана; не задан = 0 и предупреждение). Запуск: `higgsfield generate create <model> --prompt … --image-references …
+    --wait --json`; результат скачивается в out_dir. Без «да» Александра — только dry_run (правило платных генераций)."""
+    ENGINE = {"name": "higgsfield-cli", "model": "", "version": "cli 1.1.26", "license": "условия Higgsfield", "public_name": "технология NEYRA"}
+    MODELS = {"image": ("nano_banana_flash", 2), "video": ("seedance_2_5", 35)}
+    CLI = "/opt/homebrew/bin/higgsfield"
+
+    def estimate_credits(self, job):
+        model, cr = self.MODELS[job.kind]
+        if job.kind == "video": cr = cr * max(1, int(job.params.get("duration", 5))) / 5
+        return cr
+
+    def estimate(self, job):
+        rate = float(job.params.get("usd_per_credit") or os.environ.get("NV_USD_PER_CREDIT") or 0)
+        return self.estimate_credits(job) * rate
+
+    def _run(self, job, out):
+        import subprocess, shutil
+        if not os.path.exists(self.CLI): raise RuntimeError("нет higgsfield CLI (brew install) или не выполнен `higgsfield auth login`")
+        if job.params.get("needs") == "deystvie_en" and "{ACTION_EN}" in job.prompt: raise RuntimeError("в промпте остался {ACTION_EN} — заполните deystvie_en в карточке кадра")
+        model, _ = self.MODELS[job.kind]
+        cmd = [self.CLI, "generate", "create", model, "--prompt", job.prompt, "--json", "--wait", "--wait-timeout", "20m"]
+        if job.kind == "image":
+            cmd += ["--resolution", job.params.get("resolution", "2k"), "--aspect-ratio", job.params.get("aspect_ratio", "16:9")]
+        else:
+            cmd += ["--duration", str(job.params.get("duration", 5)), "--resolution", job.params.get("resolution", "720p"), "--aspect-ratio", job.params.get("aspect_ratio", "16:9")]
+            if job.refs: cmd += ["--mode", "omni_reference"]
+        for r in job.refs:
+            if r.get("path") and os.path.exists(r["path"]): cmd += ["--image-references", r["path"]]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=1500)
+        if res.returncode != 0: raise RuntimeError(f"higgsfield: {res.stderr.strip()[:300] or res.stdout.strip()[:300]}")
+        data = json.loads(res.stdout)
+        urls = [u for u in (data.get("result_urls") or data.get("urls") or [data.get("url")]) if u]
+        if not urls:  # структура ответа уточняется первым боевым запуском
+            raise RuntimeError("higgsfield: в ответе нет ссылки на результат — сохранён сырой JSON: " + json.dumps(data)[:200])
+        ext = ".mp4" if job.kind == "video" else ".png"
+        path = out / f"{job.id}{ext}"
+        urllib.request.urlretrieve(urls[0], path)
+        extra = {"higgsfield_job": data.get("id") or data.get("job_id"), "credits": self.estimate_credits(job), "raw": data}
+        self.ENGINE = {**self.ENGINE, "model": model}
+        return path, self.estimate(job), extra
+
+ADAPTERS = {"karandash": KarandashComfy, "image": NanoBanana, "video": Seedance, "image-hf": HiggsfieldCLI, "video-hf": HiggsfieldCLI}
 
 def selftest():
     import tempfile
@@ -129,6 +174,10 @@ def selftest():
     assert not r2.ok and "ComfyUI" in r2.error, r2
     r3 = Seedance().run(Job(kind="video", project="test", target="shot:1.1", prompt="x", out_dir=d, budget_limit=0.1))
     assert not r3.ok and "лимита" in r3.error, r3
+    hf = HiggsfieldCLI()
+    jv = Job(kind="video", project="test", target="shot:1.1", prompt="x", params={"duration": 10, "usd_per_credit": 0.1}, out_dir=d)
+    assert hf.estimate_credits(jv) == 70 and abs(hf.estimate(jv) - 7.0) < 1e-9, hf.estimate_credits(jv)
+    r4 = hf.run(dataclasses.replace(jv, dry_run=True)); assert r4.ok and r4.provenance["dry_run"], r4
     print("selftest ok:", r.file)
 
 if __name__ == "__main__":
