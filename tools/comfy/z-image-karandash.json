@@ -1,0 +1,14 @@
+{
+ "_comment": "Граф ComfyUI (API-формат) для карандашной раскадровки: Z-Image Turbo + LoRA «Storyboard Sketch». Имена файлов моделей — как в официальном шаблоне ComfyUI для Z-Image (ноябрь 2025); уточнить при первом запуске на сервере (№25): unet/z_image_turbo_bf16.safetensors, text_encoders/qwen_3_4b.safetensors, vae/ae.safetensors, loras/storyboard-sketch-z-image.safetensors. Плейсхолдеры {PROMPT} {NEGATIVE} {SEED} {WIDTH} {HEIGHT} {STEPS} {LORA} заполняет generator.KarandashComfy.",
+ "1": {"class_type": "UNETLoader", "inputs": {"unet_name": "z_image_turbo_bf16.safetensors", "weight_dtype": "default"}},
+ "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen_3_4b.safetensors", "type": "lumina2", "device": "default"}},
+ "3": {"class_type": "VAELoader", "inputs": {"vae_name": "ae.safetensors"}},
+ "4": {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["1", 0], "lora_name": "{LORA}", "strength_model": 0.9}},
+ "5": {"class_type": "ModelSamplingAuraFlow", "inputs": {"model": ["4", 0], "shift": 3.0}},
+ "6": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": "{PROMPT}"}},
+ "7": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": "{NEGATIVE}"}},
+ "8": {"class_type": "EmptySD3LatentImage", "inputs": {"width": "{WIDTH}", "height": "{HEIGHT}", "batch_size": 1}},
+ "9": {"class_type": "KSampler", "inputs": {"model": ["5", 0], "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["8", 0], "seed": "{SEED}", "steps": "{STEPS}", "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}},
+ "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["3", 0]}},
+ "11": {"class_type": "SaveImage", "inputs": {"images": ["10", 0], "filename_prefix": "neyra/{JOB}"}}
+}

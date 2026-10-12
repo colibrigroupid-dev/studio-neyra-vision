@@ -11,7 +11,7 @@
     python3 tools/generator.py selftest
 """
 from __future__ import annotations
-import dataclasses, datetime, hashlib, json, os, pathlib, sys, uuid, urllib.request
+import dataclasses, datetime, hashlib, json, os, pathlib, sys, uuid, urllib.request, urllib.parse
 
 @dataclasses.dataclass
 class Job:
@@ -99,10 +99,49 @@ class KarandashComfy(Generator):
     def estimate(self, job):
         return float(job.params.get("gpu_usd_per_hour", 0.5)) * float(job.params.get("seconds", 3)) / 3600
 
+    GRAPH = pathlib.Path(__file__).parent / "comfy" / "z-image-karandash.json"
+
+    def graph(self, job, seed):
+        """Граф из tools/comfy/z-image-karandash.json с подставленными значениями; числа — числами."""
+        g = json.loads(self.GRAPH.read_text(encoding="utf-8")); g.pop("_comment", None)
+        subst = {"{PROMPT}": job.prompt, "{NEGATIVE}": job.negative, "{LORA}": job.params.get("lora_file", "storyboard-sketch-z-image.safetensors"), "{JOB}": job.id}
+        nums = {"{SEED}": int(seed), "{WIDTH}": int(job.params.get("width", 1024)), "{HEIGHT}": int(job.params.get("height", 576)), "{STEPS}": int(job.params.get("steps", 8))}
+        for node in g.values():
+            for k, v in node["inputs"].items():
+                if isinstance(v, str):
+                    if v in nums: node["inputs"][k] = nums[v]
+                    else:
+                        for a, b in subst.items(): v = v.replace(a, b)
+                        node["inputs"][k] = v
+        return g
+
     def _run(self, job, out):
-        url = job.params.get("comfy_url") or os.environ.get("NV_COMFY_URL")
+        url = (job.params.get("comfy_url") or os.environ.get("NV_COMFY_URL") or "").rstrip("/")
         if not url: raise RuntimeError("нет ComfyUI: задайте NV_COMFY_URL (сервер с GPU, №25) — пока только dry_run")
-        raise RuntimeError("адаптер ComfyUI подключается, когда появится сервер (№25): граф Z-Image + LoRA, очередь /prompt, выдача /history")
+        if "{ACTION_EN}" in job.prompt: raise RuntimeError("в промпте остался {ACTION_EN} — заполните deystvie_en в карточке кадра")
+        import time, random
+        variants = int(job.params.get("variants", 1)); files = []; t0 = time.time()
+        for i in range(variants):
+            seed = int(job.params.get("seed", 0)) + i if job.params.get("seed") else random.randrange(1, 2**31)
+            body = json.dumps({"prompt": self.graph(job, seed), "client_id": f"neyra-{job.id}"}).encode()
+            req = urllib.request.Request(url + "/prompt", data=body, headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=30) as r: pid = json.loads(r.read())["prompt_id"]
+            for _ in range(600):  # до 10 минут на вариант
+                time.sleep(1)
+                with urllib.request.urlopen(f"{url}/history/{pid}", timeout=30) as r: h = json.loads(r.read())
+                if pid in h:
+                    outs = [im for o in h[pid].get("outputs", {}).values() for im in o.get("images", [])]
+                    if not outs: raise RuntimeError("ComfyUI вернул историю без картинок: " + json.dumps(h[pid].get("status", {}))[:200])
+                    im = outs[0]; q = urllib.parse.urlencode({"filename": im["filename"], "subfolder": im.get("subfolder", ""), "type": im.get("type", "output")})
+                    path = out / f"{job.id}-v{i+1}.png"
+                    urllib.request.urlretrieve(f"{url}/view?{q}", path); files.append((path, seed)); break
+            else:
+                raise RuntimeError(f"ComfyUI: вариант {i+1} не готов за 10 минут")
+        secs = time.time() - t0
+        cost = float(job.params.get("gpu_usd_per_hour", 0.5)) * secs / 3600
+        for p2, sd in files[1:]:  # сайдкар каждому варианту; первый вернётся из run()
+            write_provenance(p2, job, self.ENGINE, cost / len(files), {"seed": sd, "variant_of": job.id, "gpu_seconds": round(secs, 1)})
+        return files[0][0], cost, {"seed": files[0][1], "variants": [str(p2) for p2, _ in files], "gpu_seconds": round(secs, 1)}
 
 class NanoBanana(Generator):
     """Чистовые кадры и портреты: Nano Banana 2 через ~/Documents/CODE/nano-banana/nb.py (ключ ~/.config/nano-banana/key)."""
@@ -172,6 +211,8 @@ def selftest():
     assert r.ok and r.provenance["schema"] == "neyra-vision/provenance/1" and r.provenance["dry_run"] is True, r
     r2 = KarandashComfy().run(dataclasses.replace(job, dry_run=False))
     assert not r2.ok and "ComfyUI" in r2.error, r2
+    g = KarandashComfy().graph(dataclasses.replace(job, params={"width": 1024, "height": 576, "steps": 8}), 42)
+    assert g["9"]["inputs"]["seed"] == 42 and g["8"]["inputs"]["width"] == 1024 and "rider" in g["6"]["inputs"]["text"] and g["11"]["inputs"]["filename_prefix"].endswith(job.id), g["9"]
     r3 = Seedance().run(Job(kind="video", project="test", target="shot:1.1", prompt="x", out_dir=d, budget_limit=0.1))
     assert not r3.ok and "лимита" in r3.error, r3
     hf = HiggsfieldCLI()
