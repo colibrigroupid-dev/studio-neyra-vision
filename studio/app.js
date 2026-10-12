@@ -176,13 +176,48 @@ const brand = () => `<a class='brand' href='#/' aria-label='neyra.vision'>neyra<
 const langs = () => `<div class='langs' aria-label='${t('Язык интерфейса', 'Интерфейс тілі')}'><button data-lang='ru' class='${state.locale === 'ru' ? 'active' : ''}' aria-pressed='${state.locale === 'ru'}'>РУС</button><button data-lang='kk' class='${state.locale === 'kk' ? 'active' : ''}' aria-pressed='${state.locale === 'kk'}'>ҚАЗ</button></div>`;
 const statusName = status => ({ draft: t('Черновик', 'Жұмыс нұсқасы'), review: t('На согласовании', 'Келісілуде'), approved: t('Утверждено', 'Бекітілді'), working: t('В работе', 'Орындалуда') })[status] || t('Черновик', 'Жұмыс нұсқасы');
 const status = value => `<span class='badge ${e(value)}'><span class='dot'></span>${statusName(value)}</span>`;
-const roles = () => ({ director: t('Режиссёр', 'Режиссер'), writer: t('Сценарист', 'Сценарист'), artist: t('Художник', 'Суретші'), producer: t('Продюсер', 'Продюсер'), ...(serverClient ? { admin: t('Администратор', 'Әкімші'), editor: t('Монтажёр', 'Монтажшы'), viewer: t('Наблюдатель', 'Бақылаушы') } : {}) });
+const roles = () => ({ producer: t('Продюсер', 'Продюсер'), director: t('Режиссёр', 'Режиссер'), writer: t('Сценарист', 'Сценарист'), cinematographer: t('Оператор', 'Оператор'), artist: t('Художник', 'Суретші'), editor: t('Монтажёр', 'Монтажшы'), viewer: t('Наблюдатель', 'Бақылаушы') });
+const roleName = role => roles()[role] || ({ admin: t('Администратор', 'Әкімші'), assistant_director: t('Второй режиссёр', 'Екінші режиссер') })[role] || role;
+const teamSections = () => [
+  ['overview', t('Обзор проекта', 'Жобаға шолу')], ['script', t('Сценарий', 'Сценарий')],
+  ['breakdown', t('Разбивка', 'Сценарийді талдау')], ['heroes', t('Герои и кастинг', 'Кейіпкерлер мен кастинг')],
+  ['locations', t('Локации', 'Локациялар')], ['world', t('Мир', 'Әлем')],
+  ['storyboard', t('Раскадровка', 'Кадрлық жоспар')], ['shots', t('Кадры', 'Кадрлар')],
+  ['continuity', t('Непрерывность', 'Үздіксіздік')], ['sound', t('Звук', 'Дыбыс')],
+  ['edit', t('Монтаж и мастер', 'Монтаж және мастер')], ['plan', t('План и смета', 'Жоспар мен смета')],
+  ['journal', t('Журнал', 'Журнал')], ['team', t('Команда', 'Команда')]
+].map(([id, title]) => ({ id, title }));
+const sectionName = id => teamSections().find(section => section.id === id)?.title || stages().find(section => section.id === id)?.title || id;
+const defaultSections = role => ['producer', 'admin'].includes(role) ? teamSections().map(section => section.id)
+  : role === 'director' ? teamSections().filter(section => section.id !== 'plan').map(section => section.id)
+    : role === 'viewer' ? teamSections().filter(section => section.id !== 'plan').map(section => section.id)
+      : ['overview', ...({ writer: ['script', 'breakdown'], cinematographer: ['storyboard', 'shots'], artist: ['heroes', 'locations', 'world'], editor: ['edit', 'sound'] }[role] || [])];
+const roleSections = role => ['producer', 'director', 'admin', 'viewer'].includes(role)
+  ? [...teamSections().filter(section => !['director', 'viewer'].includes(role) || section.id !== 'plan').map(section => section.id), 'animatic', 'post']
+  : ({ writer: ['overview', 'script', 'breakdown', 'journal', 'team'], assistant_director: ['overview', 'script', 'breakdown', 'journal', 'team'], cinematographer: ['overview', 'storyboard', 'shots', 'continuity', 'journal', 'team'], artist: ['overview', 'heroes', 'locations', 'world', 'storyboard', 'shots', 'continuity', 'journal', 'team'], editor: ['overview', 'edit', 'sound', 'animatic', 'post', 'journal', 'team'] })[role] || [];
+function grantableSections() {
+  const p = project(); const principal = p?._principal;
+  if (!serverClient || !principal) return [...teamSections().map(section => section.id), 'animatic', 'post'];
+  const membership = p.members.find(member => member.keyId === principal.id);
+  return (principal.sections || []).filter(section => principal.role === 'admin' || membership?.sections.includes(section));
+}
+const roleHint = role => ({
+  producer: t('Видит весь проект, вехи и смету; управляет командой.', 'Бүкіл жобаны, кезеңдер мен сметаны көреді; команданы басқарады.'),
+  director: t('Видит творческие разделы и статусы кадров; управляет командой. Смета отдельно.', 'Шығармашылық бөлімдер мен кадр мәртебелерін көреді; команданы басқарады. Смета бөлек.'),
+  writer: t('Работает со сценарием; читает разбивку.', 'Сценариймен жұмыс істейді; талдауды оқиды.'),
+  cinematographer: t('Работает с раскадровкой и кадрами.', 'Кадрлық жоспар мен кадрлармен жұмыс істейді.'),
+  artist: t('Работает с героями, локациями и миром.', 'Кейіпкерлермен, локациялармен және әлеммен жұмыс істейді.'),
+  editor: t('Работает с монтажом; читает раздел звука.', 'Монтажбен жұмыс істейді; дыбыс бөлімін оқиды.'),
+  viewer: t('Только просмотр выбранных разделов, без изменения материалов.', 'Таңдалған бөлімдерді ғана көреді, материалдарды өзгерте алмайды.'),
+  admin: t('Управляет проектом и командой.', 'Жобаны және команданы басқарады.')
+})[role] || t('Доступ определяется ролью и выбранными разделами.', 'Қолжетімділік рөл мен таңдалған бөлімдерге байланысты.');
+const canManageTeam = () => !serverClient || project()?._capabilities?.manageTeam === true;
 const stages = () => [
   { id: 'script', title: t('Сценарий', 'Сценарий'), short: t('От идеи к истории', 'Идеядан оқиғаға'), description: t('Пишите по сценам, обсуждайте правки и фиксируйте утверждённую версию. Сценарий становится основой всех следующих этапов.', 'Көріністерді жазыңыз, түзетулерді талқылаңыз және бекітілген нұсқаны сақтаңыз. Сценарий келесі кезеңдердің негізіне айналады.'), result: t('Версия сценария · сцены · персонажи', 'Сценарий нұсқасы · көріністер · кейіпкерлер') },
   { id: 'storyboard', title: t('Раскадровка', 'Кадрлық жоспар'), short: t('История обретает форму', 'Оқиға бейнеге айналады'), description: t('Разложите сцены на кадры. Соберите действие, композицию и изображения в единую визуальную последовательность.', 'Көріністерді кадрларға бөліңіз. Әрекет, композиция мен суреттерді бірізді визуалды жоспарға біріктіріңіз.'), result: t('Кадры · изображения · визуальные решения', 'Кадрлар · суреттер · визуалды шешімдер') },
   { id: 'animatic', title: t('ИИматик', 'ЖИ-аниматик'), short: t('Почувствуйте ритм фильма', 'Фильмнің ырғағын сезініңіз'), description: t('Соберите предварительную последовательность изображений с длительностями. Оцените ритм и порядок до начала производства.', 'Суреттердің экранда қанша уақыт көрсетілетінін белгілеп, алдын ала нұсқа құрастырыңыз. Өндіріс басталмай тұрып, ырғақ пен реттілікті бағалаңыз.'), result: t('Последовательность · хронометраж · версия сборки', 'Реттілік · хронометраж · құрастырылған нұсқа') },
   { id: 'shots', title: t('Каждый кадр', 'Әр кадр'), short: t('От замысла к результату', 'Ойдан нәтижеге'), description: t('У каждого кадра своя карточка: описание, камера, промпт, исполнитель, варианты и статус согласования.', 'Әр кадрдың өз карточкасы бар: сипаттама, камера, промпт, орындаушы, нұсқалар және келісу мәртебесі.'), result: t('Карточка кадра · материалы · согласование', 'Кадр карточкасы · материалдар · келісу') },
-  { id: 'team', title: t('Работа команды', 'Команданың жұмысы'), short: t('Один проект для всех', 'Бәріне ортақ бір жоба'), description: t('Режиссёр, сценарист, художник и продюсер работают в разделах одного проекта. У каждого понятная роль и зона ответственности.', 'Режиссер, сценарист, суретші мен продюсер бір жобаның бөлімдерінде жұмыс істейді. Әркімнің рөлі мен міндеті айқын.'), result: t('Участники · роли · доступ к разделам', 'Қатысушылар · рөлдер · бөлімдерге қолжетімділік') },
+  { id: 'team', title: t('Команда', 'Команда'), short: t('Один проект для всех', 'Бәріне ортақ бір жоба'), description: t('Режиссёр, сценарист, художник и продюсер работают в разделах одного проекта. У каждого понятная роль и зона ответственности.', 'Режиссер, сценарист, суретші мен продюсер бір жобаның бөлімдерінде жұмыс істейді. Әркімнің рөлі мен міндеті айқын.'), result: t('Участники · роли · доступ к разделам', 'Қатысушылар · рөлдер · бөлімдерге қолжетімділік') },
   { id: 'post', title: t('Постпродакшен', 'Постпродакшн'), short: t('Фильм становится целым', 'Фильм біртұтас туындыға айналады'), description: t('Планируйте монтаж, цвет, звук и VFX. Соберите работу отделов в один процесс завершения фильма.', 'Монтажды, түсті, дыбысты және VFX жұмыстарын жоспарлаңыз. Бөлімдердің жұмысын фильмді аяқтаудың ортақ үдерісіне біріктіріңіз.'), result: t('Монтаж · звук · цвет · VFX', 'Монтаж · дыбыс · түс · VFX') }
 ];
 const navItems = () => [{ id: 'overview', title: t('Обзор проекта', 'Жобаға шолу') }, ...stages()];
@@ -233,7 +268,22 @@ function animaticPage() {
   const index = frameAt(p.shots, playTime);
   return `${pageHeading(t('ИИматик', 'ЖИ-аниматик'), t('Предварительный ритм фильма. Просмотр референсов без звука.', 'Фильмнің алдын ала ырғағы. Референстерді дыбыссыз көру.'))}<div class='animatic-screen'><img id='animatic-image' src='assets/hero.jpg' alt='${t('Демонстрационный визуальный референс', 'Демонстрациялық визуалды референс')}'><div class='animatic-label'>NEYRA.VISION / ${t('ВИЗУАЛЬНЫЙ РЕФЕРЕНС', 'ВИЗУАЛДЫ РЕФЕРЕНС')}</div><div class='animatic-caption' id='animatic-caption'>${e(local(p.shots[index].title))}</div></div><div class='play-controls'><button class='icon-btn' data-action='play' aria-label='${t('Воспроизвести', 'Ойнату')}' id='play-button'>${icon('animatic')}</button><input class='seek' id='play-seek' type='range' min='0' max='${totalDuration(p.shots)}' step='0.1' value='${playTime}' aria-label='${t('Позиция воспроизведения', 'Ойнату орны')}'><span class='mono' id='play-time' style='font-size:11px'>${playTime.toFixed(1)} / ${totalDuration(p.shots)}s</span></div><div class='timeline'>${p.shots.map((s, i) => `<button data-seek-shot='${i}' class='${i === index ? 'active' : ''}'><span class='mono'>${e(s.id)}</span> / ${e(local(s.title))}<span class='duration'>${s.duration} ${t('сек', 'сек')}</span></button>`).join('')}</div><div class='access-note'>${t('В прототипе используется один собственный визуальный референс с разным кадрированием. Длительность каждого плана меняется в карточке кадра. Генерация изображений, временный звук и видеоэкспорт — следующие этапы.', 'Прототипте бір авторлық визуалды референс әртүрлі кадрлаумен қолданылады. Әр кадрдың ұзақтығын оның карточкасында өзгертуге болады. Сурет генерациясы, уақытша дыбыс және бейнеэкспорт — келесі кезеңдер.')}</div>`;
 }
-function teamPage() { const p = project(); return `${pageHeading(t('Команда проекта', 'Жоба командасы'), t('Участники, роли и разделы рабочего пространства.', 'Жұмыс кеңістігінің қатысушылары, рөлдері және бөлімдері.'), btn(t('Добавить участника', 'Қатысушы қосу'), 'member', true, 'plus'))}<div class='panel'><table class='team-table'><thead><tr><th>${t('УЧАСТНИК', 'ҚАТЫСУШЫ')}</th><th>${t('РОЛЬ', 'РӨЛ')}</th><th>${t('РАЗДЕЛЫ', 'БӨЛІМДЕР')}</th></tr></thead><tbody>${p.members.map(m => `<tr><td><div class='member-info'><span class='avatar'>${e(m.name.slice(0, 1))}</span>${e(m.name)}</div></td><td>${roles()[m.role] || e(m.role)}</td><td><div class='sections'>${m.sections.map(id => `<span class='badge'>${stages().find(s => s.id === id)?.title || e(id)}</span>`).join('')}</div></td></tr>`).join('')}</tbody></table></div><div class='access-note'>${serverClient ? t('Добавление участника с keyId открывает доступ по его внешнему ключу и указанным разделам. Значение ключа выдаёт оператор сервера; приглашение автоматически не отправляется.', 'Қатысушыны keyId арқылы қосу оның сыртқы кілті мен көрсетілген бөлімдері бойынша қолжетімділік ашады. Кілтті сервер операторы береді; шақыру автоматты түрде жіберілмейді.') : t('Локальная модель команды. Добавление участника не открывает доступ другому человеку.', 'Команданың жергілікті үлгісі. Қатысушыны қосу басқа адамға қолжетімділік бермейді.')}</div>`; }
+function teamPage() {
+  const p = project();
+  const manage = canManageTeam();
+  const accessName = member => !serverClient ? t('Локальная запись', 'Жергілікті жазба')
+    : member.accessStatus === 'active' ? t('Доступ активен', 'Қолжетімділік белсенді')
+      : member.accessStatus === 'revoked' ? t('Доступ отозван', 'Қолжетімділік қайтарылды')
+        : t('Ключ не выпущен', 'Кілт берілмеген');
+  return `<section class='team-space'>${pageHeading(t('Команда проекта', 'Жоба командасы'), t('Участники, роли и разделы рабочего пространства.', 'Жұмыс кеңістігінің қатысушылары, рөлдері және бөлімдері.'), manage ? btn(t('Добавить участника', 'Қатысушы қосу'), 'member', true, 'plus') : '')}
+    ${p.members.length ? `<div class='team-members'>${p.members.map(member => `<article class='team-member'>
+      <div class='member-info'><span class='avatar' aria-hidden='true'>${e(String(member.name || '').slice(0, 1))}</span><div><h2>${e(member.name)}</h2><p class='member-email'>${e(member.email || t('E-mail не указан', 'E-mail көрсетілмеген'))}</p></div></div>
+      <dl class='member-access'><div><dt>${t('Роль', 'Рөлі')}</dt><dd>${e(roleName(member.role))}</dd></div><div><dt>${t('Статус доступа', 'Қолжетімділік мәртебесі')}</dt><dd>${e(accessName(member))}</dd></div><div class='member-sections'><dt>${t('Разделы', 'Бөлімдер')}</dt><dd>${(member.sections || []).map(id => `<span class='badge'>${e(sectionName(id))}</span>`).join('') || t('Разделы не выбраны', 'Бөлімдер таңдалмаған')}</dd></div></dl>
+      ${manage && member.accessStatus !== 'revoked' ? `<div class='member-actions'><button class='btn' data-edit-member='${e(member.id)}'>${t('Изменить права', 'Құқықтарды өзгерту')}</button>${serverClient && member.keyId && !(member.keySource === 'external' && member.role === 'admin') ? `<button class='btn' data-revoke-member='${e(member.id)}'>${t('Отозвать доступ', 'Қолжетімділікті қайтару')}</button>` : ''}</div>` : ''}
+    </article>`).join('')}</div>` : `<div class='empty'><h2>${t('В команде пока нет участников', 'Командада әзірге қатысушылар жоқ')}</h2><p>${manage ? t('Добавьте человека и выберите его роль и разделы.', 'Қатысушыны қосып, оның рөлі мен бөлімдерін таңдаңыз.') : t('Руководитель проекта добавит участников.', 'Жоба жетекшісі қатысушыларды қосады.')}</p></div>`}
+    <p class='access-note'>${serverClient ? manage ? t('Ключ участника показывается один раз при добавлении. E-mail сохраняется для будущих приглашений.', 'Қатысушының кілті қосылған кезде бір рет көрсетіледі. E-mail кейінгі шақырулар үшін сақталады.') : t('Доступен просмотр команды. Продюсер или режиссёр управляет участниками и правами.', 'Команданы көре аласыз. Қатысушылар мен құқықтарды продюсер немесе режиссер басқарады.') : t('Локальная модель команды. Добавление участника не открывает доступ другому человеку. Для выдачи ключей подключите сервер.', 'Команданың жергілікті үлгісі. Қатысушыны қосу басқа адамға қолжетімділік бермейді. Кілт беру үшін серверге қосылыңыз.')}</p>
+  </section>`;
+}
 const postInfo = () => ({ edit: [t('Монтаж', 'Монтаж'), t('Собрать утверждённые планы в последовательность фильма.', 'Бекітілген кадрларды фильмнің ретімен монтаждау.')], color: [t('Цвет', 'Түс'), t('Согласовать общий визуальный характер и цвет кадров.', 'Кадрлардың ортақ визуалды сипаты мен түсін келісу.')], sound: [t('Звук', 'Дыбыс'), t('Подготовить диалоги, атмосферу, музыку и финальный микс.', 'Диалогтарды, атмосфераны, музыканы және соңғы миксті дайындау.')], vfx: [t('VFX и графика', 'VFX және графика'), t('Проверить эффекты, титры и финальные правки.', 'Эффектілерді, титрлерді және соңғы түзетулерді тексеру.')] });
 function postPage() { const p = project(); if (!p.post.length) p.post = ['edit', 'color', 'sound', 'vfx'].map(id => ({ id, done: false })); return `${pageHeading(t('План постпродакшена', 'Постпродакшн жоспары'), t('Список работ для завершения фильма.', 'Фильмді аяқтауға арналған жұмыстар тізімі.'), `<span class='badge'>${p.post.filter(v => v.done).length} / ${p.post.length}</span>`)}<div class='post-list'>${p.post.map(task => `<div class='post-task ${task.done ? 'completed' : ''}'><input id='post-${task.id}' data-post='${task.id}' type='checkbox' ${task.done ? 'checked' : ''}><label for='post-${task.id}'><h2>${postInfo()[task.id][0]}</h2><p>${postInfo()[task.id][1]}</p></label>${status(task.done ? 'approved' : 'draft')}</div>`).join('')}</div><div class='access-note'>${t('В этом разделе планируем работу. Монтажные инструменты, звук, цветокоррекция и экспорт мастер-файла пока не подключены.', 'Бұл бөлімде жұмысты жоспарлаймыз. Монтаж құралдары, дыбыс, түс түзету және мастер-файл экспорты әлі қосылмаған.')}</div>`; }
 function workspace(page) {
@@ -246,16 +296,57 @@ function workspace(page) {
   return `<div class='workspace'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('РАБОЧЕЕ ПРОСТРАНСТВО', 'ЖҰМЫС КЕҢІСТІГІ')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}</a>`).join('')}</nav><div class='side-foot'>studio.neyra.vision<br>${t('СЦЕНАРИЙ → КАДР → ФИЛЬМ', 'СЦЕНАРИЙ → КАДР → ФИЛЬМ')}</div></aside><main class='work-main'><div class='prototype-note'>${t('ПРОТОТИП · Генерация изображений и видео пока не подключена.', 'ПРОТОТИП · Сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${content}</main></div></div>`;
 }
 
-function openDialog(html) { lastFocus = document.activeElement; dialog.innerHTML = html; dialog.showModal(); }
+function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.innerHTML = html; dialog.showModal(); }
 const dialogHead = (title, subtitle = '') => `<div class='dialog-header'><div><div class='eyebrow'>NEYRA.VISION / STUDIO</div><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div><button class='icon-btn' data-close aria-label='${t('Закрыть', 'Жабу')}'>${icon('close')}</button></div>`;
 const dialogActions = label => `<div class='dialog-actions'><button type='button' class='btn' data-close>${t('Отмена', 'Бас тарту')}</button><button type='submit' class='btn primary'>${label}${icon('arrow')}</button></div>`;
 function createDialog() { openDialog(`${dialogHead(t('Начнём новую историю.', 'Жаңа оқиғаны бастайық.'), t('Ваш текущий проект останется в списке проектов.', 'Қазіргі жобаңыз жобалар тізімінде сақталады.'))}<form id='create-form'>${serverClient ? `<label for='project-slug'>${t('Код проекта (латиница)', 'Жоба коды (латынша)')}</label><input id='project-slug' name='slug' maxlength='64'><small>${t('Необязательно. Этот код задаёт проект в правах ключа; пустое поле создаст новый код автоматически.', 'Міндетті емес. Бұл код кілт құқықтарындағы жобаны белгілейді; бос өріс жаңа кодты автоматты түрде жасайды.')}</small>` : ''}<label for='project-title'>${t('Название проекта', 'Жоба атауы')}</label><input id='project-title' name='title' required maxlength='120' placeholder='${t('Название вашего фильма', 'Фильміңіздің атауы')}'><label for='project-synopsis'>${t('О чём ваша история?', 'Оқиғаңыз не туралы?')}</label><textarea id='project-synopsis' name='synopsis' rows='3' maxlength='4000'></textarea>${dialogActions(t('Создать проект', 'Жоба құру'))}</form>`); }
 function serverDialog() {
   openDialog(`${dialogHead(t('Сервер', 'Сервер'), t('Адрес и ключ роли сохраняются только на этом устройстве.', 'Мекенжай мен рөл кілті тек осы құрылғыда сақталады.'))}<form id='server-form'><label for='server-url'>${t('Сервер', 'Сервер')}</label><input id='server-url' name='url' type='url' required value='${e(settings.url)}'><label for='server-key'>${t('Ключ роли', 'Рөл кілті')} (X-Key)</label><input id='server-key' name='key' type='password' autocomplete='off' maxlength='512' value='${e(settings.key)}'><p class='access-note'>${t('Пустой ключ включает локальный режим. Локальные проекты сохраняются отдельно и не загружаются на сервер автоматически. Роли требуется членство в проекте: руководитель добавляет участника с keyId в разделе «Команда».', 'Бос кілт жергілікті режимді қосады. Жергілікті жобалар бөлек сақталады және серверге автоматты түрде жүктелмейді. Рөл жобаға мүше болуы керек: жетекші «Команда» бөлімінде keyId арқылы қатысушыны қосады.')}</p>${dialogActions(t('Сохранить и подключиться', 'Сақтау және қосылу'))}</form>`);
 }
-function memberDialog() {
-  const sections = [{ id: 'overview', title: t('Обзор', 'Шолу') }, ...stages()];
-  openDialog(`${dialogHead(t('Добавить участника', 'Қатысушы қосу'), serverClient ? t('Ключ должен быть создан оператором сервера заранее.', 'Кілтті сервер операторы алдын ала жасауы керек.') : t('Локальная модель роли. Приглашение не отправляется.', 'Рөлдің жергілікті үлгісі. Шақыру жіберілмейді.'))}<form id='member-form'><label for='member-name'>${t('Имя', 'Аты')}</label><input id='member-name' name='name' required maxlength='80'><label for='member-role'>${t('Роль', 'Рөлі')}</label><select id='member-role' name='role'>${Object.entries(roles()).map(([key, name]) => `<option value='${key}'>${name}</option>`).join('')}</select>${serverClient ? `<label for='member-key-id'>${t('Идентификатор ключа', 'Кілт идентификаторы')} (keyId)</label><input id='member-key-id' name='keyId' required maxlength='80' pattern='[A-Za-z0-9_-]+'><small>${t('Это id ключа из конфигурации сервера, например writer-local.', 'Бұл — сервер конфигурациясындағы кілт id мәні, мысалы writer-local.')}</small>` : ''}<label>${t('Разделы проекта', 'Жоба бөлімдері')}</label>${sections.map(s => `<label class='field-check'><input type='checkbox' name='sections' value='${s.id}' ${['overview', 'script'].includes(s.id) ? 'checked' : ''}>${s.title}</label>`).join('')}${dialogActions(t('Добавить участника', 'Қатысушы қосу'))}</form>`);
+function memberDialog(id = '') {
+  if (!canManageTeam()) return;
+  const member = id ? project().members.find(item => item.id === id) : undefined;
+  if (id && !member) return;
+  const role = member?.role || 'writer';
+  const external = serverClient && member?.keySource === 'external';
+  const selected = member?.sections || defaultSections(role);
+  const allowed = roleSections(role).filter(section => grantableSections().includes(section));
+  const sections = teamSections();
+  for (const section of selected) if (!sections.some(item => item.id === section)) sections.push({ id: section, title: sectionName(section) });
+  const choices = roles();
+  if (member && !Object.hasOwn(choices, role)) choices[role] = roleName(role);
+  openDialog(`${dialogHead(member ? t('Изменить права', 'Құқықтарды өзгерту') : t('Добавить участника', 'Қатысушы қосу'), member ? e(member.name) : serverClient ? t('После сохранения сервер выдаст ключ доступа.', 'Сақтағаннан кейін сервер қолжетімділік кілтін береді.') : t('Локальная модель роли. Ключ доступа не выдаётся.', 'Рөлдің жергілікті үлгісі. Қолжетімділік кілті берілмейді.'))}
+    <form id='member-form' ${member ? `data-id='${e(member.id)}'` : ''}>
+      ${member ? `<p class='member-email'>${e(member.email || t('E-mail не указан', 'E-mail көрсетілмеген'))}</p>` : `<label for='member-name'>${t('Имя', 'Аты')}</label><input id='member-name' name='name' required maxlength='80' autocomplete='name'><label for='member-email'>E-mail</label><input id='member-email' name='email' type='email' ${serverClient ? 'required' : ''} maxlength='254' autocomplete='email'>`}
+      <label for='member-role'>${t('Роль', 'Рөлі')}</label><select id='member-role' name='role' aria-describedby='member-role-hint' ${external ? 'disabled' : ''}>${Object.entries(choices).map(([value, title]) => `<option value='${e(value)}' ${role === value ? 'selected' : ''}>${e(title)}</option>`).join('')}</select>
+      <p class='role-hint' id='member-role-hint'>${e(roleHint(role))}</p>
+      ${external ? `<p class='role-hint'>${t('Роль закреплена внешним ключом сервера. Здесь можно изменить разделы участника.', 'Рөл сервердің сыртқы кілтімен бекітілген. Мұнда қатысушының бөлімдерін өзгертуге болады.')}</p>` : ''}
+      <fieldset class='member-section-fields'><legend>${t('Разделы проекта', 'Жоба бөлімдері')}</legend><p>${t('Можно дать доступ к выбранным разделам в пределах своей роли и прав.', 'Өз рөліңіз бен құқықтарыңыз шегінде таңдалған бөлімдерге қолжетімділік бере аласыз.')}</p>${sections.map(section => `<label class='field-check'><input type='checkbox' name='sections' value='${e(section.id)}' ${selected.includes(section.id) && allowed.includes(section.id) ? 'checked' : ''} ${allowed.includes(section.id) ? '' : 'disabled'}>${e(section.title)}</label>`).join('')}</fieldset>
+      ${dialogActions(member ? t('Сохранить права', 'Құқықтарды сақтау') : t('Добавить участника', 'Қатысушы қосу'))}
+    </form>`);
+}
+function memberKeyDialog(key) {
+  openDialog(`${dialogHead(t('Участник добавлен. Сохраните ключ.', 'Қатысушы қосылды. Кілтті сақтаңыз.'), t('Ключ показывается один раз. После закрытия его нельзя открыть снова.', 'Кілт бір рет көрсетіледі. Жапқаннан кейін оны қайта ашу мүмкін емес.'))}<div class='member-key-panel'><label for='issued-member-key'>${t('Ключ доступа', 'Қолжетімділік кілті')}</label><textarea id='issued-member-key' readonly rows='3' autocomplete='off' spellcheck='false'>${e(key)}</textarea><button class='btn primary' data-copy-member-key>${t('Скопировать', 'Көшіру')}${icon('download')}</button><p>${t('Передайте ключ лично; письмо на e-mail подключим позже', 'Кілтті жеке беріңіз; e-mail арқылы хат жіберуді кейін қосамыз')}</p></div><div class='dialog-actions'><button class='btn' data-close>${t('Готово', 'Дайын')}</button></div>`);
+  dialog.dataset.memberKey = 'true';
+}
+function memberRevokeDialog(id) {
+  if (!serverClient || !canManageTeam()) return;
+  const member = project().members.find(item => item.id === id);
+  if (!member || member.accessStatus === 'revoked') return;
+  openDialog(`${dialogHead(t('Отозвать доступ?', 'Қолжетімділікті қайтару керек пе?'), e(member.name))}<form id='member-revoke-form' data-id='${e(member.id)}'><p class='revoke-explanation'>${t('Ключ участника перестанет открывать этот проект. Материалы и запись участника останутся в проекте.', 'Қатысушының кілті бұл жобаны аша алмайды. Материалдар мен қатысушы жазбасы жобада қалады.')}</p>${dialogActions(t('Отозвать доступ', 'Қолжетімділікті қайтару'))}</form>`);
+}
+function removeCurrentProject() {
+  serverClient?.known.delete(state.activeId);
+  delete state.projects[state.activeId];
+  state.activeId = Object.keys(state.projects)[0] || '';
+  selectedScene = null;
+}
+async function refreshOwnRights(member, p) {
+  if (member.keyId !== p._principal?.id) return;
+  // Hide management while the server re-evaluates the current key's rights.
+  p._capabilities = { manageTeam: false };
+  try { state.projects[state.activeId] = await serverClient.loadProject(state.activeId); }
+  catch (error) { if ([401, 403, 404].includes(error.status)) removeCurrentProject(); else throw error; }
 }
 
 function shotDialog(id) {
@@ -293,6 +384,10 @@ app.addEventListener('click', async event => {
   if (scene) { selectedScene = scene.dataset.selectScene || scene.dataset.scene; if (scene.dataset.selectScene) render(); }
   const shot = event.target.closest('[data-shot]');
   if (shot) shotDialog(shot.dataset.shot);
+  const editMember = event.target.closest('[data-edit-member]');
+  if (editMember) { memberDialog(editMember.dataset.editMember); return; }
+  const revokeMember = event.target.closest('[data-revoke-member]');
+  if (revokeMember) { memberRevokeDialog(revokeMember.dataset.revokeMember); return; }
   const seek = event.target.closest('[data-seek-shot]');
   if (seek && project()) { playTime = project().shots.slice(0, Number(seek.dataset.seekShot)).reduce((n, s) => n + s.duration, 0); updatePlayer(); }
   const action = event.target.closest('[data-action]')?.dataset.action;
@@ -374,8 +469,33 @@ app.addEventListener('change', async event => {
     });
   }
 });
+dialog.addEventListener('change', event => {
+  if (event.target.id !== 'member-role') return;
+  const role = event.target.value;
+  const hint = document.querySelector('#member-role-hint');
+  if (hint) hint.textContent = roleHint(role);
+  const defaults = defaultSections(role);
+  const allowed = roleSections(role).filter(section => grantableSections().includes(section));
+  dialog.querySelectorAll("input[name='sections']").forEach(input => {
+    input.disabled = !allowed.includes(input.value);
+    input.checked = !input.disabled && defaults.includes(input.value);
+  });
+});
 dialog.addEventListener('click', async event => {
   if (event.target.closest('[data-close]')) dialog.close();
+  if (event.target.closest('[data-copy-member-key]')) {
+    const field = document.querySelector('#issued-member-key');
+    if (!field) return;
+    try {
+      if (!globalThis.navigator?.clipboard?.writeText) throw new Error('CLIPBOARD_UNAVAILABLE');
+      await navigator.clipboard.writeText(field.value);
+      toast(t('Ключ скопирован.', 'Кілт көшірілді.'));
+    } catch {
+      field.focus(); field.select();
+      toast(t('Скопируйте выделенный ключ вручную.', 'Белгіленген кілтті қолмен көшіріңіз.'));
+    }
+    return;
+  }
   const restore = event.target.closest('[data-restore-version]');
   if (restore) await runOperation(async () => {
     if (!await flushDraft() || !await persist()) return;
@@ -425,14 +545,38 @@ dialog.addEventListener('submit', async event => {
       if (!serverClient && !await persist()) return;
       dialog.close(); go('script'); toast(t('Проект создан. Добавьте первую сцену.', 'Жоба құрылды. Алғашқы көріністі қосыңыз.'));
     } else if (form.id === 'member-form') {
-      const name = data.get('name').trim(); if (!name) return;
+      if (!canManageTeam()) return;
+      const p = project(); const id = form.dataset.id;
       const sections = data.getAll('sections'); if (!sections.length) { toast(t('Выберите хотя бы один раздел.', 'Кемінде бір бөлімді таңдаңыз.')); return; }
-      const keyId = serverClient ? data.get('keyId').trim() : '';
-      const previous = keyId ? project().members.find(m => m.keyId === keyId) : undefined;
-      if (previous) Object.assign(previous, { name, role: data.get('role'), sections });
-      else project().members.push({ id: crypto.randomUUID(), name, role: data.get('role'), sections, ...(serverClient ? { keyId } : {}) });
-      if (!await persist()) return;
-      dialog.close(); render(); toast(serverClient ? t('Участник добавлен на сервер. Доступ открыт по его ключу.', 'Қатысушы серверге қосылды. Кілті бойынша қолжетімділік ашылды.') : t('Участник добавлен в локальный прототип.', 'Қатысушы жергілікті прототипке қосылды.'));
+      if (id) {
+        const member = p.members.find(item => item.id === id); if (!member) return;
+        const rights = { sections, ...(serverClient && member.keySource === 'external' ? {} : { role: data.get('role') || member.role }) };
+        if (serverClient) { await serverClient.updateMember(state.activeId, id, rights, p); await refreshOwnRights(member, p); }
+        else { Object.assign(member, rights); if (!await persist()) return; }
+        storageError = ''; dialog.close(); render(); toast(t('Права участника сохранены.', 'Қатысушының құқықтары сақталды.'));
+      } else {
+        const name = String(data.get('name') || '').trim(); if (!name) return;
+        const email = String(data.get('email') || '').trim();
+        const rights = { role: data.get('role'), sections };
+        if (serverClient) {
+          const result = await serverClient.createMember(state.activeId, { name, email, ...rights }, p);
+          storageError = ''; render();
+          if (typeof result.key === 'string' && result.key) memberKeyDialog(result.key);
+          else { dialog.close(); toast(t('Участник добавлен, но сервер не вернул ключ. Отзовите доступ и добавьте участника повторно.', 'Қатысушы қосылды, бірақ сервер кілтті қайтармады. Қолжетімділікті қайтарып, қатысушыны қайта қосыңыз.')); }
+        } else {
+          p.members.push({ id: crypto.randomUUID(), name, email, ...rights });
+          if (!await persist()) return;
+          dialog.close(); render(); toast(t('Участник добавлен в локальный прототип.', 'Қатысушы жергілікті прототипке қосылды.'));
+        }
+      }
+    } else if (form.id === 'member-revoke-form') {
+      if (!serverClient || !canManageTeam()) return;
+      const member = project().members.find(item => item.id === form.dataset.id);
+      if (!member || member.accessStatus === 'revoked') return;
+      const own = member.keyId === project()._principal?.id;
+      await serverClient.revokeMember(state.activeId, member.id, project());
+      if (own) removeCurrentProject();
+      storageError = ''; dialog.close(); render(); toast(t('Доступ участника отозван.', 'Қатысушының қолжетімділігі қайтарылды.'));
     } else if (form.id === 'shot-form') {
       const shot = project().shots.find(s => s.id === form.dataset.id); const duration = Number(data.get('duration'));
       if (!shot || !Number.isFinite(duration) || duration < 1 || duration > 60) return;
@@ -444,7 +588,12 @@ dialog.addEventListener('submit', async event => {
     }
   });
 });
-dialog.addEventListener('close', () => { if (lastFocus?.isConnected) lastFocus.focus(); });
+dialog.addEventListener('close', () => {
+  // A close event can arrive after this native dialog has already reopened.
+  if (dialog.open) return;
+  if (dialog.dataset.memberKey) { dialog.innerHTML = ''; delete dialog.dataset.memberKey; }
+  if (lastFocus?.isConnected) lastFocus.focus();
+});
 function render() { stopPlayback(); document.documentElement.lang = state.locale; document.title = t('neyra.vision — от истории к кадру', 'neyra.vision — оқиғадан кадрға'); app.innerHTML = route() === 'home' ? landing() : workspace(route()); app.inert = busy || connecting; if (route() === 'animatic') updatePlayer(); }
 window.addEventListener('hashchange', () => { render(); const hash = location.hash; if (['#process', '#project', '#about'].includes(hash)) document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' }); else window.scrollTo(0, 0); });
 applyPaperMode();

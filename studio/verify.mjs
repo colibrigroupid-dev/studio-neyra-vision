@@ -25,8 +25,14 @@ console.log('Timeline boundaries, independent project drafts and bilingual text:
 // invalid member references, and duplicate IDs like the actual server.
 const clone = value => structuredClone(value);
 const date = '2026-10-13T00:00:00Z';
-const sections = ['overview', 'script', 'storyboard', 'shots', 'animatic', 'team', 'post'];
-const secrets = { 'admin-secret': { id: 'admin-local', role: 'admin', sections }, 'writer-secret': { id: 'writer-local', role: 'writer', sections: ['overview', 'script'] } };
+const sections = ['overview', 'script', 'breakdown', 'heroes', 'locations', 'world', 'storyboard', 'shots', 'continuity', 'sound', 'edit', 'plan', 'journal', 'animatic', 'team', 'post'];
+const secrets = {
+  'admin-secret': { id: 'admin-local', role: 'admin', sections },
+  'writer-secret': { id: 'writer-local', role: 'writer', sections: ['overview', 'script'] },
+  'producer-secret': { id: 'producer-local', role: 'producer', sections },
+  'director-secret': { id: 'director-local', role: 'director', sections },
+  'viewer-secret': { id: 'viewer-local', role: 'viewer', sections }
+};
 const baseProject = slug => ({
   slug, title: `Проект ${slug}`, synopsis: '', language: 'ru', createdAt: date, updatedAt: date, revision: 1,
   translations: { ru: { title: `Проект ${slug}`, synopsis: '' }, kk: { title: `Жоба ${slug}`, synopsis: '' } },
@@ -39,10 +45,13 @@ const errorReply = (status, code) => reply(status, { error: { code, message: `О
 
 function nativeApi(slugs = ['film']) {
   const projects = new Map(slugs.map(slug => [slug, baseProject(slug)]));
+  const issuedKeys = new Map();
   const calls = [];
   let sequence = 0;
   let fail = null;
-  const allowed = (principal, p, section) => principal.sections.includes(section) && (principal.role === 'admin' || p.members.some(m => m.keyId === principal.id && m.sections.includes(section)));
+  const manageTeam = (principal, p) => ['admin', 'producer', 'director'].includes(principal.role) && (principal.role === 'admin' || p.members.some(m => (principal.memberId ? m.id === principal.memberId : m.keyId === principal.id) && m.accessStatus !== 'revoked'));
+  const allowed = (principal, p, section) => principal.sections.includes(section) && (principal.role === 'admin' || p.members.some(m => (principal.memberId ? m.id === principal.memberId && principal.slug === p.slug : m.keyId === principal.id) && m.accessStatus !== 'revoked' && m.sections.includes(section)));
+  const publicMember = member => ({ ...clone(member), keySource: member.keyId?.startsWith('member-') ? 'issued' : 'external', accessStatus: member.accessStatus || (member.keyId ? 'active' : 'unavailable') });
   const paginate = (items, url) => {
     const offset = Number(url.searchParams.get('offset') || 0);
     const limit = Math.min(Number(url.searchParams.get('limit') || 50), 2);
@@ -70,7 +79,9 @@ function nativeApi(slugs = ['film']) {
     assert.ok(!url.href.includes('secret'), 'Secret cannot be placed in URL');
     assert.ok(!options.body || !options.body.includes('secret'), 'Secret cannot be placed in JSON');
     if (body !== undefined) assert.match(headers.get('Content-Type'), /application\/json/);
-    const principal = secrets[key];
+    const issued = issuedKeys.get(key);
+    const issuedMember = issued && projects.get(issued.slug)?.members.find(m => m.id === issued.memberId && m.accessStatus === 'active');
+    const principal = secrets[key] || (issuedMember && { id: issuedMember.keyId, memberId: issuedMember.id, slug: issued.slug, role: issuedMember.role, sections: issuedMember.sections });
     if (!principal) return errorReply(401, 'UNAUTHORIZED');
     if (fail?.(call)) { fail = null; return errorReply(500, 'STORAGE_WRITE_FAILED'); }
     const parts = url.pathname.split('/').filter(Boolean);
@@ -92,7 +103,8 @@ function nativeApi(slugs = ['film']) {
     if (!p) return errorReply(404, 'NOT_FOUND');
     const collection = parts[3];
     const section = ({ scenes: 'script', versions: 'script', members: 'team' })[collection] || collection || 'overview';
-    if (!allowed(principal, p, section)) return errorReply(403, 'FORBIDDEN');
+    if (!allowed(principal, p, section) && !(collection === 'members' && manageTeam(principal, p))) return errorReply(403, 'FORBIDDEN');
+    if (collection === 'members' && method !== 'GET' && !manageTeam(principal, p)) return errorReply(403, 'FORBIDDEN');
     if (method !== 'GET') {
       call.beforeRevision = p.revision;
       if (call.ifMatch !== `"${p.revision}"`) return errorReply(409, 'REVISION_CONFLICT');
@@ -100,7 +112,7 @@ function nativeApi(slugs = ['film']) {
     let data;
     let status = 200;
     if (!collection) {
-      if (method === 'GET') return reply(200, { data: metadata(p) }, p.revision);
+      if (method === 'GET') return reply(200, { data: { ...metadata(p), capabilities: { manageTeam: manageTeam(principal, p) }, principal: { id: principal.id, role: principal.role, sections: clone(principal.sections) } } }, p.revision);
       checkFields(body, ['title', 'synopsis', 'language', 'translations']);
       Object.assign(p, clone(body));
       data = metadata(p);
@@ -137,7 +149,44 @@ function nativeApi(slugs = ['film']) {
         data = snapshot(p, 'saved', body.label);
       }
       status = 201;
-    } else if (['scenes', 'shots', 'members'].includes(collection)) {
+    } else if (collection === 'members') {
+      const member = p.members.find(m => m.id === parts[4]);
+      if (method === 'GET') return reply(200, parts[4] ? { data: publicMember(member) } : paginate(p.members.map(publicMember), url), p.revision);
+      let issuedKey;
+      if (method === 'DELETE') {
+        assert.ok(member, 'Cannot revoke an unknown member');
+        member.accessStatus = 'revoked';
+        data = publicMember(member);
+        for (const [token, binding] of issuedKeys) if (binding.slug === p.slug && binding.memberId === member.id) issuedKeys.delete(token);
+      } else {
+        checkFields(body, ['name', 'email', 'role', 'sections', 'keyId']);
+        if (body.keyId || (member?.keyId && !member.keyId.startsWith('member-'))) {
+          const target = Object.values(secrets).find(s => s.id === (body.keyId || member.keyId));
+          assert.ok(target, 'Legacy members must reference an external keyId');
+          assert.equal(body.role || member?.role, target.role);
+          if (p.members.some(m => m !== member && m.keyId === body.keyId)) return errorReply(409, 'ALREADY_EXISTS');
+        }
+        if (method === 'POST') {
+          data = { ...clone(body), id: `m${++sequence}`, accessStatus: 'active' };
+          if (!body.keyId) {
+            assert.equal(typeof body.email, 'string', 'Minting requires the participant email');
+            data.keyId = `member-${data.id}`;
+            issuedKey = `issued-member-${sequence}-secret`;
+            issuedKeys.set(issuedKey, { slug: p.slug, memberId: data.id });
+          }
+          p.members.push(data);
+          status = 201;
+        } else {
+          assert.equal(method, 'PATCH');
+          assert.ok(member, 'Cannot change unknown member rights');
+          Object.assign(member, clone(body));
+          data = publicMember(member);
+        }
+      }
+      p.revision += 1;
+      call.committed = true;
+      return reply(status, { data: publicMember(data), ...(issuedKey ? { key: issuedKey } : {}) }, p.revision);
+    } else if (['scenes', 'shots'].includes(collection)) {
       const items = p[collection];
       const item = items.find(i => i.id === parts[4]);
       if (method === 'GET') return reply(200, parts[4] ? { data: clone(item) } : paginate(items, url), p.revision);
@@ -146,19 +195,12 @@ function nativeApi(slugs = ['film']) {
         items.splice(items.indexOf(item), 1);
         data = { id: item.id, deleted: true };
       } else {
-        const names = collection === 'scenes' ? ['title', 'text', 'translations'] : collection === 'shots' ? ['sceneId', 'title', 'description', 'prompt', 'duration', 'status', 'owner', 'lens', 'movement', 'imageUrl', 'videoUrl', 'translations', 'comments'] : ['name', 'role', 'sections', 'keyId'];
-        checkFields(body, method === 'POST' && collection !== 'members' ? ['id', ...names] : names);
-        if (collection === 'members') {
-          const target = Object.values(secrets).find(s => s.id === (body.keyId || item?.keyId));
-          assert.ok(target, 'Members must reference an external keyId');
-          assert.equal(body.role || item?.role, target.role);
-          if (items.some(m => m !== item && m.keyId === body.keyId)) return errorReply(409, 'ALREADY_EXISTS');
-        } else {
-          if ('title' in body) assert.equal(typeof body.title, 'string');
-          if (collection === 'shots' && body.sceneId) assert.ok(p.scenes.some(s => s.id === body.sceneId), 'Shot must link to a server scene');
-        }
+        const names = collection === 'scenes' ? ['title', 'text', 'translations'] : ['sceneId', 'title', 'description', 'prompt', 'duration', 'status', 'owner', 'lens', 'movement', 'imageUrl', 'videoUrl', 'translations', 'comments'];
+        checkFields(body, method === 'POST' ? ['id', ...names] : names);
+        if ('title' in body) assert.equal(typeof body.title, 'string');
+        if (collection === 'shots' && body.sceneId) assert.ok(p.scenes.some(s => s.id === body.sceneId), 'Shot must link to a server scene');
         if (method === 'POST') {
-          const id = body.id || `${collection === 'members' ? 'm' : 'item'}${++sequence}`;
+          const id = body.id || `item${++sequence}`;
           if (items.some(i => i.id === id)) return errorReply(409, 'ALREADY_EXISTS');
           data = { ...clone(body), id, ...(collection === 'shots' ? { aspectRatio: '16:9', needsReview: false } : {}) };
           items.push(data);
@@ -373,6 +415,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   let timerId = 0;
   const handlers = new Map();
   const downloads = [];
+  const clipboard = [];
   const label = { textContent: '' };
   const storageErrorNode = { textContent: '', hidden: true };
   const element = () => ({
@@ -380,9 +423,19 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     classList: { add() {}, remove() {}, toggle() {} }, style: {}, isConnected: true,
     addEventListener(type, callback) { this.listeners.set(type, callback); },
     showModal() { this.open = true; }, close() { this.open = false; this.listeners.get('close')?.({}); },
-    focus() {}, click() {}, setAttribute() {}, querySelector() { return null; }
+    focus() {}, select() {}, click() {}, setAttribute() {}, querySelector() { return null; }, querySelectorAll() { return []; }
   });
   const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element();
+  const memberRoleHint = element(), issuedMemberKey = element();
+  let memberSections = [];
+  dialog.querySelectorAll = selector => selector === "input[name='sections']" ? memberSections : [];
+  let dialogMarkup = '';
+  Object.defineProperty(dialog, 'innerHTML', { get: () => dialogMarkup, set: value => {
+    dialogMarkup = value;
+    issuedMemberKey.value = /<textarea\b[^>]*id=['"]issued-member-key['"][^>]*>([\s\S]*?)<\/textarea>/.exec(value)?.[1] || '';
+    memberRoleHint.textContent = /id=['"]member-role-hint['"][^>]*>([^<]*)/.exec(value)?.[1] || '';
+    memberSections = [...value.matchAll(/<input\b[^>]*name=['"]sections['"][^>]*>/g)].map(([tag]) => ({ value: /value=['"]([^'"]*)['"]/.exec(tag)?.[1] || '', checked: /\bchecked\b/.test(tag), disabled: /\bdisabled\b/.test(tag) }));
+  } });
   paperControl.id = 'script-paper-mode'; paperControl.dataset.paperMode = '';
   let markup = '', markupWrites = 0;
   Object.defineProperty(app, 'innerHTML', { get: () => markup, set: value => {
@@ -395,7 +448,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   class TestServer extends StudioServer { constructor(settings) { super({ ...settings, fetchImpl: fetchImpl || api?.fetchImpl || (async () => { throw new TypeError('Offline'); }) }); } }
   const document = {
     documentElement: { dataset: {} }, activeElement: null, title: '',
-    querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft, '#script-paper-mode': paperControl.value ? paperControl : null })[selector] || (selector.startsWith('.') ? element() : null); },
+    querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft, '#script-paper-mode': paperControl.value ? paperControl : null, '#member-role-hint': memberRoleHint, '#issued-member-key': issuedMemberKey })[selector] || (selector.startsWith('.') ? element() : null); },
     querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : selector === '[data-paper-mode]' && paperControl.value ? [paperControl] : []; },
     createElement() { return element(); }
   };
@@ -404,7 +457,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler), matchMedia: () => scheme };
   const context = vm.createContext({
     makeDemo, frameAt, totalDuration, StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
-    location: { hash }, crypto: globalThis.crypto, console, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
+    location: { hash }, crypto: globalThis.crypto, console, navigator: { clipboard: { writeText: async text => { clipboard.push(text); } } }, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
     setInterval: () => ++timerId, clearInterval() {}
@@ -415,14 +468,17 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     assert.equal(vm.runInContext('connecting || pendingWrites || busy', context), false, 'App asynchronous operation must finish');
   };
   const dispatch = async (surface, type, target) => surface.listeners.get(type)?.({ target, preventDefault() {} });
+  const dataAttribute = name => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
   const click = action => dispatch(app, 'click', { closest: selector => selector === '[data-action]' ? { dataset: { action } } : null });
-  const clickData = (attribute, value) => dispatch(app, 'click', { closest: selector => selector === `[data-${attribute}]` ? { dataset: { [attribute]: value } } : null });
+  const clickData = (attribute, value) => dispatch(app, 'click', { closest: selector => selector === `[data-${attribute}]` ? { dataset: { [dataAttribute(attribute)]: value } } : null });
+  const dialogClickData = (attribute, value = '') => dispatch(dialog, 'click', { closest: selector => selector === `[data-${attribute}]` ? { dataset: { [dataAttribute(attribute)]: value } } : null });
+  const dialogChange = (id, value) => dispatch(dialog, 'change', { id, value });
   const input = (id, value) => dispatch(app, 'input', { id, value });
   const change = (id, value) => dispatch(app, 'change', { id, value, dataset: id === paperControl.id ? paperControl.dataset : {} });
   const submit = (id, fields, dataset = {}) => dispatch(dialog, 'submit', { id, fields, dataset });
   const flushInput = async () => { for (const [id, timer] of [...timers]) if (timer.delay === 350) { timers.delete(id); timer.callback(); } await settle(); };
   await settle();
-  return { app, dialog, toast, label, storageErrorNode, stored, context, document, paperControl, click, clickData, input, change, submit, flushInput, settle, timers, downloads,
+  return { app, dialog, toast, label, storageErrorNode, stored, context, document, paperControl, memberRoleHint, issuedMemberKey, clipboard, click, clickData, dialogClickData, dialogChange, input, change, submit, flushInput, settle, timers, downloads,
     get markupWrites() { return markupWrites; },
     navigate: async page => { context.location.hash = `#/studio/${page}`; await handlers.get('hashchange')?.(); },
     setSystemDark: async value => { scheme.matches = value; for (const listener of schemeListeners) await listener({ matches: value, media: scheme.media }); },
@@ -744,3 +800,125 @@ console.log('Translated draft change preserves Russian text and marks all shot m
   assert.ok(native.script.text.includes(newest));
 }
 console.log('Actual app preserves independent Fountain before scene edits and exports newest text before acknowledgement: passed.');
+
+// A direct participant operation updates the confirmed project and revision.
+// The issued credential is a separate, transient return value, never member data.
+{
+  const api = nativeApi();
+  const client = connect(api);
+  const p = await client.loadProject('film');
+  assert.equal(p._capabilities.manageTeam, true);
+  const payload = { name: 'Айгерім <script>мәтін</script>', email: 'writer@example.test', role: 'writer', sections: ['overview', 'script', 'breakdown'] };
+  const issued = await client.createMember('film', payload, p);
+  assert.ok(issued.key, 'Creating a participant returns its newly issued key');
+  assert.equal(issued.member.accessStatus, 'active');
+  assert.deepEqual(api.calls.find(c => c.method === 'POST' && c.path.endsWith('/members')).body, payload);
+  assert.equal(p.members.find(m => m.id === issued.member.id).email, payload.email);
+  assert.equal(p._revision, api.projects.get('film').revision);
+  for (const storedModel of [p, [...client.known.values()], await client.loadProject('film')]) assert.ok(!JSON.stringify(storedModel).includes(issued.key), 'Issued credential cannot enter a stored project/baseline or later GET');
+
+  const participant = connect(api, issued.key);
+  assert.equal((await participant.loadProject('film'))._capabilities.manageTeam, false);
+  await assert.rejects(participant.createMember('film', payload), err => err.status === 403, 'A non-manager cannot issue credentials');
+  const rights = { role: 'viewer', sections: ['overview', 'team', 'journal', 'future-department'] };
+  await client.updateMember('film', issued.member.id, rights, p);
+  assert.deepEqual(api.calls.find(c => c.method === 'PATCH' && c.path.includes('/members/')).body, rights);
+  assert.equal(p.members.find(m => m.id === issued.member.id).role, 'viewer');
+  const restricted = await participant.loadProject('film');
+  assert.ok(restricted._denied.includes('script'), 'Rights changes apply to the existing issued key');
+  assert.equal(restricted.members.find(m => m.id === issued.member.id).email, payload.email);
+  const revoked = await client.revokeMember('film', issued.member.id, p);
+  assert.equal(revoked.accessStatus, 'revoked');
+  assert.equal(p.members.find(m => m.id === issued.member.id).accessStatus, 'revoked', 'Revocation keeps the participant history');
+  await assert.rejects(participant.loadProject('film'), err => err.status === 401, 'Revoked credentials no longer authenticate');
+  assert.equal(p._revision, api.projects.get('film').revision);
+  for (const call of api.calls.filter(c => c.committed && c.beforeRevision)) assert.equal(call.ifMatch, `"${call.beforeRevision}"`, 'Member operations advance the confirmed revision');
+}
+console.log('Participant API client issuance, transient credentials, rights changes and revoked status: passed.');
+
+// Use the actual app event handlers for managing a server team. Fixtures include
+// hostile data from another client; rendering must treat every value as text.
+{
+  const api = nativeApi();
+  const native = api.projects.get('film');
+  native.members.push({ id: 'hostile-member', name: '<img src=x onerror=alert(1)>', email: '" onclick="alert(1)@example.test', role: 'unknown<script>', sections: ['overview', '<script>department</script>'], accessStatus: 'unavailable' });
+  const local = JSON.stringify(localState(makeDemo()));
+  const stored = new Map([[workspaceKey, local], [settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
+  const ui = await appHarness({ stored, api, hash: '#/studio/team' });
+  assert.match(ui.app.innerHTML, /Команда проекта/);
+  assert.match(ui.app.innerHTML, /data-action='member'/);
+  for (const escaped of ['&lt;img src=x onerror=alert(1)&gt;', '&quot; onclick=&quot;alert(1)@example.test', 'unknown&lt;script&gt;', '&lt;script&gt;department&lt;/script&gt;']) assert.ok(ui.app.innerHTML.includes(escaped), `The team list escapes ${escaped}`);
+  assert.ok(!ui.app.innerHTML.includes('<img src=x onerror=alert(1)>'));
+
+  await ui.click('member');
+  assert.match(ui.dialog.innerHTML, /name='email'[^>]*type='email'|type='email'[^>]*name='email'/);
+  assert.ok(!ui.dialog.innerHTML.includes('keyId'), 'The producer need not configure an external key');
+  for (const role of ['producer', 'director', 'writer', 'cinematographer', 'artist', 'editor', 'viewer']) assert.ok(ui.dialog.innerHTML.includes(`value='${role}'`), `Form offers the ${role} film role`);
+  for (const section of ['overview', 'script', 'breakdown', 'heroes', 'locations', 'world', 'storyboard', 'shots', 'continuity', 'sound', 'edit', 'plan', 'journal']) assert.ok(ui.dialog.innerHTML.includes(`value='${section}'`), `Form offers the ${section} department`);
+  assert.match(ui.dialog.innerHTML, /id='member-role-hint'/);
+  const firstHint = ui.memberRoleHint.textContent;
+  await ui.dialogChange('member-role', 'director');
+  assert.ok(ui.memberRoleHint.textContent && ui.memberRoleHint.textContent !== firstHint, 'Changing a role updates what the participant sees');
+  await ui.dialogChange('member-role', 'writer');
+  assert.deepEqual(ui.dialog.querySelectorAll("input[name='sections']").filter(input => input.checked).map(input => input.value), ['overview', 'script', 'breakdown'], 'Writer role offers its script and read-only breakdown departments');
+  const payload = { name: 'Сценарист <script>текст</script>', email: 'writer@example.test', role: 'writer', sections: ['overview', 'script', 'breakdown'] };
+  await ui.submit('member-form', payload);
+  const member = native.members.find(m => m.email === payload.email);
+  assert.ok(member, 'The producer creates a server participant');
+  assert.equal(member.accessStatus, 'active');
+  const key = ui.issuedMemberKey.value;
+  assert.ok(key, 'The first create response displays the issued key');
+  assert.match(ui.dialog.innerHTML, /Передайте ключ лично; письмо на e-mail подключим позже/);
+  for (const persisted of [vm.runInContext('JSON.stringify(state)', ui.context), vm.runInContext('JSON.stringify([...serverClient.known])', ui.context), ...stored.values()]) assert.ok(!persisted.includes(key), 'The issued key is absent from state, client baseline and device storage');
+  assert.equal(stored.get(workspaceKey), local);
+  await ui.dialogClickData('copy-member-key');
+  assert.equal(ui.clipboard.at(-1), key, 'Copy writes the key displayed in the one-time dialog');
+  ui.dialog.close();
+  assert.ok(!ui.dialog.innerHTML.includes(key), 'Dismissing the key removes its DOM value');
+  await ui.clickData('edit-member', member.id);
+  assert.ok(!ui.dialog.innerHTML.includes(key), 'Reopening rights cannot recover a key');
+  assert.match(ui.dialog.innerHTML, /Изменить права/);
+  const updates = { name: payload.name, email: payload.email, role: 'viewer', sections: ['overview', 'team', 'journal'] };
+  await ui.submit('member-form', updates, { id: member.id });
+  assert.equal(native.members.find(m => m.id === member.id).role, 'viewer');
+  assert.deepEqual(native.members.find(m => m.id === member.id).sections, updates.sections);
+  await ui.clickData('revoke-member', member.id);
+  assert.match(ui.dialog.innerHTML, /member-revoke-form/);
+  await ui.submit('member-revoke-form', {}, { id: member.id });
+  assert.equal(native.members.find(m => m.id === member.id).accessStatus, 'revoked');
+  assert.match(ui.app.innerHTML, /отозван|Отозван/);
+  assert.ok(!ui.app.innerHTML.includes(key));
+  await ui.clickData('lang', 'kk');
+  assert.match(ui.app.innerHTML, /Жоба командасы/);
+  await ui.click('member');
+  assert.match(ui.dialog.innerHTML, /Қатысушы қосу/);
+  assert.match(ui.memberRoleHint.textContent, /[ӘҒҚҢӨҰҮҺІәғқңөұүһі]/);
+}
+console.log('Actual app team form, escaped data, role hints, one-time key copy, rights, revoke and RU/KK: passed.');
+
+// The server capability is authoritative. A participant who can see the team
+// has no mutation controls, including forced clicks/submissions through the DOM.
+{
+  for (const key of ['producer-secret', 'director-secret', 'viewer-secret']) {
+    const api = nativeApi();
+    const principal = secrets[key];
+    api.projects.get('film').members.push({ id: `${principal.role}-member`, name: principal.role, email: `${principal.role}@example.test`, role: principal.role, keyId: principal.id, sections });
+    const stored = new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key })]]);
+    const ui = await appHarness({ stored, api, hash: '#/studio/team' });
+    if (['producer', 'director'].includes(principal.role)) {
+      assert.match(ui.app.innerHTML, /data-action='member'/, `${principal.role} can manage the team`);
+      await ui.click('member');
+      assert.match(ui.dialog.innerHTML, /member-form/);
+    } else {
+      assert.match(ui.app.innerHTML, /viewer@example.test/, 'An ordinary participant can inspect the team');
+      for (const forbidden of ['data-action=\'member\'', 'data-edit-member=', 'data-revoke-member=']) assert.ok(!ui.app.innerHTML.includes(forbidden), 'Read-only team has no management controls');
+      const before = JSON.stringify(api.projects.get('film'));
+      await ui.click('member');
+      assert.equal(ui.dialog.open, false, 'A forced add action cannot open a restricted form');
+      await ui.submit('member-form', { name: 'Нельзя', email: 'no@example.test', role: 'writer', sections: ['overview'] });
+      assert.equal(JSON.stringify(api.projects.get('film')), before, 'A forced form submit cannot mutate a read-only team');
+      assert.ok(!api.calls.some(c => c.method !== 'GET'), 'No mutation request is sent by a non-manager');
+    }
+  }
+}
+console.log('Actual app producer/director management and read-only participant controls: passed.');

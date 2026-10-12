@@ -12,6 +12,7 @@ import math
 import os
 from pathlib import Path
 import re
+import secrets
 import tempfile
 import threading
 from urllib.parse import parse_qs, quote, unquote, urlsplit
@@ -21,16 +22,20 @@ import uuid
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_KEYS = Path.home() / ".config/neyra-studio/keys.json"
 MAX_BODY = 2 * 1024 * 1024
-SECTIONS = frozenset(("overview", "script", "storyboard", "shots", "animatic", "team", "post"))
+SECTIONS = frozenset(("overview", "script", "breakdown", "heroes", "locations", "world",
+                      "storyboard", "shots", "continuity", "sound", "edit", "plan", "journal",
+                      "animatic", "team", "post"))
 ROLE_SECTIONS = {
-    "admin": SECTIONS, "director": SECTIONS, "producer": SECTIONS,
-    "writer": frozenset(("overview", "script")),
-    "artist": frozenset(("overview", "storyboard", "shots")),
-    "editor": frozenset(("overview", "animatic", "post")),
-    "assistant_director": frozenset(("overview", "script")),
-    "cinematographer": frozenset(("overview", "storyboard", "shots")),
-    "viewer": SECTIONS - {"team"},
+    "admin": SECTIONS, "director": SECTIONS - {"plan"}, "producer": SECTIONS,
+    "writer": frozenset(("overview", "script", "breakdown", "journal", "team")),
+    "artist": frozenset(("overview", "heroes", "locations", "world", "storyboard", "shots", "continuity", "journal", "team")),
+    "editor": frozenset(("overview", "edit", "sound", "animatic", "post", "journal", "team")),
+    "assistant_director": frozenset(("overview", "script", "breakdown", "journal", "team")),
+    "cinematographer": frozenset(("overview", "storyboard", "shots", "continuity", "journal", "team")),
+    "viewer": SECTIONS - {"plan"},
 }
+MEMBER_ROLES = frozenset(("producer", "director", "writer", "cinematographer", "artist", "editor", "viewer"))
+READ_ONLY_SECTIONS = {"writer": frozenset(("breakdown",)), "editor": frozenset(("sound",))}
 MANAGERS = frozenset(("admin", "director", "producer"))
 STATUSES = frozenset(("draft", "working", "review", "approved"))
 STAGES = ("script", "breakdown", "heroes", "locations", "storyboard", "shots", "video", "sound", "edit")
@@ -186,11 +191,12 @@ def authorize(principal, slug, section, project=None, write=False, manager=False
     allowed = principal["sections"]
     if project is not None and principal["role"] != "admin":
         member = next((m for m in project["members"] if m["keyId"] == principal["id"]), None)
-        if member is None or member["role"] != principal["role"]:
+        if member is None or member["role"] != principal["role"] or member.get("revokedAt"):
             raise ApiError(403, "FORBIDDEN", "Нет доступа к проекту.")
         allowed = allowed & set(member["sections"])
     if (not project_scope(principal, slug) or section not in allowed
             or (write and principal["role"] == "viewer")
+            or (write and section in READ_ONLY_SECTIONS.get(principal["role"], ()))
             or (manager and principal["role"] not in MANAGERS)):
         raise ApiError(403, "FORBIDDEN", "Нет прав на этот проект или раздел.")
 
@@ -337,7 +343,7 @@ def post_input(body):
     return result
 
 
-def member_input(body, slug, keys, current=None):
+def legacy_member_input(body, slug, keys, current=None):
     fields(body, ("name", "role", "sections", "keyId"),
            ("name", "role", "sections", "keyId") if current is None else ())
     result = dict(current or {}, **body)
@@ -355,6 +361,76 @@ def member_input(body, slug, keys, current=None):
     if current is None:
         result["id"] = uuid.uuid4().hex
     return result
+
+
+def member_input(body, current=None):
+    fields(body, ("name", "email", "role", "sections"),
+           ("name", "email", "role", "sections") if current is None else ())
+    result = dict(current or {}, **body)
+    result["name"] = text(result["name"], "name", 240, required=True)
+    email = text(result["email"], "email", 254, required=True).strip()
+    if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", email):
+        invalid("Нужен корректный e-mail участника.")
+    result["email"] = email
+    role = enum(result["role"], MEMBER_ROLES, "role")
+    sections = result["sections"]
+    if (not isinstance(sections, list) or not sections or len(sections) > len(SECTIONS)
+            or any(not isinstance(s, str) or s not in SECTIONS for s in sections)
+            or len(set(sections)) != len(sections) or not set(sections) <= ROLE_SECTIONS[role]):
+        invalid("Разделы участника должны соответствовать роли.")
+    if current is None:
+        result.update(id=uuid.uuid4().hex, createdAt=timestamp())
+        result["keyId"] = "member-" + result["id"]
+    return result
+
+
+def issued_principal(member, slug):
+    if not member.get("keyHash") or member.get("revokedAt"):
+        return None
+    return {"id": member["keyId"], "role": member["role"], "projects": frozenset((slug,)),
+            "sections": frozenset(member["sections"]) & ROLE_SECTIONS[member["role"]], "source": "member"}
+
+
+def public_member(member, slug, keys):
+    # Allowlist: secret material never enters responses or operation content hashes.
+    result = {name: member[name] for name in
+              ("id", "name", "email", "role", "keyId", "sections", "createdAt", "revokedAt")
+              if name in member}
+    target = issued_principal(member, slug) or keys.get(member["keyId"])
+    active = (target is not None and target["role"] == member["role"] and project_scope(target, slug))
+    result["keySource"] = "issued" if member.get("keyHash") or member.get("revokedAt") else "external"
+    result["accessStatus"] = "revoked" if member.get("revokedAt") else "active" if active else "unavailable"
+    return result
+
+
+def principal_info(principal):
+    return {"id": principal["id"], "role": principal["role"],
+            "projects": sorted(principal["projects"]), "sections": sorted(principal["sections"])}
+
+
+def project_access(project, principal):
+    result = metadata(project)
+    result["principal"] = principal_info(principal)
+    try:
+        authorize(principal, project["slug"], "team", project, write=True, manager=True)
+        manage = True
+    except ApiError:
+        manage = False
+    result["capabilities"] = {"manageTeam": manage}
+    return result
+
+
+def stage_section(principal, stage):
+    # Keep №31's legacy scopes; issued team keys use the cinema section names.
+    return ("animatic" if stage == "video" else stage) if principal.get("source") == "member" else STAGE_SECTIONS[stage]
+
+
+def authorize_grant(principal, project, sections):
+    effective = set(principal["sections"])
+    if principal["role"] != "admin":
+        effective &= set(next(m for m in project["members"] if m["keyId"] == principal["id"])["sections"])
+    if not set(sections) <= effective:
+        raise ApiError(403, "FORBIDDEN", "Нельзя выдать разделы за пределами своих прав.")
 
 
 def snapshot(project, principal, kind, label="", source=None):
@@ -433,11 +509,13 @@ def assignee_input(value, project, keys, stage):
     name = text(value.get("name", ""), "assignee.name", 240)
     if key_id is not None:
         identifier(key_id)
-        target = keys.get(key_id)
+        member = next((m for m in project["members"] if m["keyId"] == key_id), None)
+        target = issued_principal(member, project["slug"]) if member is not None else None
+        target = target or keys.get(key_id)
         if target is None:
             invalid("Ключ исполнителя не найден.")
         try:
-            authorize(target, project["slug"], STAGE_SECTIONS[stage], project, write=True)
+            authorize(target, project["slug"], stage_section(target, stage), project, write=True)
         except ApiError:
             invalid("У исполнителя нет доступа к проекту или этапу.")
         member = next((m for m in project["members"] if m["keyId"] == key_id), None)
@@ -498,7 +576,7 @@ def cell_input(body, project, principal, keys, current=None):
         "status": "empty", "dueAt": None, "comment": "", "version": None, "variant": None,
     }
     stage = result["stage"]
-    authorize(principal, project["slug"], STAGE_SECTIONS[stage], project, write=True)
+    authorize(principal, project["slug"], stage_section(principal, stage), project, write=True)
     manager = principal["role"] in MANAGERS
     if (create and not manager) or (not create and not manager and
             (result["assignee"]["keyId"] != principal["id"]
@@ -533,7 +611,7 @@ def cell_input(body, project, principal, keys, current=None):
 
 
 def can_approve(principal, project, cell):
-    authorize(principal, project["slug"], STAGE_SECTIONS[cell["stage"]], project, write=True)
+    authorize(principal, project["slug"], stage_section(principal, cell["stage"]), project, write=True)
     if principal["role"] not in (cell["approverRole"], "admin", "producer"):
         raise ApiError(403, "FORBIDDEN", "Вердикт может поставить роль " + cell["approverRole"]
                        + ", администратор или продюсер.")
@@ -757,6 +835,20 @@ class Handler(SimpleHTTPRequestHandler):
         for principal in keys.values():
             if hmac.compare_digest(principal["key"].encode("ascii"), supplied[0].encode("utf-8")):
                 return principal, keys
+        parts = supplied[0].split(".")
+        if (len(parts) == 4 and parts[0] == "nv1" and SLUG.fullmatch(parts[1])
+                and IDENTIFIER.fullmatch(parts[2])):
+            try:
+                project = self.server.store.read(parts[1])
+            except ApiError as error:
+                if error.status != 404:
+                    raise
+            else:
+                member = next((m for m in project["members"] if m["keyId"] == parts[2]), None)
+                target = issued_principal(member, project["slug"]) if member is not None else None
+                digest = hashlib.sha256(supplied[0].encode("utf-8")).hexdigest()
+                if target and hmac.compare_digest(member["keyHash"], digest):
+                    return target, keys
         raise ApiError(401, "UNAUTHORIZED", "Нужен действующий ключ в заголовке X-Key.")
 
     def listing(self, items, query):
@@ -785,6 +877,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route(self, parts, query, principal, keys):
         method, store = self.command, self.server.store
+        if parts == ["api", "session"]:
+            if method != "GET":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Сессию можно только читать.")
+            return 200, {"data": principal_info(principal)}, None
         if parts == ["api", "projects"]:
             if method == "GET":
                 projects = []
@@ -841,7 +937,7 @@ class Handler(SimpleHTTPRequestHandler):
             raise ApiError(403, "FORBIDDEN", "Нет доступа к проекту.")
         project = store.read(slug)
         resource = parts[3] if len(parts) > 3 else "project"
-        section = {"versions": "script", "scenes": "script", "members": "team", "project": "overview",
+        section = {"versions": "script", "scenes": "script", "members": "overview" if method == "GET" else "team", "project": "overview",
                    "map": "overview", "cells": "overview", "approvals": "overview",
                    "activity": "overview"}.get(resource, resource)
         write = method != "GET"
@@ -852,7 +948,7 @@ class Handler(SimpleHTTPRequestHandler):
         invalidated = []
         if len(parts) == 3:
             if method == "GET":
-                return 200, {"data": metadata(project)}, project["revision"]
+                return 200, {"data": project_access(project, principal)}, project["revision"]
             if method != "PATCH":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
             body = self.body()
@@ -949,7 +1045,57 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
             status = 201
-        elif parts[3] in ("scenes", "shots", "members") and len(parts) in (4, 5):
+        elif resource == "members" and len(parts) in (4, 5):
+            items = project["members"]
+            item = get_item(items, parts[4]) if len(parts) == 5 else None
+            if method == "GET":
+                return 200, ({"data": public_member(item, slug, keys)} if item is not None
+                             else self.listing([public_member(m, slug, keys) for m in items], query)), project["revision"]
+            if method == "POST" and item is None:
+                body = self.body()
+                if "keyId" in body:
+                    member = legacy_member_input(body, slug, keys)
+                else:
+                    member = member_input(body)
+                    # An invitation may not exceed the issuer's project scope.
+                    authorize_grant(principal, project, member["sections"])
+                    if any(m.get("email", "").casefold() == member["email"].casefold()
+                           and not m.get("revokedAt") for m in items):
+                        raise ApiError(409, "ALREADY_EXISTS", "Участник с этим e-mail уже имеет доступ.")
+                    if member["keyId"] in keys:
+                        raise ApiError(409, "ALREADY_EXISTS", "Идентификатор ключа уже существует.")
+                    issued_key = "nv1." + slug + "." + member["keyId"] + "." + secrets.token_urlsafe(32)
+                    member["keyHash"] = hashlib.sha256(issued_key.encode("ascii")).hexdigest()
+                if any(m["keyId"] == member["keyId"] for m in items):
+                    raise ApiError(409, "ALREADY_EXISTS", "Ключ уже привязан к участнику.")
+                authorize_grant(principal, project, member["sections"])
+                items.append(member)
+                data, status = public_member(member, slug, keys), 201
+            elif method == "PATCH" and item is not None:
+                if item.get("revokedAt"):
+                    raise ApiError(409, "ACCESS_REVOKED", "Доступ отозван; добавьте участника заново.")
+                if item.get("keyHash"):
+                    changes = member_input(self.body(), item)
+                    if any(m is not item and m.get("email", "").casefold() == changes["email"].casefold()
+                           and not m.get("revokedAt") for m in items):
+                        raise ApiError(409, "ALREADY_EXISTS", "Участник с этим e-mail уже имеет доступ.")
+                else:
+                    changes = legacy_member_input(self.body(), slug, keys, item)
+                authorize_grant(principal, project, changes["sections"])
+                item.update(changes)
+                data, status = public_member(item, slug, keys), 200
+            elif method == "DELETE" and item is not None:
+                if item.get("keyHash") or item.get("revokedAt"):
+                    item.pop("keyHash", None)
+                    item.setdefault("revokedAt", timestamp())
+                    data = public_member(item, slug, keys)
+                else:
+                    items.remove(item)
+                    data = {"id": item["id"], "deleted": True}
+                status = 200
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
+        elif parts[3] in ("scenes", "shots") and len(parts) in (4, 5):
             collection = parts[3]
             items = project[collection]
             item = get_item(items, parts[4]) if len(parts) == 5 else None
@@ -959,14 +1105,7 @@ class Handler(SimpleHTTPRequestHandler):
             create = method == "POST" and item is None
             if create or (method == "PATCH" and item is not None):
                 body = self.body()
-                if collection == "scenes":
-                    changes = scene_input(body, create)
-                elif collection == "shots":
-                    changes = shot_input(body, project, create)
-                else:
-                    changes = member_input(body, slug, keys, item)
-                    if any(m["keyId"] == changes["keyId"] and m is not item for m in items):
-                        raise ApiError(409, "ALREADY_EXISTS", "Ключ уже привязан к участнику.")
+                changes = scene_input(body, create) if collection == "scenes" else shot_input(body, project, create)
                 if create:
                     if any(existing["id"] == changes["id"] for existing in items):
                         raise ApiError(409, "ALREADY_EXISTS", "Идентификатор уже существует.")
@@ -1032,7 +1171,10 @@ class Handler(SimpleHTTPRequestHandler):
                 action, obj = "version.restored", {"type": "version", "id": data["restoredVersionId"]}
         activity(project, principal, action, obj, data, stage, invalidated)
         store.save(project)
-        return status, {"data": data}, project["revision"]
+        payload = {"data": data}
+        if resource == "members" and method == "POST" and "issued_key" in locals():
+            payload["key"] = issued_key
+        return status, payload, project["revision"]
 
     def static(self, path, head=False):
         parts = path.strip("/").split("/") if path != "/" else []
@@ -1102,11 +1244,11 @@ class Handler(SimpleHTTPRequestHandler):
                     self.send_header("Access-Control-Allow-Headers", "X-Key, Content-Type, If-Match")
                     self.end_headers()
                     return
-                principal, keys = self.principal()
                 if head or self.command not in ("GET", "POST", "PUT", "PATCH", "DELETE"):
                     raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
                 parts = path.rstrip("/").split("/")[1:]
                 with self.server.store.lock:
+                    principal, keys = self.principal()
                     status, payload, revision = self.route(parts, url.query, principal, keys)
                 self.send_json(status, payload, revision)
             elif self.command in ("GET", "HEAD"):

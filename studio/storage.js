@@ -71,6 +71,8 @@ function emptyProject(metadata) {
     scriptStatus: 'draft',
     _server: true, _language: primary, _projectLanguage: primary,
     _revision: metadata.revision, _scriptText: '', _scriptTranslations: {}, _rawScriptTranslations: undefined, _denied: [],
+    _capabilities: copy(metadata.capabilities || { manageTeam: false }),
+    _principal: copy(metadata.principal || null),
     createdAt: metadata.createdAt, updatedAt: metadata.updatedAt
   });
 }
@@ -268,6 +270,40 @@ export class StudioServer {
     // Creation intentionally leaves scenes, shots and history empty. Existing
     // local demo data is never implicitly copied to the server.
     return this.loadProject(slug);
+  }
+
+  async writeMember(slug, method, id, payload, p) {
+    const known = this.known.get(slug);
+    if (!known) throw new StudioServerError('Сначала загрузите проект с сервера.', 409, 'PROJECT_NOT_LOADED');
+    const path = `${projectPath(slug)}/members${id ? `/${encodeURIComponent(id)}` : ''}`;
+    const response = await this.request(method, path, payload, { revision: known._revision });
+    const member = response.data;
+    if (!member?.id) throw new StudioServerError('Сервер вернул некорректного участника.', 200, 'INVALID_RESPONSE');
+    known._revision = response.revision ?? known._revision + 1;
+    for (const record of new Set([known, p].filter(Boolean))) {
+      record._revision = known._revision;
+      const index = record.members.findIndex(item => item.id === member.id);
+      // A legacy DELETE may return only {id, deleted:true}.
+      if (member.deleted) {
+        if (index >= 0) record.members.splice(index, 1);
+      } else if (index >= 0) record.members[index] = copy(member);
+      else record.members.push(copy(member));
+    }
+    // The key stays outside both the project and the confirmed baseline.
+    return response;
+  }
+
+  async createMember(slug, payload, p) {
+    const response = await this.writeMember(slug, 'POST', '', payload, p);
+    return { member: response.data, key: response.key };
+  }
+
+  async updateMember(slug, id, payload, p) {
+    return (await this.writeMember(slug, 'PATCH', id, payload, p)).data;
+  }
+
+  async revokeMember(slug, id, p) {
+    return (await this.writeMember(slug, 'DELETE', id, undefined, p)).data;
   }
 
   async saveProject(slug, p, baseline) {

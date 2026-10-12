@@ -508,7 +508,7 @@ class ApiTests(unittest.TestCase):
         self.assertNotIn("key", viewer)
         self.api("GET", "/api/projects/film/script", key="temporary-viewer")
         self.api("PUT", "/api/projects/film/script", {"text": "Запрещено"}, 403, "temporary-viewer")
-        self.api("GET", "/api/projects/film/members", status=403, key="temporary-viewer")
+        self.api("GET", "/api/projects/film/members", key="temporary-viewer")
         self.api("POST", "/api/projects/film/members", {
             "name": "Секрет в запросе", "role": "writer", "sections": ["script"],
             "keyId": "writer", "key": "should-not-be-persisted",
@@ -632,7 +632,7 @@ class ApiTests(unittest.TestCase):
                 "id": scene_id, "title": "Сцена " + scene_id}, 201)
         config = json.loads(self.keys.read_text(encoding="utf-8"))
         roles = (
-            ("director", "director", list(app.SECTIONS)),
+            ("director", "director", list(app.ROLE_SECTIONS["director"])),
             ("producer", "producer", list(app.SECTIONS)),
             ("assistant", "assistant_director", ["overview", "script"]),
             ("camera", "cinematographer", ["overview", "storyboard", "shots"]),
@@ -1199,6 +1199,314 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.project_bytes(), before)
         self.api("PATCH", path, {"status": "awaiting"})
         self.approval(changed, key="temporary-camera")
+
+
+class TeamAccessTests(unittest.TestCase):
+    """№35: выпуск, ограничение прав и отзыв ключей внутри проекта."""
+
+    # Используем настоящий HTTP Handler и те же изолированные файлы,
+    # но не наследуем ApiTests, чтобы прежние тесты не запускались повторно.
+    setUp = ApiTests.setUp
+    start_server = ApiTests.start_server
+    stop_server = ApiTests.stop_server
+    request = ApiTests.request
+    read_response = staticmethod(ApiTests.read_response)
+    api = ApiTests.api
+    create = ApiTests.create
+
+    def issue(self, role="writer", sections=None, key="temporary-admin", slug="film", **fields):
+        payload = {"name": "Участник проекта", "email": "member@example.test",
+                   "role": role, "sections": sections or ["overview", "script"]}
+        payload.update(fields)
+        return self.api("POST", f"/api/projects/{slug}/members", payload, 201, key)
+
+    def stored_project(self, slug="film"):
+        return json.loads((self.data / slug / "project.json").read_text(encoding="utf-8"))
+
+    def test_issued_keys_are_random_hash_only_and_never_returned_by_read_endpoints(self):
+        self.create()
+        configured_keys = self.keys.read_bytes()
+        name = '<script>alert("команда")</script> Әлия & К'
+        issued = self.issue(name=name, email="aliya@example.test")
+        member, secret = issued["data"], issued["key"]
+        self.assertEqual(member["name"], name)
+        self.assertEqual(member["email"], "aliya@example.test")
+        self.assertEqual(member["accessStatus"], "active")
+        self.assertIsInstance(secret, str)
+        self.assertGreaterEqual(len(secret), 32)
+        self.assertNotIn("key", member)
+        self.assertNotIn("keyHash", member)
+        second = self.issue(email="other@example.test")
+        self.assertNotEqual(secret, second["key"])
+        self.assertNotEqual(member["id"], second["data"]["id"])
+        self.assertEqual(self.keys.read_bytes(), configured_keys)
+        stored = self.stored_project()
+        persisted = next(m for m in stored["members"] if m["id"] == member["id"])
+        digest = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+        self.assertEqual(persisted["keyHash"], digest)
+        for path in self.data.rglob("*"):
+            if path.is_file():
+                self.assertNotIn(secret.encode("ascii"), path.read_bytes(), str(path))
+                self.assertNotIn(second["key"].encode("ascii"), path.read_bytes(), str(path))
+        reads = ("/api/projects", "/api/projects/film", "/api/projects/film/members",
+                 f"/api/projects/film/members/{member['id']}", "/api/projects/film/activity")
+        for path in reads:
+            with self.subTest(path=path):
+                status, response, raw = self.request("GET", path)
+                self.assertEqual(status, 200)
+                self.assertNotIn(secret.encode("ascii"), raw)
+                self.assertNotIn(digest.encode("ascii"), raw)
+                self.assertNotIn(b'"keyHash"', raw)
+                self.assertNotIn(b'"key"', raw)
+        status, session, raw = self.request("GET", "/api/session", key=secret)
+        self.assertEqual(status, 200)
+        self.assertEqual(session["data"]["id"], member["keyId"])
+        self.assertNotIn(secret.encode("ascii"), raw)
+        self.assertNotIn(digest.encode("ascii"), raw)
+
+    def test_issued_key_authenticates_after_restart_and_is_scoped_to_one_project(self):
+        self.create()
+        self.create("other")
+        issued = self.issue()
+        member, secret = issued["data"], issued["key"]
+        self.stop_server()
+        self.start_server()
+        session = self.api("GET", "/api/session", key=secret)["data"]
+        self.assertEqual(session["id"], member["keyId"])
+        self.assertEqual(session["role"], "writer")
+        self.assertEqual(session["projects"], ["film"])
+        self.assertIn("script", session["sections"])
+        listed = self.api("GET", "/api/projects", key=secret)["data"]
+        self.assertEqual([p["slug"] for p in listed], ["film"])
+        project = self.api("GET", "/api/projects/film", key=secret)["data"]
+        self.assertFalse(project["capabilities"]["manageTeam"])
+        self.api("PUT", "/api/projects/film/script", {"text": "Авторский текст Әлия"}, key=secret)
+        self.assertEqual(self.api("GET", "/api/projects/film/script")["data"]["text"],
+                         "Авторский текст Әлия")
+        self.api("GET", "/api/projects/other", status=403, key=secret)
+        self.api("GET", "/api/projects/not-created", status=403, key=secret)
+        self.api("POST", "/api/projects", {"slug": "third", "title": "Нельзя"}, 403, secret)
+        self.assertFalse((self.data / "third" / "project.json").exists())
+
+    def test_rights_change_on_next_request_and_revocation_keeps_member_but_rejects_key(self):
+        self.create()
+        issued = self.issue()
+        member, secret = issued["data"], issued["key"]
+        path = f"/api/projects/film/members/{member['id']}"
+        # Весь состав виден автору с разделами overview/script, без права team.
+        roster = self.api("GET", "/api/projects/film/members", key=secret)["data"]
+        self.assertIn(member["id"], [m["id"] for m in roster])
+        self.api("GET", path, key=secret)
+        self.api("POST", "/api/projects/film/members", {
+            "name": "Запрещено", "email": "no@example.test", "role": "writer",
+            "sections": ["overview", "script"]}, 403, secret)
+        self.api("PATCH", path, {"role": "producer", "sections": ["overview", "team"]}, 403, secret)
+        self.api("DELETE", path, status=403, key=secret)
+        self.api("PUT", "/api/projects/film/script", {"text": "Можно"}, key=secret)
+        changed = self.api("PATCH", path, {"sections": ["overview"]})
+        self.assertNotIn("key", changed)
+        self.api("GET", "/api/projects/film/script", status=403, key=secret)
+        self.api("PUT", "/api/projects/film/script", {"text": "Нельзя"}, 403, secret)
+        self.api("PATCH", path, {"role": "viewer", "sections": ["overview", "script"]})
+        self.assertEqual(self.api("GET", "/api/session", key=secret)["data"]["role"], "viewer")
+        self.api("GET", "/api/projects/film/script", key=secret)
+        self.api("PUT", "/api/projects/film/script", {"text": "Наблюдатель не пишет"}, 403, secret)
+        revoked = self.api("DELETE", path)["data"]
+        self.assertEqual(revoked["id"], member["id"])
+        self.assertEqual(revoked["accessStatus"], "revoked")
+        self.assertTrue(revoked["revokedAt"])
+        roster = self.api("GET", "/api/projects/film/members")["data"]
+        self.assertEqual(next(m for m in roster if m["id"] == member["id"])["accessStatus"], "revoked")
+        for endpoint in ("/api/session", "/api/projects", "/api/projects/film",
+                         "/api/projects/film/script", "/api/projects/film/members"):
+            with self.subTest(endpoint=endpoint):
+                self.api("GET", endpoint, status=401, key=secret)
+        # Изменение прав не восстанавливает отозванный секрет.
+        result = self.api("PATCH", path, {"role": "writer", "sections": ["overview", "script"]}, 409)
+        self.assertEqual(result["error"]["code"], "ACCESS_REVOKED")
+        self.api("GET", "/api/session", status=401, key=secret)
+
+    def test_all_manager_roles_can_issue_change_and_revoke_access_only_in_their_project(self):
+        self.create()
+        self.create("other")
+        configured = json.loads(self.keys.read_text(encoding="utf-8"))
+        configured["keys"].append({"id": "scoped-admin", "key": "temporary-scoped-admin",
+                                   "role": "admin", "projects": ["film"], "sections": ["*"]})
+        self.keys.write_text(json.dumps(configured), encoding="utf-8")
+        for role in ("admin", "producer", "director"):
+            with self.subTest(role=role):
+                manager_secret = "temporary-scoped-admin" if role == "admin" else self.issue(
+                    role, ["overview", "team", "script"], email=role + "@example.test")["key"]
+                self.assertTrue(self.api("GET", "/api/projects/film", key=manager_secret)["data"]
+                                ["capabilities"]["manageTeam"])
+                created = self.issue(key=manager_secret, email=role + "-writer@example.test")
+                path = f"/api/projects/film/members/{created['data']['id']}"
+                self.api("PATCH", path, {"sections": ["overview"]}, key=manager_secret)
+                self.api("DELETE", path, key=manager_secret)
+                self.api("GET", "/api/session", status=401, key=created["key"])
+                self.api("POST", "/api/projects/other/members", {
+                    "name": "Чужой проект", "email": "other@example.test", "role": "writer",
+                    "sections": ["overview", "script"]}, 403, manager_secret)
+                self.api("GET", "/api/projects/other/members", status=403, key=manager_secret)
+
+    def test_all_nonmanager_roles_can_view_team_but_cannot_mutate_it(self):
+        self.create()
+        for role in ("writer", "cinematographer", "artist", "editor", "viewer"):
+            with self.subTest(role=role):
+                issued = self.issue(role, ["overview", "team"], email=role + "@example.test")
+                secret = issued["key"]
+                path = f"/api/projects/film/members/{issued['data']['id']}"
+                self.api("GET", "/api/projects/film/members", key=secret)
+                self.api("GET", path, key=secret)
+                self.assertFalse(self.api("GET", "/api/projects/film", key=secret)["data"]
+                                 ["capabilities"]["manageTeam"])
+                self.api("POST", "/api/projects/film/members", {
+                    "name": "Нельзя", "email": "no@example.test", "role": "writer",
+                    "sections": ["overview", "script"]}, 403, secret)
+                self.api("PATCH", path, {"role": "producer"}, 403, secret)
+                self.api("DELETE", path, status=403, key=secret)
+
+    def test_cinema_sections_are_accepted_and_issued_roles_apply_them(self):
+        self.create()
+        sections = ["overview", "script", "breakdown", "heroes", "locations", "world",
+                    "storyboard", "shots", "continuity", "sound", "edit", "plan", "journal"]
+        producer = self.issue("producer", sections, email="producer@example.test")
+        self.assertEqual(set(producer["data"]["sections"]), set(sections))
+        session = self.api("GET", "/api/session", key=producer["key"])["data"]
+        self.assertEqual(set(session["sections"]), set(sections))
+        for role, allowed in (
+                ("writer", ["overview", "script", "breakdown", "journal"]),
+                ("cinematographer", ["overview", "storyboard", "shots", "journal"]),
+                ("artist", ["overview", "heroes", "locations", "world", "journal"]),
+                ("editor", ["overview", "edit", "sound", "journal"]),
+                ("viewer", ["overview", "script", "breakdown", "heroes", "locations", "world",
+                            "storyboard", "shots", "continuity", "sound", "edit", "journal"])):
+            with self.subTest(role=role):
+                issued = self.issue(role, allowed, email=role + "@example.test")
+                self.assertEqual(issued["data"]["role"], role)
+                self.assertEqual(set(issued["data"]["sections"]), set(allowed))
+                self.assertEqual(set(self.api("GET", "/api/session", key=issued["key"])["data"]
+                                     ["sections"]), set(allowed))
+
+    def test_invalid_member_fields_never_issue_a_key_or_change_project(self):
+        self.create()
+        payload = {"name": "Автор", "email": "writer@example.test", "role": "writer",
+                   "sections": ["overview", "script"]}
+        before = (self.data / "film" / "project.json").read_bytes()
+        keys_before = self.keys.read_bytes()
+        invalid = ({"email": "no-address"}, {"email": "a@b.test\nBcc:other@b.test"},
+                   {"name": " "}, {"role": "unknown"}, {"role": "admin"}, {"sections": []},
+                   {"sections": ["overview", "overview"]}, {"sections": ["unknown-section"]},
+                   {"sections": "script"}, {"key": "client-selected-secret"},
+                   {"keyHash": "forged"}, {"accessStatus": "active"}, {"revokedAt": "forged"})
+        for changes in invalid:
+            with self.subTest(changes=changes):
+                result = self.api("POST", "/api/projects/film/members", dict(payload, **changes), 422)
+                self.assertNotIn("key", result)
+                self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+                self.assertEqual(self.keys.read_bytes(), keys_before)
+        issued = self.issue()
+        before = (self.data / "film" / "project.json").read_bytes()
+        path = f"/api/projects/film/members/{issued['data']['id']}"
+        for changes in ({"key": "replacement"}, {"keyHash": "forged"},
+                        {"keyId": "admin"}, {"revokedAt": ""}, {"accessStatus": "active"}):
+            with self.subTest(patch=changes):
+                self.api("PATCH", path, changes, 422)
+                self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+        self.api("GET", "/api/session", key=issued["key"])
+
+    def test_manager_cannot_grant_sections_beyond_own_access_via_issued_or_external_keys(self):
+        self.create()
+        manager = self.issue("producer", ["overview", "script", "team"], email="producer@example.test")
+        artist = self.issue("artist", ["overview", "storyboard"], email="artist@example.test")
+        before = (self.data / "film" / "project.json").read_bytes()
+        for body in ({"name": "Художник", "email": "new@example.test", "role": "artist",
+                      "sections": ["overview", "storyboard"]},
+                     {"name": "Внешний художник", "keyId": "artist", "role": "artist",
+                      "sections": ["overview", "storyboard"]}):
+            with self.subTest(body=body):
+                self.api("POST", "/api/projects/film/members", body, 403, manager["key"])
+                self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+        path = f"/api/projects/film/members/{artist['data']['id']}"
+        self.api("PATCH", path, {"sections": ["overview", "storyboard"]}, 403, manager["key"])
+        self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+        self.api("PATCH", path, {"sections": ["overview"]}, key=manager["key"])
+        self.assertEqual(self.api("GET", "/api/session", key=artist["key"])["data"]["sections"],
+                         ["overview"])
+
+    def test_failed_issue_or_revoke_keeps_previous_access_and_revision(self):
+        self.create()
+        before = (self.data / "film" / "project.json").read_bytes()
+        with patch.object(app.os, "replace", side_effect=OSError("Отказ записи")):
+            result = self.api("POST", "/api/projects/film/members", {
+                "name": "Не сохранён", "email": "no@example.test", "role": "writer",
+                "sections": ["overview", "script"]}, 500)
+        self.assertEqual(result["error"]["code"], "STORAGE_WRITE_FAILED")
+        self.assertNotIn("key", result)
+        self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+        issued = self.issue()
+        before = (self.data / "film" / "project.json").read_bytes()
+        path = f"/api/projects/film/members/{issued['data']['id']}"
+        with patch.object(app.os, "replace", side_effect=OSError("Отказ отзыва")):
+            self.api("DELETE", path, status=500)
+        self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+        self.api("GET", "/api/session", key=issued["key"])
+        self.api("GET", "/api/projects/film/script", key=issued["key"])
+
+    def test_issued_member_can_work_as_cell_assignee_and_revoked_member_cannot_be_assigned(self):
+        self.create()
+        self.api("POST", "/api/projects/film/scenes", {"id": "one", "title": "Сцена"}, 201)
+        issued = self.issue()
+        member, secret = issued["data"], issued["key"]
+        cell = self.api("POST", "/api/projects/film/cells", {
+            "object": {"type": "scene", "id": "one"}, "stage": "script",
+            "assignee": {"keyId": member["keyId"]}, "version": "draft-1"}, 201)["data"]
+        self.assertEqual(cell["assignee"], {"keyId": member["keyId"], "name": member["name"]})
+        changed = self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {
+            "status": "working", "comment": "Правлю сцену"}, key=secret)["data"]
+        self.assertEqual(changed["status"], "working")
+        self.assertEqual(self.api("GET", "/api/projects/film/map", key=secret)["data"]
+                         ["myTasks"][0]["id"], cell["id"])
+        self.api("DELETE", f"/api/projects/film/members/{member['id']}")
+        before = (self.data / "film" / "project.json").read_bytes()
+        self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {
+            "assignee": {"keyId": member["keyId"]}}, 422)
+        self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {
+            "comment": "Отозванный исполнитель"}, 401, secret)
+        self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+
+    def test_issued_cinema_stage_scopes_enforce_writer_breakdown_and_editor_sound_read_only(self):
+        self.create()
+        self.api("POST", "/api/projects/film/scenes", {"id": "one", "title": "Сцена"}, 201)
+        writer = self.issue("writer", ["overview", "script", "breakdown"], email="writer@example.test")
+        editor = self.issue("editor", ["overview", "sound", "edit"], email="editor@example.test")
+        artist = self.issue("artist", ["overview", "heroes"], email="artist@example.test")
+        # У художника нет legacy storyboard: работа разрешается именно разделом heroes.
+        heroes = self.api("POST", "/api/projects/film/cells", {
+            "object": {"type": "scene", "id": "one"}, "stage": "heroes",
+            "assignee": {"keyId": artist["data"]["keyId"]}}, 201)["data"]
+        self.api("PATCH", f"/api/projects/film/cells/{heroes['id']}", {
+            "status": "working"}, key=artist["key"])
+        # Монтажёр назначается по edit без legacy post; правка комментария не запускает зависимости.
+        edit = self.api("POST", "/api/projects/film/cells", {
+            "object": {"type": "scene", "id": "one"}, "stage": "edit",
+            "assignee": {"keyId": editor["data"]["keyId"]}}, 201)["data"]
+        self.api("PATCH", f"/api/projects/film/cells/{edit['id']}", {
+            "comment": "Готовлю монтаж"}, key=editor["key"])
+        for stage, issued in (("breakdown", writer), ("sound", editor)):
+            with self.subTest(stage=stage):
+                before = (self.data / "film" / "project.json").read_bytes()
+                self.api("POST", "/api/projects/film/cells", {
+                    "object": {"type": "scene", "id": "one"}, "stage": stage,
+                    "assignee": {"keyId": issued["data"]["keyId"]}}, 422)
+                self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+                cell = self.api("POST", "/api/projects/film/cells", {
+                    "object": {"type": "scene", "id": "one"}, "stage": stage}, 201)["data"]
+                self.api("GET", f"/api/projects/film/cells/{cell['id']}", key=issued["key"])
+                before = (self.data / "film" / "project.json").read_bytes()
+                self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {
+                    "comment": "Нет права записи"}, 403, issued["key"])
+                self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
 
 
 class AtomicWriteTests(unittest.TestCase):
