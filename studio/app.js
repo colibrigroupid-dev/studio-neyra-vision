@@ -596,14 +596,27 @@ function workspace(page) {
   const section = ['map', 'heroes', 'locations'].includes(page) ? 'overview' : page === 'breakdown' ? 'script' : ['storyboard', 'shots', 'animatic'].includes(page) ? 'shots' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
   const denied = !cinemaPages.includes(page) && p?._denied?.includes(section);
   const content = !p ? `<div class='empty'><h1>${t('Нет доступных проектов', 'Қолжетімді жобалар жоқ')}</h1><p>${t('Создайте проект ключом администратора, режиссёра или продюсера. Для входа в существующий проект попросите руководителя выдать ключ участника.', 'Әкімші, режиссер немесе продюсер кілтімен жоба құрыңыз. Бар жобаға кіру үшін жетекшіден қатысушы кілтін сұраңыз.')}</p>${btn(t('Создать проект', 'Жоба құру'), 'create', true, 'plus')}</div>` : denied ? `<div class='empty'><h1>${t('Нет доступа к разделу', 'Бөлімге қолжетімділік жоқ')}</h1><p>${t('Сервер проверяет роль и разделы участника. Попросите руководителя изменить ваши права в разделе «Команда».', 'Сервер қатысушының рөлі мен бөлімдерін тексереді. Жетекшіден «Команда» бөлімінде құқықтарыңызды өзгертуді сұраңыз.')}</p></div>` : pages[page]();
-  return `<div class='workspace ${page === 'map' ? 'map-workspace' : cinemaPages.includes(page) ? 'cinema-workspace' : ''}'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('РАБОЧЕЕ ПРОСТРАНСТВО', 'ЖҰМЫС КЕҢІСТІГІ')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `${navGroupLabel(n.id)}<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}</a>`).join('')}</nav>${accountMenu(p)}</aside><main class='work-main'>${slate(p, page)}<div class='prototype-note'>${t('ПРОТОТИП · Генерация изображений и видео пока не подключена.', 'ПРОТОТИП · Сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}</main></div>${helperStub(p)}${tabbar(page)}</div>`;
+  return `<div class='workspace ${page === 'map' ? 'map-workspace' : cinemaPages.includes(page) ? 'cinema-workspace' : ''}'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('РАБОЧЕЕ ПРОСТРАНСТВО', 'ЖҰМЫС КЕҢІСТІГІ')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `${navGroupLabel(n.id)}<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}${n.id === 'map' && serverClient && meState.awaiting ? `<span class='n hot' data-nav-awaiting>${e(String(meState.awaiting))}</span>` : ''}</a>`).join('')}</nav>${accountMenu(p)}</aside><main class='work-main'>${slate(p, page)}<div class='prototype-note'>${t('ПРОТОТИП · Генерация изображений и видео пока не подключена.', 'ПРОТОТИП · Сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}</main></div>${helperStub(p)}${tabbar(page)}</div>`;
 }
 
+const meState = { awaiting: null, at: 0, loading: false };
+async function refreshMe() {
+  if (!serverClient || meState.loading || Date.now() - meState.at < 30000) return;
+  meState.loading = true;
+  try {
+    const me = await serverClient.request('GET', '/api/me');
+    const slug = project()?.slug; const mine = (me?.data?.projects || []).find(item => item.slug === slug);
+    const next = mine ? mine.awaitingMe : (me?.data?.awaitingMe ?? 0); const changed = next !== meState.awaiting; meState.awaiting = next; meState.at = Date.now();
+    for (const node of document.querySelectorAll('[data-awaiting]')) node.textContent = String(meState.awaiting);
+    if (changed && route() !== 'home' && !busy && !dialog.open) render();
+  } catch { meState.at = Date.now(); }
+  finally { meState.loading = false; }
+}
 function slate(p, page) {
   if (!p) return '';
   const section = navItems().find(n => n.id === page)?.title || '';
   const cell = (label, value) => `<div class='cell'><span>${label}</span><b>${e(String(value))}</b></div>`;
-  return `<div class='slate' aria-label='${t('Где вы находитесь', 'Сіз қайдасыз')}'>${cell(t('Проект', 'Жоба'), local(p.title))}${cell(t('Раздел', 'Бөлім'), section)}${cell(t('Версия', 'Нұсқа'), 'v' + (p.version ?? 0))}${serverClient ? cell(t('Участник', 'Қатысушы'), roleName(p._principal?.role || 'viewer')) : cell(t('Хранение', 'Сақтау'), t('в браузере', 'браузерде'))}</div>`;
+  return `<div class='slate' aria-label='${t('Где вы находитесь', 'Сіз қайдасыз')}'>${cell(t('Проект', 'Жоба'), local(p.title))}${cell(t('Раздел', 'Бөлім'), section)}${cell(t('Версия', 'Нұсқа'), 'v' + (p.version ?? 0))}${serverClient ? cell(t('Участник', 'Қатысушы'), roleName(p._principal?.role || 'viewer')) + `<div class='cell'><span>${t('Ждёт меня', 'Мені күтеді')}</span><b data-awaiting>${meState.awaiting == null ? '…' : e(String(meState.awaiting))}</b></div>` : cell(t('Хранение', 'Сақтау'), t('в браузере', 'браузерде'))}</div>`;
 }
 function accountMenu(p) {
   const principal = p?._principal; const who = principal ? (principal.name || principal.id || '') : t('Гость', 'Қонақ');
@@ -968,6 +981,7 @@ function render() {
   if (route() === 'animatic') updatePlayer();
   if (cinemaPages.includes(route()) && serverClient && project() && !connecting && !cinemaState.loading && !cinemaState.ready && !cinemaState.error) void refreshCinema();
   if (route() === 'map' && serverClient && project() && !connecting && !mapState.loading && !mapState.ready && !mapState.error) void refreshProductionMap();
+  if (route() !== 'home' && serverClient && project() && !connecting) void refreshMe();
 }
 window.addEventListener('hashchange', () => {
   cinemaState.token += 1; cinemaState.loading = false; cinemaState.ready = false; cinemaState.error = ''; passportCard = null; importCard = null;

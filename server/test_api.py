@@ -156,6 +156,17 @@ class ApiTests(unittest.TestCase):
         self.assertTrue((self.data / "film" / "project.json").is_file())
         self.api("POST", "/api/projects", {"slug": "film", "title": "Дубликат"}, 409)
 
+    def test_me_lists_projects_with_personal_counts(self):
+        self.create()
+        me = self.api("GET", "/api/me")["data"]
+        self.assertEqual(me["principal"]["id"], "admin")
+        self.assertEqual([p["slug"] for p in me["projects"]], ["film"])
+        self.assertEqual(me["projects"][0]["awaitingMe"], 0)
+        self.assertEqual(me["projects"][0]["myTasks"], 0)
+        self.assertEqual(me["awaitingMe"], 0)
+        self.assertTrue({"script", "scenes", "shots", "members"}.isdisjoint(me["projects"][0]))
+        self.api("POST", "/api/me", {}, 405)
+
     def test_restore_keeps_current_draft_as_version(self):
         self.create()
         self.api("PUT", "/api/projects/film/script", {"text": "Первая версия", "language": "ru"})

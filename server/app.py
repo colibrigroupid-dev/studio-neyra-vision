@@ -890,6 +890,37 @@ class Handler(SimpleHTTPRequestHandler):
             if method != "GET":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Сессию можно только читать.")
             return 200, {"data": principal_info(principal)}, None
+        if parts == ["api", "me"]:
+            # №36 кабинет участника: кто я и мои проекты с личными счётчиками (ждёт меня / мои задачи)
+            if method != "GET":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Кабинет можно только читать.")
+            mine = []
+            try:
+                directories = sorted(store.root.iterdir()) if store.root.exists() else []
+            except OSError:
+                raise ApiError(500, "STORAGE_READ_FAILED", "Не удалось прочитать список проектов.") from None
+            for directory in directories:
+                if not SLUG.fullmatch(directory.name) or not project_scope(principal, directory.name):
+                    continue
+                if not directory.is_dir() or directory.is_symlink():
+                    continue
+                try:
+                    project = store.read(directory.name)
+                    authorize(principal, directory.name, "overview", project)
+                except ApiError as error:
+                    if error.status in (403, 404):
+                        continue
+                    raise
+                membership = next((m for m in project.get("members", []) if m.get("keyId") == principal["id"]), None)
+                board = production_map(project, principal)
+                item = metadata(project)
+                item.update({"role": membership["role"] if membership else principal["role"],
+                             "sections": sorted(membership["sections"]) if membership else sorted(principal["sections"]),
+                             "awaitingMe": len(board["awaitingMe"]), "myTasks": len(board["myTasks"]),
+                             "sceneCount": len(project.get("scenes", [])), "shotCount": len(project.get("shots", []))})
+                mine.append(item)
+            return 200, {"data": {"principal": principal_info(principal), "projects": mine,
+                                  "awaitingMe": sum(p["awaitingMe"] for p in mine), "myTasks": sum(p["myTasks"] for p in mine)}}, None
         if parts == ["api", "projects"]:
             if method == "GET":
                 projects = []
