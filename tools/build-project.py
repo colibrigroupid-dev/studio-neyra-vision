@@ -300,6 +300,24 @@ def build(slug, proekty, outdir):
         kont = f'<p class="kontakt">Контакт продюсера: <b>{E(k.get("imya",""))}</b> · <a href="{E(k.get("telegram",""))}">Telegram</a> · <a href="mailto:{E(k.get("pochta",""))}">{E(k.get("pochta",""))}</a></p>' if k else ""
         return f'<section id="komanda"><div class="wrap"><p class="caps">Команда</p><h2>Кто делает.</h2><div class="creds">{rows}</div>{kont}</div></section>'
 
+    def nepreryvnost_html():
+        """Раздел «Непрерывность»: реестр кадров и канон — какие кадры сделаны под старый канон (RAZBOR/09 п.8)."""
+        rp = proj / "03-vizual" / "REESTR-KADROV.json"
+        if not rp.exists(): return ""
+        try: r = json.loads(rp.read_text(encoding="utf-8"))
+        except Exception: return ""
+        kadry = r.get("kadry", [])
+        if not kadry: return ""
+        stale = [k for k in kadry if k.get("aktualen") is False]
+        by = {}
+        for k in kadry: by[k.get("status", "draft")] = by.get(k.get("status", "draft"), 0) + 1
+        st_ru = {"draft": "черновик", "approved": "принято", "returned": "возвращено", "review": "на доработке"}
+        counts = " · ".join(f"{st_ru.get(k, k)} {v}" for k, v in by.items())
+        rows = "".join(f"<li><span class='mono'>{E(k['id'])}</span> {E(k.get('geroi') or '')}{' · ' + E(k.get('lokaciya')) if k.get('lokaciya') else ''}</li>" for k in stale[:12])
+        note = (f"<p class='muted'>Под старый канон сделано {len(stale)} из {len(kadry)}: их промпты собраны до последней правки канона — пересобрать перед генерацией.</p><ul class='list'>{rows}</ul>" if stale
+                else f"<p class='muted'>Все {len(kadry)} кадров собраны под текущий канон.</p>")
+        return f'<section id="nepreryvnost"><div class="wrap"><p class="caps">Непрерывность · канон <span class="mono">{E(r.get("kanon_version", "—"))}</span></p><h2>Один облик во всех кадрах.</h2><p class="muted">Кадров {len(kadry)} · {E(counts)}.</p>{note}</div></section>'
+
     def zhurnal_html():
         if not zhurnal: return ""
         return f'<section id="zhurnal"><div class="wrap"><p class="caps">Журнал решений</p><h2>Что решили и когда.</h2><div class="doc doc--zh">{md(zhurnal)}</div></div></section>'
@@ -326,6 +344,7 @@ def build(slug, proekty, outdir):
 </header>
 {path_html()}
 {karta_html()}
+{nepreryvnost_html()}
 <section id="zamysel"><div class="wrap grid2">
   <div><p class="caps">Замысел</p><h2>О чём на самом деле.</h2><div class="doc big">{md(o_chyom)}</div>{podzag_html}</div>
   <div><p class="caps">Решено</p><div class="doc">{md(resheno)}</div>{obs_html}</div>
