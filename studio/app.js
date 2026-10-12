@@ -127,6 +127,14 @@ function schedulePersist() {
   draftTimer = setTimeout(() => { draftTimer = null; persist(draftProjectId); }, 350);
   updateStorageLabel();
 }
+function preserveIndependentDraft(p) {
+  if (!serverClient || !p._scriptText) return;
+  const sceneText = p.scenes.map(s => `${s.title[p._language]}\n\n${s.text[p._language]}`).join('\n\n');
+  if (sceneText === p._scriptText) return;
+  const text = { ru: p._scriptTranslations?.ru || '', kk: p._scriptTranslations?.kk || '' };
+  text[p._language] = p._scriptText;
+  p.scenes.push({ id: `recovery-${crypto.randomUUID()}`, title: { ru: 'Сохранённый черновик', kk: 'Сақталған жұмыс нұсқасы' }, text });
+}
 async function flushDraft() {
   if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; return persist(draftProjectId); }
   await writeQueue;
@@ -155,7 +163,7 @@ const brand = () => `<a class='brand' href='#/' aria-label='neyra.vision'>neyra<
 const langs = () => `<div class='langs' aria-label='${t('Язык интерфейса', 'Интерфейс тілі')}'><button data-lang='ru' class='${state.locale === 'ru' ? 'active' : ''}' aria-pressed='${state.locale === 'ru'}'>РУС</button><button data-lang='kk' class='${state.locale === 'kk' ? 'active' : ''}' aria-pressed='${state.locale === 'kk'}'>ҚАЗ</button></div>`;
 const statusName = status => ({ draft: t('Черновик', 'Жұмыс нұсқасы'), review: t('На согласовании', 'Келісілуде'), approved: t('Утверждено', 'Бекітілді'), working: t('В работе', 'Орындалуда') })[status] || t('Черновик', 'Жұмыс нұсқасы');
 const status = value => `<span class='badge ${e(value)}'><span class='dot'></span>${statusName(value)}</span>`;
-const roles = () => ({ director: t('Режиссёр', 'Режиссер'), writer: t('Сценарист', 'Сценарист'), artist: t('Художник', 'Суретші'), producer: t('Продюсер', 'Продюсер') });
+const roles = () => ({ director: t('Режиссёр', 'Режиссер'), writer: t('Сценарист', 'Сценарист'), artist: t('Художник', 'Суретші'), producer: t('Продюсер', 'Продюсер'), ...(serverClient ? { admin: t('Администратор', 'Әкімші'), editor: t('Монтажёр', 'Монтажшы'), viewer: t('Наблюдатель', 'Бақылаушы') } : {}) });
 const stages = () => [
   { id: 'script', title: t('Сценарий', 'Сценарий'), short: t('От идеи к истории', 'Идеядан оқиғаға'), description: t('Пишите по сценам, обсуждайте правки и фиксируйте утверждённую версию. Сценарий становится основой всех следующих этапов.', 'Көріністерді жазыңыз, түзетулерді талқылаңыз және бекітілген нұсқаны сақтаңыз. Сценарий келесі кезеңдердің негізіне айналады.'), result: t('Версия сценария · сцены · персонажи', 'Сценарий нұсқасы · көріністер · кейіпкерлер') },
   { id: 'storyboard', title: t('Раскадровка', 'Кадрлық жоспар'), short: t('История обретает форму', 'Оқиға бейнеге айналады'), description: t('Разложите сцены на кадры. Соберите действие, композицию и изображения в единую визуальную последовательность.', 'Көріністерді кадрларға бөліңіз. Әрекет, композиция мен суреттерді бірізді визуалды жоспарға біріктіріңіз.'), result: t('Кадры · изображения · визуальные решения', 'Кадрлар · суреттер · визуалды шешімдер') },
@@ -243,7 +251,7 @@ function shotDialog(id) {
   openDialog(`${dialogHead(`${t('Кадр', 'Кадр')} ${e(shot.id)} / ${e(local(shot.title))}`)}<div class='dialog-preview'><img src='assets/hero.jpg' alt='${t('Демонстрационный референс', 'Демонстрациялық референс')}'></div><form id='shot-form' data-id='${e(id)}'><label for='shot-title'>${t('Название кадра', 'Кадр атауы')}</label><input id='shot-title' name='title' value='${e(local(shot.title))}' required maxlength='140'><div class='form-row'><div><label for='shot-duration'>${t('Длительность, сек', 'Ұзақтығы, сек')}</label><input id='shot-duration' name='duration' type='number' min='1' max='60' step='1' value='${shot.duration}' required></div><div><label for='shot-status'>${t('Статус', 'Мәртебе')}</label><select id='shot-status' name='status'>${['draft', 'working', 'review', 'approved'].map(s => `<option value='${s}' ${s === shot.status ? 'selected' : ''}>${statusName(s)}</option>`).join('')}</select></div></div><div class='form-row'><div><label for='shot-owner'>${t('Ответственный', 'Жауапты')}</label><input id='shot-owner' name='owner' value='${e(shot.owner)}' maxlength='80'></div><div><label for='shot-lens'>${t('Объектив', 'Объектив')}</label><input id='shot-lens' name='lens' value='${e(shot.lens)}' maxlength='80'></div></div><label for='shot-description'>${t('Действие и композиция', 'Әрекет пен композиция')}</label><textarea id='shot-description' name='description' rows='2' maxlength='4000'>${e(local(shot.description))}</textarea><label for='shot-prompt'>${t('Промпт для следующего этапа', 'Келесі кезеңге арналған промпт')}</label><textarea id='shot-prompt' name='prompt' rows='3' maxlength='8000'>${e(local(shot.prompt))}</textarea>${dialogActions(t('Сохранить изменения', 'Өзгерістерді сақтау'))}</form><section class='comment-list'><h3>${t('Комментарии', 'Пікірлер')} / ${shot.comments.length}</h3><div id='comments'>${shot.comments.map(c => `<div class='comment'><strong>${e(c.author)}</strong><p>${e(c.text)}</p></div>`).join('')}</div><label for='comment-text'>${t('Ваш комментарий', 'Сіздің пікіріңіз')}</label><textarea id='comment-text' class='comment-input' rows='2' maxlength='2000'></textarea><button class='btn small' data-comment-shot='${e(id)}' style='margin-top:12px'>${t('Оставить комментарий', 'Пікір қалдыру')}${icon('plus')}</button></section>`);
 }
 function versionsDialog() { const p = project(); openDialog(`${dialogHead(t('История сценария', 'Сценарий тарихы'), t('Перед восстановлением откройте текст. Текущая редакция сохранится в истории.', 'Қалпына келтірмес бұрын мәтінді ашыңыз. Қазіргі мәтін тарихта сақталады.'))}<div>${p.snapshots.map((snapshot, index) => `<details class='version-entry'><summary>${t('Версия', 'Нұсқа')} ${snapshot.version} · ${new Date(snapshot.date).toLocaleString(state.locale === 'kk' ? 'kk-KZ' : 'ru-RU')} ${snapshot.kind === 'backup' ? `· ${t('Резервная копия', 'Сақтық көшірме')}` : ''}</summary><pre>${e(serverClient ? snapshot.scriptTranslations?.[state.scriptLang] ?? snapshot.scriptText : snapshot.scenes.map(scene => `${scene.title[state.scriptLang]}\n\n${scene.text[state.scriptLang]}`).join('\n\n————————\n\n'))}</pre><button class='btn small' data-restore-version='${index}'>${t('Восстановить как новую версию', 'Жаңа нұсқа ретінде қалпына келтіру')}${icon('back')}</button></details>`).reverse().join('')}</div>`); }
-async function addScene() { const p = project(); const id = `s-${crypto.randomUUID()}`; p.scenes.push({ id, title: { ru: 'НАТ. НОВАЯ СЦЕНА — ДЕНЬ', kk: 'СЫРТҚЫ КӨРІНІС. ЖАҢА КӨРІНІС — КҮНДІЗ' }, text: { ru: '', kk: '' } }); selectedScene = id; p.scriptStatus = 'draft'; await persist(); go('script'); }
+async function addScene() { const p = project(); preserveIndependentDraft(p); const id = `s-${crypto.randomUUID()}`; p.scenes.push({ id, title: { ru: 'НАТ. НОВАЯ СЦЕНА — ДЕНЬ', kk: 'СЫРТҚЫ КӨРІНІС. ЖАҢА КӨРІНІС — КҮНДІЗ' }, text: { ru: '', kk: '' } }); selectedScene = id; p.scriptStatus = 'draft'; await persist(); go('script'); }
 async function addShot() { const p = project(); if (!p.scenes.length) { toast(t('Сначала добавьте сцену в сценарий.', 'Алдымен сценарийге көрініс қосыңыз.')); go('script'); return; } const id = String(Math.max(0, ...p.shots.map(s => Number(s.id) || 0)) + 1).padStart(2, '0'); const sceneId = p.scenes.some(scene => scene.id === sceneFilter) ? sceneFilter : p.scenes[0].id; const shot = { id, sceneId, title: { ru: 'Новый кадр', kk: 'Жаңа кадр' }, description: { ru: '', kk: '' }, prompt: { ru: '', kk: '' }, duration: 5, status: 'draft', owner: '', lens: '35 mm', movement: { ru: 'Статика', kk: 'Қозғалыссыз' }, comments: [] }; p.shots.push(shot); if (!await persist()) return; render(); shotDialog(id); }
 function updatePlayer() { const shots = project().shots; if (!shots.length || !document.querySelector('#play-seek')) return; const index = frameAt(shots, playTime); document.querySelector('#play-seek').value = playTime; document.querySelector('#play-time').textContent = `${playTime.toFixed(1)} / ${totalDuration(shots)}s`; document.querySelector('#animatic-caption').textContent = local(shots[index].title); document.querySelector('#animatic-image').style.objectPosition = `${[12, 85, 35, 60, 95, 50][index % 6]}% 50%`; document.querySelectorAll('[data-seek-shot]').forEach((el, i) => el.classList.toggle('active', i === index)); const button = document.querySelector('#play-button'); button.innerHTML = icon(playback ? 'pause' : 'animatic'); button.setAttribute('aria-label', playback ? t('Пауза', 'Кідірту') : t('Воспроизвести', 'Ойнату')); }
 function togglePlay() { if (playback) stopPlayback(); else { if (playTime >= totalDuration(project().shots)) playTime = 0; let last = performance.now(); playback = setInterval(() => { const now = performance.now(); playTime = Math.min(totalDuration(project().shots), playTime + (now - last) / 1000); last = now; if (playTime >= totalDuration(project().shots)) stopPlayback(); updatePlayer(); }, 100); } updatePlayer(); }
@@ -300,9 +308,10 @@ app.addEventListener('click', async event => {
 });
 app.addEventListener('input', event => {
   const p = project(); if (!p) return;
-  if (event.target.id === 'draft-text') { p._scriptText = event.target.value; p.scriptStatus = 'draft'; schedulePersist(); }
+  if (event.target.id === 'draft-text') { p._scriptText = event.target.value; p._scriptTranslations[p._language] = p._scriptText; p.scriptStatus = 'draft'; schedulePersist(); }
   if (event.target.id === 'scene-title' || event.target.id === 'scene-text') {
     const scene = p.scenes.find(s => s.id === selectedScene); if (!scene) return;
+    preserveIndependentDraft(p);
     const field = event.target.id === 'scene-title' ? 'title' : 'text'; scene[field][state.scriptLang] = event.target.value;
     if (p.scriptStatus !== 'draft') {
       p.scriptStatus = 'draft'; document.querySelector('.page-heading .row').innerHTML = status('draft');
@@ -336,7 +345,7 @@ app.addEventListener('change', async event => {
       if (!await flushDraft()) return;
       const id = `s-${crypto.randomUUID()}`;
       const scene = { id, title: { ru: file.name, kk: file.name }, text: { ru: '', kk: '' } };
-      scene.text[state.scriptLang] = await file.text(); project().scenes.push(scene); project().scriptStatus = 'draft';
+      scene.text[state.scriptLang] = await file.text(); preserveIndependentDraft(project()); project().scenes.push(scene); project().scriptStatus = 'draft';
       const saved = await persist(); selectedScene = id; render();
       if (saved) toast(t('Файл добавлен отдельной сценой. Исходный текст сохранён.', 'Файл жеке көрініс ретінде қосылды. Бастапқы мәтін сақталды.'));
     });

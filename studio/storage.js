@@ -70,7 +70,7 @@ function emptyProject(metadata) {
     scenes: [], shots: [], members: [], post: [], snapshots: [], version: 0,
     scriptStatus: 'draft',
     _server: true, _language: primary, _projectLanguage: primary,
-    _revision: metadata.revision, _scriptText: '', _scriptTranslations: {}, _denied: [],
+    _revision: metadata.revision, _scriptText: '', _scriptTranslations: {}, _rawScriptTranslations: undefined, _denied: [],
     createdAt: metadata.createdAt, updatedAt: metadata.updatedAt
   });
 }
@@ -227,6 +227,7 @@ export class StudioServer {
     if (draft) {
       p._language = language(draft.language);
       p._scriptText = draft.text;
+      p._rawScriptTranslations = copy(draft.translations);
       p._scriptTranslations = copy(draft.translations || {});
       p._scriptTranslations[p._language] = draft.text;
       p.scriptStatus = draft.status;
@@ -253,6 +254,7 @@ export class StudioServer {
       p.version = 0;
       p._scriptText = '';
       p._scriptTranslations = {};
+      p._rawScriptTranslations = undefined;
     }
     // Also compare a final metadata read: no accepted model mixes revisions.
     this.checkReadRevision(await this.request('GET', path), p._revision);
@@ -296,7 +298,10 @@ export class StudioServer {
     const comparableScenes = scenes => scenes.map(scene => ({ id: scene.id, ...scenePayload(scene, primary) }));
     const scenesChanged = !same(comparableScenes(p.scenes), comparableScenes(known.scenes));
     if (scenesChanged) {
-      known._pendingScenesDraft = { ru: scenesText(p.scenes, 'ru'), kk: scenesText(p.scenes, 'kk') };
+      known._pendingScenesDraft = {
+        texts: { ru: scenesText(p.scenes, 'ru'), kk: scenesText(p.scenes, 'kk') },
+        sourceText: p._scriptText
+      };
     }
     for (const scene of p.scenes) {
       const existing = known.scenes.find(item => item.id === scene.id);
@@ -316,6 +321,9 @@ export class StudioServer {
       const existing = known.shots.find(item => item.id === shot.id);
       const payload = shotPayload(shot, primary);
       const patch = existing ? changes(payload, shotPayload(existing, primary)) : payload;
+      // Re-approval is an explicit action even when the status was already
+      // approved: the API clears its own needsReview flag via that PATCH.
+      if (existing?.needsReview && shot.needsReview === false && shot.status === 'approved') patch.status = 'approved';
       if (!Object.keys(patch).length) continue;
       const result = await write(existing ? 'PATCH' : 'POST', existing ? `${path}/shots/${encodeURIComponent(shot.id)}` : `${path}/shots`, existing ? patch : { id: shot.id, ...payload });
       const model = shotModel(result, primary);
@@ -350,21 +358,28 @@ export class StudioServer {
     if (!p._denied?.includes('script')) {
       const draftLanguage = language(p._language);
       const pendingScenesDraft = known._pendingScenesDraft;
-      const draftText = pendingScenesDraft ? pendingScenesDraft[draftLanguage] : p._scriptText ?? known._scriptText;
-      const draftTranslations = pendingScenesDraft
-        ? copy(pendingScenesDraft)
+      // A retry of the original snapshot still completes its derived draft.
+      // A later whole-text edit takes priority once its scenes are confirmed.
+      const explicitDraftChanged = pendingScenesDraft && !scenesChanged
+        && p._scriptText !== pendingScenesDraft.sourceText
+        && p._scriptText !== pendingScenesDraft.texts[draftLanguage];
+      const usePendingDraft = pendingScenesDraft && !explicitDraftChanged;
+      const draftText = usePendingDraft ? pendingScenesDraft.texts[draftLanguage] : p._scriptText ?? known._scriptText;
+      const draftTranslations = usePendingDraft
+        ? copy(pendingScenesDraft.texts)
         : copy(p._scriptTranslations || known._scriptTranslations || {});
       draftTranslations[draftLanguage] = draftText;
       const payload = { text: draftText, language: draftLanguage, status: p.scriptStatus, translations: draftTranslations };
       const previous = { text: known._scriptText, language: known._language, status: known.scriptStatus, translations: known._scriptTranslations };
       if (!same(payload, previous)) {
         const result = await write('PUT', `${path}/script`, payload);
-        if (result.text !== known._scriptText) {
+        if (result.text !== known._scriptText || !same(result.translations, known._rawScriptTranslations)) {
           for (const shot of known.shots) shot.needsReview = true;
           for (const shot of p.shots) shot.needsReview = true;
         }
         known._scriptText = p._scriptText = result.text;
         known._language = p._language = language(result.language);
+        known._rawScriptTranslations = p._rawScriptTranslations = copy(result.translations);
         known._scriptTranslations = p._scriptTranslations = copy(result.translations || {});
         known._scriptTranslations[known._language] = result.text;
         p._scriptTranslations[p._language] = result.text;

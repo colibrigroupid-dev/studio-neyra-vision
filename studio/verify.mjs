@@ -82,6 +82,7 @@ function nativeApi(slugs = ['film']) {
       assert.equal(typeof body.title, 'string');
       if (projects.has(body.slug)) return errorReply(409, 'ALREADY_EXISTS');
       const p = { ...baseProject(body.slug), ...clone(body) };
+      p.post = ['edit', 'color', 'sound', 'vfx'].map(id => ({ id, done: false }));
       p.members.push({ id: `m${++sequence}`, name: 'Создатель проекта', role: principal.role, keyId: principal.id, sections: clone(principal.sections) });
       projects.set(p.slug, p);
       call.committed = true;
@@ -472,3 +473,101 @@ console.log('Actual app local startup, default settings, escaping, persistence a
   assert.equal(ui.label.textContent, 'сохранено на сервере');
 }
 console.log('Actual app server label, derived draft follow-up, failed-save label and explicit retry: passed.');
+
+{
+  const api = nativeApi();
+  const native = api.projects.get('film');
+  native.scenes = [{ id: 's1', title: 'Сцена', text: 'Начало', translations: { ru: { title: 'Сцена', text: 'Начало' }, kk: { title: 'Көрініс', text: 'Басы' } } }];
+  let hold = false, release, started = false, holdPath = 'script';
+  const fetchImpl = async (url, options) => {
+    if (hold && ['PUT', 'POST'].includes(options.method) && new URL(url).pathname.endsWith(`/${holdPath}`)) {
+      hold = false; started = true;
+      await new Promise(resolve => { release = resolve; });
+    }
+    return api.fetchImpl(url, options);
+  };
+  const stored = new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
+  const ui = await appHarness({ stored, api, fetchImpl });
+  hold = true;
+  await ui.input('scene-text', 'Первая правка');
+  for (const [id, timer] of [...ui.timers]) if (timer.delay === 350) { ui.timers.delete(id); timer.callback(); }
+  for (let i = 0; i < 100 && !started; i += 1) await Promise.resolve();
+  assert.ok(started, 'Delayed write reached the server boundary');
+  assert.equal(ui.label.textContent, 'сохраняется на сервере…');
+  await ui.input('scene-text', 'Следующая правка во время сохранения');
+  release(); await ui.settle();
+  assert.equal(ui.label.textContent, 'сохраняется на сервере…', 'A newer unsent draft keeps the pending label');
+  await ui.flushInput();
+  assert.ok(native.script.text.includes('Следующая правка во время сохранения'), 'An earlier response cannot overwrite a newer author input');
+  api.failOnce(c => c.method === 'PUT' && c.path.endsWith('/script'));
+  await ui.input('scene-text', 'Сцены успели сохраниться, черновик — нет');
+  await ui.flushInput();
+  await ui.input('draft-text', 'Title: Новый полный авторский текст после ошибки\n\n<script>Сохрани дословно</script>');
+  await ui.flushInput();
+  assert.equal(native.script.text, 'Title: Новый полный авторский текст после ошибки\n\n<script>Сохрани дословно</script>', 'A pending derived draft cannot replace a newer explicit full draft');
+  hold = true; holdPath = 'versions'; started = false;
+  const savingVersion = ui.click('save-script');
+  for (let i = 0; i < 100 && !started; i += 1) await Promise.resolve();
+  assert.ok(started);
+  assert.equal(ui.label.textContent, 'сохраняется на сервере…', 'A version is pending until its POST response confirms persistence');
+  assert.equal(ui.app.inert, true);
+  assert.equal(ui.dialog.inert, true);
+  release(); await savingVersion;
+  assert.equal(ui.label.textContent, 'сохранено на сервере');
+  assert.equal(ui.app.inert, false);
+}
+console.log('Actual app in-flight author edits and full-draft retry after partial failure: passed.');
+
+{
+  const api = nativeApi();
+  const native = api.projects.get('film');
+  native.script.text = 'Title: Независимый текущий Fountain\n\nПолный текст вне списка сцен.';
+  native.script.translations.ru = native.script.text;
+  native.versions.push({ id: 'historic', number: 1, kind: 'saved', label: '', createdAt: date, createdBy: 'admin-local', scenes: [], script: { ...clone(native.script), text: 'Title: Исторический Fountain\n\nИсторический текст вне сцен.', translations: { ru: 'Title: Исторический Fountain\n\nИсторический текст вне сцен.' } } });
+  let offline = false;
+  const fetchImpl = async (url, options) => { if (offline) throw new TypeError('Disconnected'); return api.fetchImpl(url, options); };
+  const original = localState(makeDemo());
+  original.projects.existing.snapshots = [{ version: 1, date, scenes: clone(original.projects.existing.scenes) }];
+  const stored = new Map([[workspaceKey, JSON.stringify(original)], [settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
+  const ui = await appHarness({ stored, api, fetchImpl });
+  offline = true;
+  const current = 'Title: Несохранённый полный Fountain\n\n<script>Последняя авторская правка</script>';
+  await ui.input('draft-text', current);
+  await ui.flushInput();
+  assert.equal(ui.label.textContent, 'только в этом браузере');
+  const local = JSON.parse(stored.get(workspaceKey));
+  assert.deepEqual(local.projects.existing, original.projects.existing, 'Offline fallback retains original browser projects');
+  assert.ok(local.projects.film.scenes.some(s => s.text.ru.includes(current)), 'Offline recovery includes the independent current Fountain draft');
+  assert.ok(local.projects.film.snapshots.some(v => v.scenes.some(s => s.text.ru.includes('Исторический текст вне сцен.'))), 'Offline recovery retains independent historical version text');
+  assert.ok(ui.toast.textContent.includes('локальной копией'));
+  offline = false;
+  const failedStored = new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
+  const quotaUi = await appHarness({ stored: failedStored, api, fetchImpl });
+  quotaUi.setStorageFailure(true); offline = true;
+  await quotaUi.input('draft-text', 'Черновик при заполненном localStorage');
+  await quotaUi.flushInput();
+  assert.ok(!quotaUi.toast.textContent.includes('сохранён локальной копией'), 'A failed fallback write cannot claim local persistence');
+  assert.ok(quotaUi.toast.textContent.includes('Не удалось сохранить в браузере'));
+}
+console.log('Actual app offline recovery of current and historical drafts, including local quota failure: passed.');
+
+{
+  const api = nativeApi();
+  const client = connect(api);
+  let p = await client.loadProject('film');
+  p.scenes = clone(makeDemo().scenes);
+  p.shots = clone(makeDemo().shots);
+  await client.saveProject('film', p);
+  p = await client.loadProject('film');
+  for (const shot of p.shots) { shot.status = 'approved'; shot.needsReview = false; }
+  await client.saveProject('film', p);
+  assert.ok(p.shots.every(s => !s.needsReview));
+  assert.ok(api.projects.get('film').shots.every(s => !s.needsReview), 'Reapproving an already approved shot must clear the server review flag too');
+  const oldPrimaryDraft = p._scriptText;
+  p.scenes[0].text.kk += '\nҚазақша авторлық түзету.';
+  await client.saveProject('film', p);
+  assert.equal(p._scriptText, oldPrimaryDraft, 'A Kazakh edit preserves the primary Russian draft');
+  assert.ok(p.shots.every(s => s.needsReview), 'A translated draft change marks every shot for review');
+  assert.ok(api.projects.get('film').shots.every(s => s.needsReview));
+}
+console.log('Translated draft change preserves Russian text and marks all shot materials for review: passed.');
