@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru" data-theme="graphite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Как это работает · Neyra Vision Studio</title>
+<meta name="description" content="Как команда работает в окне проекта Neyra Vision Studio: вход по ключу, разделы по цехам, карта производства, кадры и правило «да».">
+<meta name="theme-color" content="#1a1a1a">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../assets/favicon-64.png" sizes="64x64">
+<link rel="stylesheet" href="../dizayn/tokeny.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 var(--fs-text)/1.55 var(--body);-webkit-font-smoothing:antialiased}
+a{color:inherit}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}::selection{background:var(--accent);color:var(--accent-ink)}
+.wrap{max-width:720px;margin:0 auto;padding:32px 20px 96px}
+.top{display:flex;align-items:center;gap:12px;min-height:44px;margin-bottom:40px}
+.top a{display:inline-flex;align-items:center;gap:10px;min-height:44px;text-decoration:none}
+.top b{font:600 .95rem/1 var(--disp);letter-spacing:.12em;text-transform:uppercase}
+.top small{display:block;font:400 .7rem/1 var(--mono);letter-spacing:.2em;color:var(--dim);margin-top:.35em}
+.label{font:500 var(--fs-label)/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+h1{font:500 clamp(1.75rem,1.4rem + 1.6vw,2.4rem)/1.15 var(--disp);letter-spacing:-.015em;margin:8px 0 12px;text-wrap:balance}
+h2{font:500 var(--fs-lead)/1.25 var(--disp);margin:48px 0 12px}
+p{margin:0 0 12px;max-width:62ch;text-wrap:pretty}
+.lead{color:var(--muted);font-size:1.0625rem}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s;display:grid;gap:10px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:44px 1fr;gap:12px;background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:16px 18px 16px 14px}
+ol.steps li::before{content:counter(s,decimal-leading-zero);font:500 .95rem/1 var(--mono);color:var(--accent);padding-top:3px;grid-row:1/3}
+ol.steps li>*{grid-column:2}
+ol.steps b{display:block;font-weight:600;margin-bottom:4px}
+ol.steps p{margin:0;color:var(--muted);font-size:var(--fs-small)}
+.sheet{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px}
+.row{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:start;padding:14px 18px;border-bottom:1px solid var(--line-soft)}
+.row:last-child{border:0}.row .k{font-weight:600;white-space:nowrap}.row .v{color:var(--muted);font-size:var(--fs-small)}
+.lamp{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--lamp-off);vertical-align:middle;margin-right:8px}
+.lamp.r{background:var(--lamp-red)}.lamp.a{background:var(--lamp-amber)}.lamp.g{background:var(--lamp-green)}
+code{font:.9em var(--mono);background:var(--surface-2);padding:.1em .4em;border-radius:4px}
+.note{border-left:2px solid var(--accent);padding:4px 0 4px 14px;color:var(--muted);margin:16px 0}
+footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line-soft);color:var(--dim);font-size:var(--fs-small)}
+footer a{display:inline-flex;align-items:center;min-height:44px;margin-right:16px}
+@media (max-width:600px){.row{grid-template-columns:1fr}.row .k{white-space:normal}ol.steps p{font-size:1rem}.row .v{font-size:1rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="top"><a href="../"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 7h20v10H2z"/><path d="M8 7v10M16 7v10"/></svg><span><b>Neyra Vision</b><small>STUDIO · ПОМОЩЬ</small></span></a></div>
+
+ <p class="label">Как это работает</p>
+ <h1>Один проект, одно окно, своя задача у каждого.</h1>
+ <p class="lead">Сценарий, разбивка, герои, локации, раскадровка, кадры, звук, монтаж. Каждый работает в своём цехе, продюсер видит всё, решения ставятся в одном месте.</p>
+
+ <h2>Как войти</h2>
+ <ol class="steps">
+  <li><b>Получите ключ участника</b><p>Продюсер заводит вас в разделе «Люди и права» и показывает ключ один раз. Храните его как пароль.</p></li>
+  <li><b>Откройте окно проекта</b><p>Адрес <code>studio.neyra.vision/studio/</code>. Работает на телефоне и ноутбуке.</p></li>
+  <li><b>Подключите сервер</b><p>Кнопка «Сервер» вверху: адрес <code>https://api.studio.neyra.vision</code> и ваш ключ. Один раз на каждом устройстве.</p></li>
+  <li><b>Выберите проект</b><p>Слева появятся разделы, доступные по вашей роли. Что ждёт именно вас, собрано в «Обзоре».</p></li>
+ </ol>
+
+ <h2>Путь проекта</h2>
+ <ol class="steps">
+  <li><b>Сценарий</b><p>Драфты с версиями, читательское заключение, поэпизодник. Фильм пишет человек, помощник держит структуру и формат.</p></li>
+  <li><b>Разбивка</b><p>Из сценария автоматически: сцены, кто в сцене, локации, страницы. Отсюда рождаются паспорта героев и локаций.</p></li>
+  <li><b>Герои и локации</b><p>У каждого паспорт: что никогда не меняется, утверждённый портрет или мастер-пластина, запретные детали. Это замок, который держит один облик во всех кадрах.</p></li>
+  <li><b>Раскадровка</b><p>Сначала карандашом, дёшево: контактный лист всей сцены, режиссёр ставит лампы и пишет замечание одной строкой. Замечание становится правилом для следующих кадров.</p></li>
+  <li><b>Кадры</b><p>Принятые карандашные кадры идут в чистовик, у каждого карточка: номер, крупность, варианты, кто принял, что и за сколько сделано.</p></li>
+  <li><b>Звук, монтаж, выпуск</b><p>Голоса, шумы, сборки по версиям, страница проекта по коду для партнёров и инвесторов.</p></li>
+ </ol>
+
+ <h2>Лампы и решения</h2>
+ <div class="sheet">
+  <div class="row"><div class="k"><span class="lamp"></span>Не начато</div><div class="v">Клетка карты пуста. Ответственный ещё не назначен или не взял в работу.</div></div>
+  <div class="row"><div class="k"><span class="lamp a"></span>В работе · ждёт решения</div><div class="v">Исполнитель сдал версию, утверждающий видит её в «Ждёт меня».</div></div>
+  <div class="row"><div class="k"><span class="lamp g"></span>Принято</div><div class="v">Версия принята, следующий цех может начинать. Решение записано в ленту с именем и временем.</div></div>
+  <div class="row"><div class="k"><span class="lamp r"></span>Возвращено</div><div class="v">С причиной одной строкой. Причина попадает в правила проекта, чтобы не повторяться.</div></div>
+ </div>
+
+ <h2>Три правила</h2>
+ <div class="sheet">
+  <div class="row"><div class="k">Платное только после «да»</div><div class="v">Любая картинка или ролик сначала показывает список кадров и цену. Запуск только касанием, голосом нельзя.</div></div>
+  <div class="row"><div class="k">Видео после принятых картинок</div><div class="v">Сначала кадр, потом лист, потом «да», потом ролик. Так дешевле и ровнее.</div></div>
+  <div class="row"><div class="k">Всё сохраняется с историей</div><div class="v">Кто, когда, чем и за сколько. Проект можно выгрузить одним файлом с паспортом и передать.</div></div>
+ </div>
+
+ <h2>Помощник</h2>
+ <p>Одно окно внизу экрана на всех этапах. Он помнит весь проект: сценарий, героев, решения, журнал. На вкладке «Сценарий» разбирает текст, на «Раскадровке» собирает кадры, на «Карте» говорит, кто тормозит. Можно голосом: «принять 12.3», «вернуть 12.2, свет не совпадает».</p>
+ <p class="note">Не уверены, куда нажать? Спросите помощника словами. Он не тратит ваши деньги без подтверждения.</p>
+
+ <footer><a href="../">На главную</a><a href="../studio/">Открыть окно проекта</a></footer>
+</div>
+</body>
+</html>
