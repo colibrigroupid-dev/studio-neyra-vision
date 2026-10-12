@@ -7,12 +7,11 @@ const valueAt = (value, lang) => typeof value === 'string' ? value : value?.[lan
 const projectPath = slug => `/api/projects/${encodeURIComponent(slug)}`;
 
 export class StudioServerError extends Error {
-  constructor(message, status, code, details) {
+  constructor(message, status, code) {
     super(message);
     this.name = 'StudioServerError';
     this.status = status;
     this.code = code;
-    this.details = details;
   }
 }
 
@@ -155,7 +154,7 @@ export class StudioServer {
       throw new StudioServerError(controller.signal.aborted ? 'Сервер не ответил за 4 секунды.' : 'Сервер недоступен. Проверьте адрес и подключение.', 0, 'NETWORK_ERROR');
     } finally { clearTimeout(timeout); }
     if (!response.ok) {
-      throw new StudioServerError(payload?.error?.message || `Ошибка сервера (${response.status}).`, response.status, payload?.error?.code || 'SERVER_ERROR', payload?.error?.details);
+      throw new StudioServerError(payload?.error?.message || `Ошибка сервера (${response.status}).`, response.status, payload?.error?.code || 'SERVER_ERROR');
     }
     if (!payload || !Object.hasOwn(payload, 'data')) {
       throw new StudioServerError('В ответе сервера нет данных.', response.status, 'INVALID_RESPONSE');
@@ -305,65 +304,6 @@ export class StudioServer {
 
   async revokeMember(slug, id, p) {
     return (await this.writeMember(slug, 'DELETE', id, undefined, p)).data;
-  }
-
-  productionRevision(slug, p, { writing = false } = {}) {
-    const known = this.known.get(slug);
-    if (writing && !known) throw new StudioServerError('Сначала загрузите проект с сервера.', 409, 'PROJECT_NOT_LOADED');
-    if (known && p?._revision != null && p._revision !== known._revision) {
-      throw new StudioServerError('Проект изменился. Загрузите актуальную карту перед продолжением.', 409, 'REVISION_CONFLICT');
-    }
-    return known?._revision ?? p?._revision;
-  }
-
-  // Map/history reads use the same revision as the loaded project. Promoting
-  // only its revision after someone else's edit would leave saveProject's
-  // content baseline stale and could silently overwrite their changes.
-  async loadMap(slug, p) {
-    const expected = this.productionRevision(slug, p);
-    const response = await this.request('GET', `${projectPath(slug)}/map`);
-    this.checkReadRevision(response, expected);
-    const map = response.data;
-    if (!map || map.project !== slug || !['stages', 'objects', 'grid', 'cells', 'myTasks', 'awaitingMe'].every(name => Array.isArray(map[name]))) {
-      throw new StudioServerError('Сервер вернул некорректную карту производства.', 200, 'INVALID_RESPONSE');
-    }
-    // Retain the displayed revision for the UI's stale-card check.
-    return { ...copy(map), _revision: response.revision ?? expected };
-  }
-
-  async loadCells(slug, p) {
-    return this.list(`${projectPath(slug)}/cells`, this.productionRevision(slug, p));
-  }
-
-  async loadApprovals(slug, p) {
-    return this.list(`${projectPath(slug)}/approvals`, this.productionRevision(slug, p));
-  }
-
-  async loadActivity(slug, p) {
-    return this.list(`${projectPath(slug)}/activity`, this.productionRevision(slug, p));
-  }
-
-  async writeProduction(slug, method, resource, payload, p) {
-    const revision = this.productionRevision(slug, p, { writing: true });
-    const response = await this.request(method, `${projectPath(slug)}/${resource}`, payload, { revision });
-    const known = this.known.get(slug);
-    // Commit the confirmed revision immediately. A later map refresh can fail
-    // without causing an accepted action to be retried with an old If-Match.
-    known._revision = response.revision ?? revision + 1;
-    if (p) p._revision = known._revision;
-    return response.data;
-  }
-
-  async createCell(slug, payload, p) {
-    return this.writeProduction(slug, 'POST', 'cells', payload, p);
-  }
-
-  async updateCell(slug, id, payload, p) {
-    return this.writeProduction(slug, 'PATCH', `cells/${encodeURIComponent(id)}`, payload, p);
-  }
-
-  async createApproval(slug, payload, p) {
-    return this.writeProduction(slug, 'POST', 'approvals', payload, p);
   }
 
   async saveProject(slug, p, baseline) {
