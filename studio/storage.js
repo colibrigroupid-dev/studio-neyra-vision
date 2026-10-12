@@ -142,7 +142,8 @@ export class StudioServer {
     let response;
     let payload;
     try {
-      response = await this.fetchImpl(`${this.url}${path}`, options);
+      // Native browser fetch requires the global receiver, not this client.
+      response = await this.fetchImpl.call(globalThis, `${this.url}${path}`, options);
       try { payload = await response.json(); } catch {
         throw new StudioServerError('Сервер вернул некорректный ответ.', response.status, 'INVALID_RESPONSE');
       }

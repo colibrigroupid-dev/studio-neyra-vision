@@ -368,7 +368,7 @@ console.log('External single-language draft and consistent concurrent reload: pa
 // Execute the actual app with a tiny event surface. This verifies saving and
 // rendering behavior without claiming browser layout or native DOM coverage.
 const appSource = (await readFile(new URL('./app.js', import.meta.url), 'utf8')).replace(/^import .*;\n/gm, '');
-async function appHarness({ stored = new Map(), api, fetchImpl, hash = '#/studio/script', failStorage = false } = {}) {
+async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch = false, hash = '#/studio/script', failStorage = false } = {}) {
   const timers = new Map();
   let timerId = 0;
   const handlers = new Map();
@@ -398,7 +398,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, hash = '#/studio
   };
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler) };
   const context = vm.createContext({
-    makeDemo, frameAt, totalDuration, StudioServer: TestServer, structuredClone, localStorage, document, window,
+    makeDemo, frameAt, totalDuration, StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
     location: { hash }, crypto: globalThis.crypto, console, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
@@ -423,6 +423,51 @@ async function appHarness({ stored = new Map(), api, fetchImpl, hash = '#/studio
 const localState = p => ({ locale: 'ru', scriptLang: 'ru', activeId: 'existing', projects: { existing: p } });
 const workspaceKey = 'neyra-vision-prototype-v1';
 const settingsStorageKey = 'neyra-vision-server-settings-v1';
+
+// Browser fetch requires its global receiver. Use the real client constructor
+// and its default fetch, rather than TestServer's injected arrow function.
+{
+  const api = nativeApi();
+  api.projects.get('film').script.text = 'Серверный черновик после перезагрузки';
+  const originalLocal = JSON.stringify(localState(makeDemo()));
+  const stored = new Map([[workspaceKey, originalLocal]]);
+  const originalFetch = globalThis.fetch;
+  const receivers = [];
+  globalThis.fetch = async function (input, options) {
+    receivers.push(this);
+    if (this !== globalThis) throw new TypeError('Illegal invocation');
+    return api.fetchImpl(input, options);
+  };
+  try {
+    const first = await appHarness({ stored, useDefaultFetch: true });
+    assert.equal(first.label.textContent, 'только в этом браузере');
+    assert.equal(receivers.length, 0, 'No connection without a saved role key');
+    await first.click('server');
+    await first.submit('server-form', { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
+    assert.equal(first.label.textContent, 'сохранено на сервере', 'The first submit must connect without a retry');
+    assert.equal(first.storageErrorNode.textContent, '');
+    assert.deepEqual(JSON.parse(stored.get(settingsStorageKey)), { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
+    assert.equal(api.calls.filter(c => c.path === '/api/projects').length, 1);
+
+    const callsBeforeReload = api.calls.length;
+    const reloaded = await appHarness({ stored, useDefaultFetch: true });
+    assert.equal(reloaded.label.textContent, 'сохранено на сервере', 'Saved settings must reconnect on startup without clicks');
+    assert.equal(reloaded.storageErrorNode.textContent, '');
+    assert.equal(vm.runInContext('serverClient instanceof StudioServer', reloaded.context), true);
+    assert.equal(vm.runInContext('state.activeId', reloaded.context), 'film');
+    assert.equal(vm.runInContext('Object.keys(state.projects).join(",")', reloaded.context), 'film');
+    assert.equal(vm.runInContext('project()._scriptText', reloaded.context), api.projects.get('film').script.text);
+    const reloadCalls = api.calls.slice(callsBeforeReload);
+    assert.equal(reloadCalls.filter(c => c.path === '/api/projects').length, 1, 'Startup connects once');
+    assert.ok(reloadCalls.length > 1, 'Startup also loads server project contents');
+    assert.ok(api.calls.every(c => c.method === 'GET' && c.key === 'admin-secret'));
+    assert.equal(stored.get(workspaceKey), originalLocal, 'Connecting and reload retain the separate local workspace');
+    assert.ok(receivers.length > 0 && receivers.every(receiver => receiver === globalThis));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+console.log('Native-like default fetch receiver, first connection and automatic reconnect with saved settings: passed.');
 
 {
   const p = makeDemo();
