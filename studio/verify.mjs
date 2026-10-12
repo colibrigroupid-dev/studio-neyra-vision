@@ -372,6 +372,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, hash = '#/studio
   const timers = new Map();
   let timerId = 0;
   const handlers = new Map();
+  const downloads = [];
   const label = { textContent: '' };
   const storageErrorNode = { textContent: '', hidden: true };
   const element = () => ({
@@ -392,12 +393,13 @@ async function appHarness({ stored = new Map(), api, fetchImpl, hash = '#/studio
   const document = {
     documentElement: {}, activeElement: null, title: '',
     querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft })[selector] || (selector.startsWith('.') ? element() : null); },
-    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : []; }
+    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : []; },
+    createElement() { return element(); }
   };
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler) };
   const context = vm.createContext({
     makeDemo, frameAt, totalDuration, StudioServer: TestServer, structuredClone, localStorage, document, window,
-    location: { hash }, crypto: globalThis.crypto, console, URL, Blob, performance,
+    location: { hash }, crypto: globalThis.crypto, console, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
     setInterval: () => ++timerId, clearInterval() {}
@@ -413,7 +415,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, hash = '#/studio
   const submit = (id, fields, dataset = {}) => dispatch(dialog, 'submit', { id, fields, dataset });
   const flushInput = async () => { for (const [id, timer] of [...timers]) if (timer.delay === 350) { timers.delete(id); timer.callback(); } await settle(); };
   await settle();
-  return { app, dialog, toast, label, storageErrorNode, stored, context, click, input, submit, flushInput, settle, timers,
+  return { app, dialog, toast, label, storageErrorNode, stored, context, click, input, submit, flushInput, settle, timers, downloads,
     navigate: async page => { context.location.hash = `#/studio/${page}`; await handlers.get('hashchange')?.(); },
     setStorageFailure: value => { failStorage = value; }
   };
@@ -571,3 +573,28 @@ console.log('Actual app offline recovery of current and historical drafts, inclu
   assert.ok(api.projects.get('film').shots.every(s => s.needsReview));
 }
 console.log('Translated draft change preserves Russian text and marks all shot materials for review: passed.');
+
+{
+  const api = nativeApi();
+  const native = api.projects.get('film');
+  const independent = 'Title: Независимый Fountain\n\n<script>Авторский текст вне списка сцен</script>';
+  native.script.text = independent;
+  native.script.translations.ru = independent;
+  native.scenes = [{ id: 's1', title: 'Первоначальная сцена', text: 'Сценический текст' }];
+  const stored = new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
+  const ui = await appHarness({ stored, api });
+  await ui.click('add-scene');
+  assert.ok(native.scenes.some(s => s.text === independent), 'Adding a scene preserves an independent Fountain draft as a recovery scene');
+  assert.ok(native.script.text.includes(independent));
+  const newest = 'Title: Самая свежая авторская правка\n\n<script>Экспорт до подтверждения</script>';
+  await ui.input('draft-text', newest);
+  await ui.click('download');
+  assert.equal(await ui.downloads.at(-1).text(), newest, 'Export includes the current full draft before the server acknowledges it');
+  assert.notEqual(native.script.text, newest, 'The export was tested before the delayed save');
+  await ui.flushInput();
+  await ui.input('scene-text', 'Новая правка выбранной сцены');
+  await ui.flushInput();
+  assert.ok(native.scenes.some(s => s.text === newest), 'Editing a scene preserves the independent full draft before deriving new text');
+  assert.ok(native.script.text.includes(newest));
+}
+console.log('Actual app preserves independent Fountain before scene edits and exports newest text before acknowledgement: passed.');
