@@ -103,4 +103,4 @@ dialog input,dialog select,dialog textarea{background:var(--bg);border:1px solid
   .helper-stub{left:0}.workspace .btn,.workspace .langs button,.workspace .work-controls #project-switch,.workspace .work-header .brand{min-height:44px}.helper-stub .q input{font-size:16px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-.passport-card .passport-empty{color:var(--dim)}
+.passport-card .passport-empty{color:var(--muted)}
