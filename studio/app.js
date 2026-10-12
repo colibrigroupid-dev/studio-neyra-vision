@@ -638,6 +638,7 @@ function accountMenu(p) {
   const role = principal ? roleName(principal.role) : t('без ключа', 'кілтсіз');
   const initial = String(who || '·').trim().slice(0, 1).toUpperCase();
   return `<details class='menu'><summary><span class='ava' aria-hidden='true'>${e(initial)}</span><span class='who'><b>${e(who)}</b><small>${e(role)}</small></span></summary><div class='pop' role='menu'>
+    ${Object.keys(state.projects).length > 1 ? `<div class='menu-group'>${t('Мои проекты', 'Менің жобаларым')}</div>${Object.entries(state.projects).slice(0, 6).map(([id, record]) => `<button type='button' role='menuitem' data-project='${e(id)}' ${id === state.activeId ? `aria-current='true'` : ''}>${icon('overview')}${e(local(record.title) || id)}</button>`).join('')}<hr>` : ''}
     <a href='../pomoshch/' role='menuitem'>${icon('script')}${t('Как это работает', 'Бұл қалай жұмыс істейді')}</a>
     <button type='button' role='menuitem' data-action='server'>${icon('team')}${t('Сервер и ключ', 'Сервер мен кілт')}</button>
     <button type='button' role='menuitem' data-action='create'>${icon('plus')}${t('Новый проект', 'Жаңа жоба')}</button>
@@ -778,6 +779,8 @@ app.addEventListener('click', async event => {
   if (event.target.closest("[data-action='voice']")) { listenVoice(); return; }
   const chip = event.target.closest('[data-cmd]');
   if (chip) { runCommand(chip.dataset.cmd); return; }
+  const pick = event.target.closest('[data-project]');
+  if (pick) { const id = pick.dataset.project; await runOperation(async () => { if (!await flushDraft()) { render(); return; } if (serverClient) state.projects[id] = await serverClient.loadProject(id); state.activeId = id; selectedScene = null; sceneFilter = 'all'; playTime = 0; persistPreferences(); go('overview'); render(); }); return; }
   const waitRow = event.target.closest('[data-open-cell]');
   if (waitRow) { event.preventDefault(); mapFilter = 'awaiting'; go('map'); await runOperation(() => mapCellDialog(waitRow.dataset.openCell)); return; }
   const lang = event.target.closest('[data-lang]');
