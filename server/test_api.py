@@ -296,6 +296,8 @@ class ApiTests(unittest.TestCase):
 
     def test_new_fields_validate_shape_and_post_checks_section_and_write_role(self):
         self.create()
+        self.assertEqual(self.api("GET", "/api/projects/film/post")["data"], {"tasks": [
+            {"id": task_id, "done": False} for task_id in ("edit", "color", "sound", "vfx")]})
         for translations in ([], {"en": {}}, {"kk": []}, {"ru": {"secret": "Нет"}}):
             with self.subTest(translations=translations):
                 self.api("PATCH", "/api/projects/film", {"translations": translations}, 422)

@@ -49,6 +49,12 @@ function useLocal(keepCurrent = false) {
     const active = state.activeId;
     for (const [id, record] of Object.entries(state.projects)) {
       const copy = structuredClone(record);
+      const sceneText = copy.scenes.map(s => `${s.title[copy._language]}\n\n${s.text[copy._language]}`).join('\n\n');
+      if (copy._scriptText && copy._scriptText !== sceneText) {
+        const draftText = { ru: copy._scriptTranslations?.ru || '', kk: copy._scriptTranslations?.kk || '' };
+        draftText[copy._language] = copy._scriptText;
+        copy.scenes.push({ id: `recovery-${crypto.randomUUID()}`, title: { ru: 'Сохранённый черновик', kk: 'Сақталған жұмыс нұсқасы' }, text: draftText });
+      }
       for (const key of Object.keys(copy)) if (key.startsWith('_')) delete copy[key];
       const target = localWorkspace.projects[id] ? `server-${id}-${crypto.randomUUID()}` : id;
       localWorkspace.projects[target] = copy;
@@ -60,13 +66,13 @@ function useLocal(keepCurrent = false) {
   serverClient = null;
   state = localWorkspace;
   selectedScene = null;
-  persistLocal();
+  return persistLocal();
 }
 function reportStorageError(error) {
   storageError = `${t('Ошибка:', 'Қате:')} ${error.message || t('Не удалось сохранить.', 'Сақтау мүмкін болмады.')}`;
   if (error.status === 0) {
-    useLocal(true);
-    storageError += t(' Текущий проект сохранён локальной копией; подключитесь повторно через «Сервер».', 'Қазіргі жоба жергілікті көшірме ретінде сақталды; «Сервер» арқылы қайта қосылыңыз.');
+    const savedLocally = useLocal(true);
+    storageError += savedLocally ? t(' Текущий проект сохранён локальной копией; подключитесь повторно через «Сервер».', 'Қазіргі жоба жергілікті көшірме ретінде сақталды; «Сервер» арқылы қайта қосылыңыз.') : t(' Локальная запись тоже не удалась. Скачайте сценарий до закрытия страницы.', 'Жергілікті сақтау да орындалмады. Бетті жаппас бұрын сценарийді жүктеп алыңыз.');
     render();
   }
   updateStorageLabel(); toast(storageError);
@@ -77,12 +83,22 @@ async function persist(id = state.activeId) {
   const record = state.projects[id];
   if (!record) return false;
   const draft = structuredClone(record);
+  const originalScenes = JSON.stringify(record.scenes);
+  const originalText = record._scriptText;
+  const originalStatus = record.scriptStatus;
   pendingWrites += 1; updateStorageLabel();
   const save = writeQueue.then(async () => {
     if (client !== serverClient) return false;
     try {
       await client.saveProject(id, draft);
       record._revision = draft._revision;
+      if (originalScenes === JSON.stringify(record.scenes) && originalText === record._scriptText) {
+        record._scriptText = draft._scriptText;
+        record._scriptTranslations = draft._scriptTranslations;
+        record._language = draft._language;
+      }
+      if (originalStatus === record.scriptStatus) record.scriptStatus = draft.scriptStatus;
+      for (const shot of record.shots) if (draft.shots.find(s => s.id === shot.id)?.needsReview) shot.needsReview = true;
       for (const member of record.members) {
         const saved = draft.members.find(m => m.keyId && m.keyId === member.keyId);
         if (saved) member.id = saved.id;
@@ -104,7 +120,8 @@ function schedulePersist() {
 }
 async function flushDraft() {
   if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; return persist(draftProjectId); }
-  await writeQueue; return !storageError;
+  await writeQueue;
+  return storageError ? persist() : true;
 }
 async function connectServer() {
   if (!settings.key) { useLocal(); storageError = ''; connecting = false; render(); return; }

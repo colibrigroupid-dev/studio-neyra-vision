@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
 import { frameAt, totalDuration } from './timeline.js';
 import { makeDemo } from './data.js';
 
@@ -361,3 +363,112 @@ console.log('Revision conflict, missing key and typed network error: passed.');
   assert.equal(p._scriptText, 'Черновик, изменённый во время чтения');
 }
 console.log('External single-language draft and consistent concurrent reload: passed.');
+
+// Execute the actual app with a tiny event surface. This verifies saving and
+// rendering behavior without claiming browser layout or native DOM coverage.
+const appSource = (await readFile(new URL('./app.js', import.meta.url), 'utf8')).replace(/^import .*;\n/gm, '');
+async function appHarness({ stored = new Map(), api, fetchImpl, hash = '#/studio/script', failStorage = false } = {}) {
+  const timers = new Map();
+  let timerId = 0;
+  const handlers = new Map();
+  const label = { textContent: '' };
+  const storageErrorNode = { textContent: '', hidden: true };
+  const element = () => ({
+    listeners: new Map(), innerHTML: '', textContent: '', value: '', dataset: {}, inert: false, open: false,
+    classList: { add() {}, remove() {}, toggle() {} }, style: {}, isConnected: true,
+    addEventListener(type, callback) { this.listeners.set(type, callback); },
+    showModal() { this.open = true; }, close() { this.open = false; this.listeners.get('close')?.({}); },
+    focus() {}, click() {}, setAttribute() {}, querySelector() { return null; }
+  });
+  const app = element(), dialog = element(), toast = element(), draft = element();
+  let markup = '';
+  Object.defineProperty(app, 'innerHTML', { get: () => markup, set: value => {
+    markup = value;
+    label.textContent = /data-storage-label[^>]*>([^<]*)/.exec(value)?.[1] || '';
+  } });
+  const localStorage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => { if (failStorage) throw new Error('Quota exceeded'); stored.set(key, value); } };
+  class TestServer extends StudioServer { constructor(settings) { super({ ...settings, fetchImpl: fetchImpl || api?.fetchImpl || (async () => { throw new TypeError('Offline'); }) }); } }
+  const document = {
+    documentElement: {}, activeElement: null, title: '',
+    querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft })[selector] || (selector.startsWith('.') ? element() : null); },
+    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : []; }
+  };
+  const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler) };
+  const context = vm.createContext({
+    makeDemo, frameAt, totalDuration, StudioServer: TestServer, structuredClone, localStorage, document, window,
+    location: { hash }, crypto: globalThis.crypto, console, URL, Blob, performance,
+    FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
+    setInterval: () => ++timerId, clearInterval() {}
+  });
+  vm.runInContext(appSource, context, { filename: 'studio/app.js' });
+  const settle = async () => {
+    for (let i = 0; i < 300 && vm.runInContext('connecting || pendingWrites || busy', context); i += 1) await Promise.resolve();
+    assert.equal(vm.runInContext('connecting || pendingWrites || busy', context), false, 'App asynchronous operation must finish');
+  };
+  const dispatch = async (surface, type, target) => surface.listeners.get(type)?.({ target, preventDefault() {} });
+  const click = action => dispatch(app, 'click', { closest: selector => selector === '[data-action]' ? { dataset: { action } } : null });
+  const input = (id, value) => dispatch(app, 'input', { id, value });
+  const submit = (id, fields, dataset = {}) => dispatch(dialog, 'submit', { id, fields, dataset });
+  const flushInput = async () => { for (const [id, timer] of [...timers]) if (timer.delay === 350) { timers.delete(id); timer.callback(); } await settle(); };
+  await settle();
+  return { app, dialog, toast, label, storageErrorNode, stored, context, click, input, submit, flushInput, settle, timers,
+    navigate: async page => { context.location.hash = `#/studio/${page}`; await handlers.get('hashchange')?.(); },
+    setStorageFailure: value => { failStorage = value; }
+  };
+}
+const localState = p => ({ locale: 'ru', scriptLang: 'ru', activeId: 'existing', projects: { existing: p } });
+const workspaceKey = 'neyra-vision-prototype-v1';
+const settingsStorageKey = 'neyra-vision-server-settings-v1';
+
+{
+  const p = makeDemo();
+  p.title.ru = '<script>Название</script>';
+  const stored = new Map([[workspaceKey, JSON.stringify(localState(p))]]);
+  const ui = await appHarness({ stored });
+  assert.equal(ui.label.textContent, 'только в этом браузере');
+  assert.ok(ui.app.innerHTML.includes('&lt;script&gt;Название&lt;/script&gt;'));
+  assert.ok(!ui.app.innerHTML.includes('<script>Название'));
+  await ui.click('server');
+  assert.ok(ui.dialog.innerHTML.includes("value='http://127.0.0.1:8770'"));
+  assert.ok(ui.dialog.innerHTML.includes("type='password'"));
+  const raw = '<script>Авторский текст</script> & "реплика"';
+  await ui.input('scene-text', raw);
+  assert.equal(JSON.parse(stored.get(workspaceKey)).projects.existing.scenes[0].text.ru, raw);
+  const restarted = await appHarness({ stored });
+  assert.ok(restarted.app.innerHTML.includes('&lt;script&gt;Авторский текст&lt;/script&gt; &amp; &quot;реплика&quot;'));
+  await restarted.click('save-script');
+  assert.equal(restarted.toast.textContent, 'Версия сценария сохранена.');
+  assert.equal(JSON.parse(stored.get(workspaceKey)).projects.existing.version, 2);
+  restarted.setStorageFailure(true);
+  await restarted.input('scene-text', 'Невозможно записать');
+  assert.ok(restarted.toast.textContent.includes('Не удалось сохранить в браузере'));
+  await restarted.click('save-script');
+  assert.ok(!restarted.toast.textContent.includes('Версия сценария сохранена'), 'Quota failure must not claim a successful version');
+}
+console.log('Actual app local startup, default settings, escaping, persistence and quota failure: passed.');
+
+{
+  const api = nativeApi();
+  const native = api.projects.get('film');
+  native.scenes = [{ id: 's1', title: 'ИНТ. КОМНАТА — ДЕНЬ', text: 'Начало', translations: { ru: { title: 'ИНТ. КОМНАТА — ДЕНЬ', text: 'Начало' }, kk: { title: 'ІШКІ. ҮЙ — КҮН', text: 'Басы' } } }];
+  native.script = { text: 'ИНТ. КОМНАТА — ДЕНЬ\n\nНачало', language: 'ru', status: 'draft', updatedAt: date, translations: { ru: 'ИНТ. КОМНАТА — ДЕНЬ\n\nНачало', kk: 'ІШКІ. ҮЙ — КҮН\n\nБасы' } };
+  const originalLocal = JSON.stringify(localState(makeDemo()));
+  const stored = new Map([[workspaceKey, originalLocal], [settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
+  const ui = await appHarness({ stored, api });
+  assert.equal(ui.label.textContent, 'сохранено на сервере');
+  assert.equal(stored.get(workspaceKey), originalLocal, 'Connecting retains the independent browser workspace');
+  await ui.click('add-scene');
+  assert.ok(native.script.text.includes('НОВАЯ СЦЕНА'));
+  await ui.click('save-script');
+  assert.ok(native.versions.at(-1).script.text.includes('НОВАЯ СЦЕНА'), 'A follow-up save must retain the draft derived by add-scene');
+  api.failOnce(c => c.method === 'PATCH' && c.path.includes('/scenes/'));
+  await ui.input('scene-text', 'Правка с ошибкой сохранения');
+  await ui.flushInput();
+  assert.equal(ui.label.textContent, 'ошибка сохранения');
+  assert.ok(!ui.toast.textContent.includes('Версия сценария сохранена'));
+  await ui.click('save-script');
+  assert.ok(native.versions.at(-1).script.text.includes('Правка с ошибкой сохранения'), 'Explicit save retries a failed draft');
+  assert.equal(ui.label.textContent, 'сохранено на сервере');
+}
+console.log('Actual app server label, derived draft follow-up, failed-save label and explicit retry: passed.');
