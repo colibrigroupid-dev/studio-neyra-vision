@@ -441,6 +441,26 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(raw, b"literal encoded asset")
         self.assertNotIn(b"PRIVATE_MARKER", raw)
 
+    def test_encoded_leading_slash_cannot_redirect_to_external_host(self):
+        (self.repo / "studio").mkdir()
+        (self.repo / "studio" / "index.html").write_text("studio", encoding="utf-8")
+        status, _, _, headers = self.request("GET", "/%2fstudio", key=None, include_headers=True)
+        self.assertEqual(status, 400)
+        self.assertNotIn("Location", headers)
+
+    def test_incomplete_body_is_rejected_before_creating_project(self):
+        body = b'{"slug":"film","title":"Title"}'
+        incoming = (b"POST /api/projects HTTP/1.0\r\nX-Key: temporary-admin\r\n"
+                    b"Content-Type: application/json\r\nContent-Length: 200\r\n\r\n" + body)
+        connection = MemorySocket(incoming)
+        self.httpd.RequestHandlerClass(connection, ("127.0.0.1", 12345), self.httpd)
+        response = http.client.HTTPResponse(MemorySocket(bytes(connection.outgoing)))
+        response.begin()
+        status, failure, _ = self.read_response(response, False)
+        self.assertEqual(status, 400)
+        self.assertEqual(failure["error"]["code"], "INVALID_JSON")
+        self.assertFalse((self.data / "film" / "project.json").exists())
+
     def test_head_does_not_disclose_private_files_or_send_a_body(self):
         self.create()
         status, _, raw, headers = self.request("HEAD", "/", key=None, include_headers=True)

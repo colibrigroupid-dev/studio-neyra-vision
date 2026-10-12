@@ -383,7 +383,10 @@ class Handler(SimpleHTTPRequestHandler):
         if self.headers.get_content_type() != "application/json":
             raise ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Нужен Content-Type: application/json.")
         try:
-            value = parse_json(self.rfile.read(size).decode("utf-8"))
+            raw = self.rfile.read(size)
+            if len(raw) != size:
+                raise ValueError()
+            value = parse_json(raw.decode("utf-8"))
         except (ValueError, RecursionError):
             raise ApiError(400, "INVALID_JSON", "Некорректный JSON в кодировке UTF-8.") from None
         if not isinstance(value, dict):
@@ -633,7 +636,7 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             url = urlsplit(self.path)
             path = unquote(url.path, errors="strict")
-            if ("\\" in path or any(ord(c) < 32 for c in path)
+            if (path.startswith("//") or "\\" in path or any(ord(c) < 32 for c in path)
                     or any(p in (".", "..") for p in path.split("/"))):
                 raise ApiError(400, "BAD_REQUEST", "Некорректный путь.")
             if path == "/api" or path.startswith("/api/"):
