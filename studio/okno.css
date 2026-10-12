@@ -70,7 +70,7 @@ body{font-size:16px;line-height:1.5}
   .tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 .65rem/1 var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--dim);min-height:44px}
   .tabbar a[aria-current]{color:var(--text)}.tabbar .icon{width:20px;height:20px}
   .sidebar{position:static;height:auto;overflow:visible}.menu{display:none}
-  .helper-stub{bottom:60px}.work-main{padding-bottom:250px}.work-main .sheet .row{grid-template-columns:1fr}.work-main .sheet .row .c{grid-column:1;grid-row:auto}.helper-stub .chip{min-height:36px}
+  .helper-stub{bottom:60px}.work-main{padding-bottom:250px}.work-main .sheet .row{grid-template-columns:1fr}.work-main .sheet .row .c{grid-column:1;grid-row:auto}.helper-stub .chips .chip{min-height:44px;padding:0 14px;font-size:14px}
 }
 /* группа листов на Обзоре (как в прототипе) */
 .work-main .group{display:grid;gap:12px;margin-bottom:28px}
