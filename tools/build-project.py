@@ -147,6 +147,7 @@ def build(slug, proekty, outdir):
     personazhi = (proj / "01-zamysel" / "personazhi.md").read_text(encoding="utf-8") if (proj / "01-zamysel" / "personazhi.md").exists() else ""
     poepizodnik = (proj / "02-scenariy" / "poepizodnik.md").read_text(encoding="utf-8") if (proj / "02-scenariy" / "poepizodnik.md").exists() else ""
     smeta = (proj / "SMETA.md").read_text(encoding="utf-8") if (proj / "SMETA.md").exists() else ""
+    razbivka = (proj / "02-scenariy" / "razbivka.md").read_text(encoding="utf-8") if (proj / "02-scenariy" / "razbivka.md").exists() else ""
 
     out = outdir / slug
     imgdir = out / "img"
@@ -270,6 +271,7 @@ def build(slug, proekty, outdir):
 </div></section>
 {lenta_html()}
 <section id="sinopsis"><div class="wrap"><p class="caps">Синопсис</p><h2>История.</h2><div class="doc cols">{md(sinopsis)}</div></div></section>
+{"<section id='razbivka'><div class='wrap'><p class='caps'>Разбивка сценария</p><h2>Сцены, герои, локации — из драфта.</h2><div class='doc' style='max-width:none'>"+md(razbivka)+"</div></div></section>" if razbivka else ""}
 <section id="geroi"><div class="wrap"><p class="caps">Герои</p><h2>Кто есть кто.</h2><div class="doc">{md(personazhi)}</div></div></section>
 <section id="poepizodnik"><div class="wrap"><p class="caps">Поэпизодник</p><h2>Пятнадцать битов.</h2><div class="doc">{md(poepizodnik)}</div></div></section>
 {stil_html}

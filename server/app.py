@@ -4,6 +4,7 @@
 import argparse
 import copy
 from datetime import datetime, timezone
+import hashlib
 import hmac
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -26,10 +27,23 @@ ROLE_SECTIONS = {
     "writer": frozenset(("overview", "script")),
     "artist": frozenset(("overview", "storyboard", "shots")),
     "editor": frozenset(("overview", "animatic", "post")),
+    "assistant_director": frozenset(("overview", "script")),
+    "cinematographer": frozenset(("overview", "storyboard", "shots")),
     "viewer": SECTIONS - {"team"},
 }
 MANAGERS = frozenset(("admin", "director", "producer"))
 STATUSES = frozenset(("draft", "working", "review", "approved"))
+STAGES = ("script", "breakdown", "heroes", "locations", "storyboard", "shots", "video", "sound", "edit")
+STAGE_SECTIONS = dict(zip(STAGES, ("script", "script", "storyboard", "storyboard", "storyboard",
+                                        "shots", "animatic", "post", "post")))
+APPROVER_ROLES = {
+    "script": ("producer", "writer"), "breakdown": ("assistant_director",),
+    "heroes": ("director",), "locations": ("director",),
+    "storyboard": ("director", "cinematographer"), "shots": ("director",),
+    "video": ("director",), "sound": ("director",), "edit": ("producer", "director"),
+}
+CELL_STATUSES = frozenset(("empty", "working", "done", "awaiting", "approved", "returned"))
+OBJECT_TYPES = frozenset(("scene", "shot", "teaser", "episode"))
 SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\Z")
 IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}\Z")
 PUBLIC_EXTENSIONS = frozenset((
