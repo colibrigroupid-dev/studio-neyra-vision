@@ -1,0 +1,53 @@
+{
+  "keys": [
+    {
+      "id": "admin-local",
+      "key": "",
+      "role": "admin",
+      "projects": ["*"],
+      "sections": ["overview", "script", "storyboard", "shots", "animatic", "team", "post"]
+    },
+    {
+      "id": "director-local",
+      "key": "",
+      "role": "director",
+      "projects": ["demo"],
+      "sections": ["overview", "script", "storyboard", "shots", "animatic", "team", "post"]
+    },
+    {
+      "id": "producer-local",
+      "key": "",
+      "role": "producer",
+      "projects": ["demo"],
+      "sections": ["overview", "script", "storyboard", "shots", "animatic", "team", "post"]
+    },
+    {
+      "id": "writer-local",
+      "key": "",
+      "role": "writer",
+      "projects": ["demo"],
+      "sections": ["overview", "script"]
+    },
+    {
+      "id": "artist-local",
+      "key": "",
+      "role": "artist",
+      "projects": ["demo"],
+      "sections": ["overview", "storyboard", "shots"]
+    },
+    {
+      "id": "editor-local",
+      "key": "",
+      "role": "editor",
+      "projects": ["demo"],
+      "sections": ["overview", "animatic", "post"]
+    },
+    {
+      "id": "viewer-local",
+      "key": "",
+      "role": "viewer",
+      "projects": ["demo"],
+      "sections": ["overview", "script", "storyboard", "shots", "animatic", "post"]
+    }
+  ]
+}
