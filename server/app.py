@@ -18,6 +18,11 @@ import threading
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 import uuid
 
+if __package__:
+    from .blocks import breakdown
+else:
+    from blocks import breakdown
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_KEYS = Path.home() / ".config/neyra-studio/keys.json"
@@ -457,7 +462,7 @@ def activity(project, principal, action, obj, data, stage=None, invalidated=()):
     journal = project["activity"]
     member = next((m for m in project["members"] if m["keyId"] == principal["id"]), None)
     event = {
-        "id": uuid.uuid4().hex, "sequence": len(journal) + 1,
+        "id": breakdown.ulid(), "studio_id": project["studio_id"], "sequence": len(journal) + 1,
         "keyId": principal["id"], "name": member["name"] if member else principal["id"],
         "createdAt": timestamp(), "action": action, "object": copy.deepcopy(obj),
         "contentHash": content_hash(data), "previousHash": journal[-1]["hash"] if journal else None,
@@ -690,8 +695,9 @@ def production_map(project, principal):
 
 
 class Store:
-    def __init__(self, root):
+    def __init__(self, root, studio_id="default"):
         self.root = Path(root).resolve()
+        self.studio_id = identifier(studio_id)
         # Один процесс, несколько потоков: блокировка покрывает чтение → проверку → запись.
         self.lock = threading.RLock()
 
@@ -708,6 +714,9 @@ class Store:
             project = parse_json(self.path(slug).read_text(encoding="utf-8"))
             if not isinstance(project, dict) or project.get("slug") != slug:
                 raise ValueError()
+            project.setdefault("studio_id", self.studio_id)
+            if project["studio_id"] != self.studio_id:
+                raise ApiError(403, "FORBIDDEN", "Проект принадлежит другой студии.")
             required = {"slug", "title", "synopsis", "language", "createdAt", "updatedAt",
                         "revision", "script", "scenes", "shots", "members", "versions"}
             if (not required <= project.keys() or type(project["revision"]) is not int
@@ -719,7 +728,7 @@ class Store:
                         or any(not isinstance(item, dict) or "id" not in item for item in project[collection])):
                     raise ValueError()
             # Старые проекты читаются без записи на GET; прежнюю историю не выдумываем.
-            for collection in ("cells", "approvals", "activity"):
+            for collection in ("cells", "approvals", "activity", "characters", "locations"):
                 project.setdefault(collection, [])
                 if (not isinstance(project[collection], list)
                         or any(not isinstance(item, dict) or "id" not in item for item in project[collection])):
@@ -915,6 +924,7 @@ class Handler(SimpleHTTPRequestHandler):
                     "synopsis": text(body.get("synopsis", ""), "synopsis", 8000),
                     "language": enum(body.get("language", "ru"), ("ru", "kk"), "language"),
                     "createdAt": date, "updatedAt": date, "revision": 1,
+                    "studio_id": store.studio_id, "characters": [], "locations": [],
                     "scenes": [], "shots": [], "versions": [], "cells": [], "approvals": [], "activity": [],
                     "post": [{"id": task_id, "done": False} for task_id in ("edit", "color", "sound", "vfx")],
                     "members": [{"id": uuid.uuid4().hex, "name": "Создатель проекта",
@@ -939,13 +949,15 @@ class Handler(SimpleHTTPRequestHandler):
         resource = parts[3] if len(parts) > 3 else "project"
         section = {"versions": "script", "scenes": "script", "members": "overview" if method == "GET" else "team", "project": "overview",
                    "map": "overview", "cells": "overview", "approvals": "overview",
-                   "activity": "overview"}.get(resource, resource)
+                   "activity": "overview", "characters": "overview" if method == "GET" else "heroes",
+                   "locations": "overview" if method == "GET" else "locations"}.get(resource, resource)
         write = method != "GET"
         authorize(principal, slug, section, project, write=write,
                   manager=write and resource in ("project", "members"))
         if write:
             self.check_revision(project)
         invalidated = []
+        import_events = []
         if len(parts) == 3:
             if method == "GET":
                 return 200, {"data": project_access(project, principal)}, project["revision"]
@@ -974,6 +986,48 @@ class Handler(SimpleHTTPRequestHandler):
                 invalidated.extend(invalidate_cells(project, lambda c: c["object"]["type"] in ("scene", "shot")))
             project["script"] = draft
             data, status = draft, 200
+        elif resource == "breakdown" and len(parts) == 4:
+            if method != "POST":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Разбивка импортируется методом POST.")
+            document = breakdown.parse_input(self.body())
+            data, import_events = breakdown.import_data(
+                document, project["scenes"], project["characters"], project["locations"],
+                timestamp(), project["studio_id"])
+            changed_scene_ids = {obj["id"] for action, obj, _ in import_events if action == "scene.updated"}
+            affected_shots = {s["id"] for s in project["shots"] if s["sceneId"] in changed_scene_ids}
+            if changed_scene_ids:
+                invalidated.extend(invalidate_cells(project, lambda c:
+                    (c["object"]["type"] == "scene" and c["object"]["id"] in changed_scene_ids)
+                    or (c["object"]["type"] == "shot" and c["object"]["id"] in affected_shots)))
+                for shot in project["shots"]:
+                    if shot["id"] in affected_shots:
+                        shot["needsReview"] = True
+            status = 200
+        elif resource in ("characters", "locations") and len(parts) in (4, 5):
+            items = project[resource]
+            item = get_item(items, parts[4]) if len(parts) == 5 else None
+            if method == "GET":
+                return 200, ({"data": item} if item is not None else self.listing(items, query)), project["revision"]
+            create = method == "POST" and item is None
+            if create or (method == "PATCH" and item is not None):
+                changes = breakdown.passport_input(self.body(), create)
+                name = changes.get("name", item["name"] if item is not None else "")
+                if any(existing is not item and breakdown.name_key(existing["name"]) == breakdown.name_key(name)
+                       for existing in items):
+                    raise ApiError(409, "ALREADY_EXISTS", "Паспорт с этим именем уже существует.")
+                date = timestamp()
+                if create:
+                    item = dict(changes, id=breakdown.ulid(), createdAt=date, updatedAt=date,
+                                studio_id=project["studio_id"])
+                    items.append(item)
+                else:
+                    item.update(changes, updatedAt=date)
+                data, status = item, 201 if create else 200
+            elif method == "DELETE" and item is not None:
+                items.remove(item)
+                data, status = {"id": item["id"], "deleted": True}, 200
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
         elif resource == "map" and len(parts) == 4:
             if method != "GET":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Карту можно только читать; задачи меняются через cells.")
@@ -1164,11 +1218,16 @@ class Handler(SimpleHTTPRequestHandler):
             action = ("approval." + data["verdict"] if resource == "approvals"
                       else "cell." + ("created" if status == 201 else "updated"))
         else:
-            kind = {"scenes": "scene", "shots": "shot", "members": "member", "versions": "version"}.get(resource, resource)
+            kind = {"scenes": "scene", "shots": "shot", "members": "member", "versions": "version",
+                    "characters": "character", "locations": "location"}.get(resource, resource)
             obj = {"type": kind, "id": data.get("id", slug)}
             action = kind + "." + ("deleted" if method == "DELETE" else "created" if status == 201 else "updated")
             if resource == "versions" and len(parts) == 6:
                 action, obj = "version.restored", {"type": "version", "id": data["restoredVersionId"]}
+            if resource == "breakdown":
+                action = "breakdown.imported"
+        for import_action, import_object, import_data in import_events:
+            activity(project, principal, import_action, import_object, import_data)
         activity(project, principal, action, obj, data, stage, invalidated)
         store.save(project)
         payload = {"data": data}
@@ -1257,6 +1316,8 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
         except ApiError as error:
             self.send_json(error.status, {"error": {"code": error.code, "message": error.message}}, head=head)
+        except breakdown.ValidationError as error:
+            self.send_json(422, {"error": {"code": "VALIDATION_ERROR", "message": str(error)}}, head=head)
         except (ValueError, UnicodeError):
             self.send_json(400, {"error": {"code": "BAD_REQUEST", "message": "Некорректный запрос."}}, head=head)
         except (TimeoutError, OSError):
@@ -1287,14 +1348,14 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def make_server(host="127.0.0.1", port=8770, repo_root=REPO_ROOT, data_root=None,
-                keys_path=DEFAULT_KEYS, bind_and_activate=True):
+                keys_path=DEFAULT_KEYS, bind_and_activate=True, studio_id="default"):
     repo_root = Path(repo_root).resolve()
     keys_path = Path(keys_path).expanduser().resolve()
     load_keys(keys_path)
     server = ThreadingHTTPServer((host, port), Handler, bind_and_activate=bind_and_activate)
     server.repo_root = repo_root
     server.keys_path = keys_path
-    server.store = Store(data_root if data_root is not None else REPO_ROOT / "server/data")
+    server.store = Store(data_root if data_root is not None else REPO_ROOT / "server/data", studio_id)
     return server
 
 
@@ -1304,9 +1365,11 @@ def main():
     parser.add_argument("--port", default=8770, type=int)
     parser.add_argument("--data-dir", type=Path, default=REPO_ROOT / "server/data")
     parser.add_argument("--keys-file", type=Path, default=DEFAULT_KEYS)
+    parser.add_argument("--studio-id", default="default", help="Идентификатор студии этого хранилища")
     options = parser.parse_args()
     try:
-        server = make_server(options.host, options.port, data_root=options.data_dir, keys_path=options.keys_file)
+        server = make_server(options.host, options.port, data_root=options.data_dir, keys_path=options.keys_file,
+                             studio_id=options.studio_id)
     except (ApiError, OSError) as error:
         parser.exit(1, (error.message if isinstance(error, ApiError) else "Не удалось открыть порт сервера.") + "\n")
     print("Neyra Vision Studio: http://%s:%s/" % server.server_address)

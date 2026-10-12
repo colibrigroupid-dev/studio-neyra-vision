@@ -262,7 +262,20 @@ def build(slug, proekty, outdir):
                 body_html = body_html.replace(f"<p>@@PROMPT{i}@@</p>", det).replace(f"@@PROMPT{i}@@", det)
             return f'<article class="pass">{head}<h3>{E(m.get("imya", p["slug"]))}</h3><p class="caps">{E(sub)}</p><div class="doc pass__doc">{body_html}</div></article>'
         g = "".join(card(p, "geroi") for p in geroi); l = "".join(card(p, "lokacii") for p in lok)
-        return f'<section id="pasporta"><div class="wrap"><p class="caps">Паспорта · герои {len(geroi)} · локации {len(lok)}</p><h2>Кто и где — что никогда не меняется.</h2><p class="muted">Текст «что никогда не меняется» и промпты — черновики редактора; принимает автор. Портреты и пластины появятся после выбора варианта ⭐ — это и будет замок.</p>{("<h3 class=caps style=margin-top:2rem>Герои</h3><div class=passes>" + g + "</div>") if g else ""}{("<h3 class=caps style=margin-top:2rem>Локации</h3><div class=passes>" + l + "</div>") if l else ""}</div></section>'
+        kan = ""
+        try:
+            sys.path.insert(0, str(pathlib.Path(__file__).parent)); import kanon as _kanon
+            K = _kanon.read_kanon(proj)
+        except Exception:
+            K = None
+        if K:
+            locked = sum(1 for h in K["heroes"].values() if h["identity"] and h["refs"]); textonly = sum(1 for h in K["heroes"].values() if h["identity"] and not h["refs"])
+            missing = [n for n, k in (("палитра", "palette"), ("свет", "light"), ("носитель", "medium"), ("объективы", "lens")) if not K["style"].get(k)]
+            nt = sum(1 for h in K["heroes"].values() if not h["taboo"])
+            parts = [f"версия <code>{E(K['version'])}</code>", f"замков с портретом {locked}", f"только текстом {textonly}", f"запретов {len(K['forbid'])}", f"правил из замечаний {len(K['rules'])}"]
+            todo = (["стиль: " + ", ".join(missing)] if missing else []) + ([f"табу-детали у {nt} героев"] if nt else [])
+            kan = '<p class="muted kanon">Канон проекта · ' + " · ".join(parts) + (". Ждёт худрука: " + E("; ".join(todo)) + "." if todo else ". Заполнен.") + "</p>"
+        return f'<section id="pasporta"><div class="wrap"><p class="caps">Паспорта · герои {len(geroi)} · локации {len(lok)}</p><h2>Кто и где — что никогда не меняется.</h2>{kan}<p class="muted">Текст «что никогда не меняется» и промпты — черновики редактора; принимает автор. Портреты и пластины появятся после выбора варианта ⭐ — это и будет замок.</p>{("<h3 class=caps style=margin-top:2rem>Герои</h3><div class=passes>" + g + "</div>") if g else ""}{("<h3 class=caps style=margin-top:2rem>Локации</h3><div class=passes>" + l + "</div>") if l else ""}</div></section>'
 
     def karta_html():
         sec = section(proekt, "Карта производства")

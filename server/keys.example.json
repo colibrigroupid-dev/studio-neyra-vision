@@ -5,7 +5,7 @@
       "key": "",
       "role": "admin",
       "projects": ["*"],
-      "sections": ["overview", "script", "storyboard", "shots", "animatic", "team", "post"]
+      "sections": ["overview", "script", "breakdown", "heroes", "locations", "storyboard", "shots", "animatic", "team", "post"]
     },
     {
       "id": "director-local",

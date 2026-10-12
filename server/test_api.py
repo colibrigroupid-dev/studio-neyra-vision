@@ -9,6 +9,7 @@
 """
 
 import concurrent.futures
+import copy
 from datetime import datetime
 import hashlib
 import http.client
@@ -22,6 +23,7 @@ import unittest
 from unittest.mock import patch
 
 from server import app
+from tools.razbivka import parse as parse_breakdown
 
 
 class MemorySocket:
@@ -1507,6 +1509,499 @@ class TeamAccessTests(unittest.TestCase):
                 self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {
                     "comment": "Нет права записи"}, 403, issued["key"])
                 self.assertEqual((self.data / "film" / "project.json").read_bytes(), before)
+
+
+class BreakdownApiTests(unittest.TestCase):
+    """Контракт разбивки проверяется через HTTP Handler и настоящие файлы проекта."""
+
+    setUp = ApiTests.setUp
+    start_server = ApiTests.start_server
+    stop_server = ApiTests.stop_server
+    request = ApiTests.request
+    read_response = staticmethod(ApiTests.read_response)
+    api = ApiTests.api
+    create = ApiTests.create
+    member = ApiTests.member
+    issue = TeamAccessTests.issue
+
+    @staticmethod
+    def parsed_breakdown():
+        return parse_breakdown(
+            "Title: Проверочная разбивка\n\n= Первый акт\n\n"
+            "ИНТ. ЮРТА — ДЕНЬ\n\nӘЛИЯ (25) подходит к двери.\n\n"
+            "ӘЛИЯ\nЯ вернулась.\n\nНАТ. АУЛ — НОЧЬ\n\n"
+            "ЕР ТӨСТІК\nМен сені күтемін.\n\nӘЛИЯ\nИдём.\n")
+
+    def project_bytes(self):
+        return (self.data / "film" / "project.json").read_bytes()
+
+    def import_breakdown(self, payload=None, key="temporary-admin", status=200, headers=None):
+        return self.api("POST", "/api/projects/film/breakdown",
+                        self.parsed_breakdown() if payload is None else payload,
+                        status, key, headers)
+
+    def test_direct_parser_output_imports_all_entities_fields_and_activity(self):
+        self.create()
+        document = self.parsed_breakdown()
+        self.assertEqual([s["n"] for s in document["scenes"]], [1, 2])
+        self.assertEqual([c["name"] for c in document["characters"]], ["ӘЛИЯ", "ЕР ТӨСТІК"])
+        result = self.import_breakdown(document)["data"]
+        defaults = {"role": "", "identity": "", "taboo": [], "height": "", "refs": [],
+                    "status": "draft", "translations": {}}
+        entity_ids = set()
+        stored = json.loads(self.project_bytes())
+        for collection in ("scenes", "characters", "locations"):
+            with self.subTest(collection=collection):
+                self.assertEqual(result["summary"][collection],
+                                 {"created": 2, "updated": 0, "unchanged": 0})
+                rows = self.api("GET", f"/api/projects/film/{collection}")["data"]
+                self.assertEqual(len(rows), 2)
+                self.assertEqual({r["id"] for r in result[collection]}, {r["id"] for r in rows})
+                for source, row in zip(document[collection], rows):
+                    self.assertRegex(row["id"], r"^[0-9A-HJKMNP-TV-Z]{26}$")
+                    self.assertNotIn(row["id"], entity_ids)
+                    entity_ids.add(row["id"])
+                    self.assertEqual(row["studio_id"], stored["studio_id"])
+                    self.assertTrue(row["createdAt"])
+                    self.assertEqual(row["updatedAt"], row["createdAt"])
+                    for field, value in source.items():
+                        self.assertEqual(row["title" if field == "heading" else field], value)
+                    if collection == "scenes":
+                        self.assertEqual(row["text"], "")
+                    else:
+                        self.assertEqual({k: row[k] for k in defaults}, defaults)
+        events = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        imported = [e for e in events if e["action"] == "breakdown.imported"]
+        self.assertEqual(len(imported), 1)
+        self.assertEqual(imported[0]["object"], {"type": "breakdown", "id": "film"})
+        created = [e for e in events if e["action"] in
+                   ("scene.created", "character.created", "location.created")]
+        self.assertEqual({e["object"]["id"] for e in created}, entity_ids)
+        self.assertEqual(len(created), 6)
+        self.assertTrue(all(e["keyId"] == "admin" and e["contentHash"] for e in created))
+        for event in events:
+            self.assertRegex(event["id"], r"^[0-9A-HJKMNP-TV-Z]{26}$")
+            self.assertEqual(event["studio_id"], stored["studio_id"])
+        self.assertEqual([e["sequence"] for e in events], list(range(1, len(events) + 1)))
+        self.assertEqual([e["previousHash"] for e in events[1:]], [e["hash"] for e in events[:-1]])
+        self.assertEqual(self.api("GET", "/api/projects/film/script")["data"]["text"], "")
+
+    def test_import_is_idempotent_by_normalized_name_and_preserves_passports_and_author_text(self):
+        self.create()
+        self.api("PUT", "/api/projects/film/script", {
+            "text": "Авторский сценарий <Әлия> & Ер Төстік", "language": "kk",
+            "translations": {"ru": "Авторский перевод"}})
+        scene = self.api("POST", "/api/projects/film/scenes", {
+            "id": "manual", "title": "  инт. юрта — день  ", "text": "Авторская сцена",
+            "translations": {"kk": {"text": "Автор аудармасы"}}}, 201)["data"]
+        passport = {"role": "Главная героиня", "identity": "Замок внешности Ә Ғ Қ Ң Ө Ұ Ү Һ І",
+                    "taboo": ["Не менять внешность"], "height": "Выше партнёра",
+                    "refs": [{"path": "assets/aliya.png", "role": "identity"}], "status": "locked",
+                    "scenes": [1], "translations": {"kk": {"name": "Әлия", "identity": "Келбет"}}}
+        character = self.api("POST", "/api/projects/film/characters",
+                             dict(passport, name="  әлия  "), 201)["data"]
+        location = self.api("POST", "/api/projects/film/locations",
+                            dict(passport, name="ЮРТА", refs=[{"path": "assets/yurt.png",
+                                                               "role": "environment"}]), 201)["data"]
+        author_script = self.api("GET", "/api/projects/film/script")["data"]
+        first = self.import_breakdown()["data"]
+        self.assertEqual(first["scenes"][0]["id"], scene["id"])
+        self.assertEqual(first["characters"][0]["id"], character["id"])
+        self.assertEqual(first["locations"][0]["id"], location["id"])
+        snapshots = {c: self.api("GET", f"/api/projects/film/{c}")["data"]
+                     for c in ("scenes", "characters", "locations")}
+        for collection, original in (("characters", character), ("locations", location)):
+            current = next(r for r in snapshots[collection] if r["id"] == original["id"])
+            for field in ("name", "role", "identity", "taboo", "height", "refs", "status", "translations"):
+                self.assertEqual(current[field], original[field])
+        manual = next(s for s in snapshots["scenes"] if s["id"] == "manual")
+        self.assertEqual(manual["text"], scene["text"])
+        self.assertEqual(manual["translations"], scene["translations"])
+        self.assertEqual(snapshots["characters"][0]["scenes"], [1, 2])
+        second_document = self.parsed_breakdown()
+        second_document["characters"][0]["name"] = " ӘЛИЯ "
+        second_document["characters"][1]["name"] = "  ер   төстік  "
+        second_document["locations"][0]["name"] = " юрта "
+        second_document["locations"][1]["name"] = " аул "
+        before_events = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        second = self.import_breakdown(second_document)["data"]
+        for collection in snapshots:
+            self.assertEqual(second["summary"][collection],
+                             {"created": 0, "updated": 0, "unchanged": 2})
+            self.assertEqual(second[collection], first[collection])
+            self.assertEqual(self.api("GET", f"/api/projects/film/{collection}")["data"], snapshots[collection])
+        self.assertEqual(self.api("GET", "/api/projects/film/script")["data"], author_script)
+        after_events = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        self.assertEqual(after_events[:-1], before_events)
+        self.assertEqual(after_events[-1]["action"], "breakdown.imported")
+        # Изменённые вычисленные сведения обновляются в тех же сущностях.
+        second_document["characters"][0]["lines"] += 1
+        second_document["locations"][0]["times"] = ["ДЕНЬ", "ВЕЧЕР"]
+        changed = self.import_breakdown(second_document)["data"]
+        self.assertEqual(changed["characters"][0]["id"], character["id"])
+        self.assertEqual(changed["summary"]["characters"]["updated"], 1)
+        self.assertEqual(changed["summary"]["locations"]["updated"], 1)
+        self.assertEqual(self.api("GET", f"/api/projects/film/characters/{character['id']}")["data"]
+                         ["identity"], passport["identity"])
+        self.assertEqual(self.api("GET", "/api/projects/film/script")["data"], author_script)
+
+    def test_unicode_name_normalization_reuses_passports_and_rejects_duplicate_names(self):
+        self.create()
+        document = self.parsed_breakdown()
+        document["characters"][0]["name"] = "ЙОЛ"
+        document["locations"][0]["name"] = "ЙЕЛ"
+        first = self.import_breakdown(document)["data"]
+        document["characters"][0]["name"] = " и\u0306ол "
+        document["locations"][0]["name"] = " и\u0306ел "
+        second = self.import_breakdown(document)["data"]
+        self.assertEqual(first["characters"], second["characters"])
+        self.assertEqual(first["locations"], second["locations"])
+        before = self.project_bytes()
+        for collection, name in (("characters", " и\u0306ол "), ("locations", " и\u0306ел ")):
+            with self.subTest(collection=collection):
+                result = self.api("POST", f"/api/projects/film/{collection}", {"name": name}, 409)
+                self.assertEqual(result["error"]["code"], "ALREADY_EXISTS")
+                self.assertEqual(self.project_bytes(), before)
+
+    def test_scene_numbers_keep_repeated_headings_distinct_and_reimports_keep_manual_work(self):
+        self.create()
+        document = self.parsed_breakdown()
+        document["scenes"][1]["heading"] = document["scenes"][0]["heading"]
+        first = self.import_breakdown(document)["data"]
+        self.assertNotEqual(first["scenes"][0]["id"], first["scenes"][1]["id"])
+        for row in first["scenes"]:
+            self.api("PATCH", f"/api/projects/film/scenes/{row['id']}",
+                     {"text": "Работа автора сцены " + str(row["n"])})
+        document["scenes"] = list(reversed(document["scenes"]))
+        document["scenes"][0]["heading"] = "НАТ. АУЛ — РАССВЕТ"
+        second = self.import_breakdown(document)["data"]
+        self.assertEqual({r["n"]: r["id"] for r in first["scenes"]},
+                         {r["n"]: r["id"] for r in second["scenes"]})
+        scenes = self.api("GET", "/api/projects/film/scenes")["data"]
+        self.assertEqual(len(scenes), 2)
+        self.assertEqual({s["n"]: s["text"] for s in scenes},
+                         {1: "Работа автора сцены 1", 2: "Работа автора сцены 2"})
+        self.assertEqual(next(s for s in scenes if s["n"] == 2)["title"], "НАТ. АУЛ — РАССВЕТ")
+
+    def test_changed_import_invalidates_only_affected_scene_and_shot_cells_and_keeps_media(self):
+        self.create()
+        imported = self.import_breakdown()["data"]
+        cells, shots = {}, {}
+        for row in imported["scenes"]:
+            n, scene_id = row["n"], row["id"]
+            shot = self.api("POST", "/api/projects/film/shots", {
+                "id": "shot-" + str(n), "sceneId": scene_id, "title": "Кадр " + str(n),
+                "imageUrl": "https://example.test/frame-" + str(n) + ".png",
+                "videoUrl": "https://example.test/video-" + str(n) + ".mp4"}, 201)["data"]
+            shots[n] = shot
+            for kind, object_id, stage in (("scene", scene_id, "heroes"),
+                                            ("shot", shot["id"], "storyboard")):
+                cells[n, kind] = self.api("POST", "/api/projects/film/cells", {
+                    "object": {"type": kind, "id": object_id}, "stage": stage,
+                    "version": "v1", "status": "awaiting"}, 201)["data"]
+        # Апрув также теряет актуальность; сама append-only история апрува сохраняется.
+        scene_cell = cells[1, "scene"]
+        self.api("POST", "/api/projects/film/approvals", {
+            "object": scene_cell["object"], "stage": scene_cell["stage"],
+            "version": "v1", "verdict": "approved"}, 201)
+        before_cells = self.api("GET", "/api/projects/film/cells")["data"]
+        approvals = self.api("GET", "/api/projects/film/approvals")["data"]
+        self.import_breakdown()
+        self.assertEqual(self.api("GET", "/api/projects/film/cells")["data"], before_cells)
+        for n, shot in shots.items():
+            self.assertEqual(self.api("GET", f"/api/projects/film/shots/{shot['id']}")["data"], shot)
+        document = self.parsed_breakdown()
+        document["scenes"][0]["act"] = "Изменённый акт"
+        self.import_breakdown(document)
+        expected_invalidated = {cells[1, kind]["id"] for kind in ("scene", "shot")}
+        after_cells = self.api("GET", "/api/projects/film/cells")["data"]
+        for current in after_cells:
+            if current["id"] in expected_invalidated:
+                self.assertEqual(current["status"], "done")
+            else:
+                self.assertEqual(current, next(c for c in before_cells if c["id"] == current["id"]))
+        affected = self.api("GET", "/api/projects/film/shots/shot-1")["data"]
+        self.assertTrue(affected["needsReview"])
+        self.assertEqual({k: v for k, v in affected.items() if k != "needsReview"},
+                         {k: v for k, v in shots[1].items() if k != "needsReview"})
+        self.assertEqual(self.api("GET", "/api/projects/film/shots/shot-2")["data"], shots[2])
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], approvals)
+        event = self.api("GET", "/api/projects/film/activity?limit=100")["data"][-1]
+        self.assertEqual(event["action"], "breakdown.imported")
+        self.assertEqual(set(event["invalidatedCellIds"]), expected_invalidated)
+        self.stop_server()
+        self.start_server()
+        self.assertEqual(self.api("GET", "/api/projects/film/cells")["data"], after_cells)
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], approvals)
+        self.assertEqual(self.api("GET", "/api/projects/film/shots/shot-1")["data"], affected)
+
+    def test_passport_crud_defaults_translations_pagination_conflicts_and_activity(self):
+        self.create()
+        for collection, kind in (("characters", "character"), ("locations", "location")):
+            with self.subTest(collection=collection):
+                base = f"/api/projects/film/{collection}"
+                first = self.api("POST", base, {"name": "Әлия"}, 201)["data"]
+                self.assertEqual({k: first[k] for k in
+                                  ("role", "identity", "height", "status", "taboo", "refs", "scenes", "translations")},
+                                 {"role": "", "identity": "", "height": "", "status": "draft",
+                                  "taboo": [], "refs": [], "scenes": [], "translations": {}})
+                second = self.api("POST", base, {"name": "Ер Төстік"}, 201)["data"]
+                body = {"role": "Героиня", "identity": "Келбет Ә Ғ Қ Ң Ө Ұ Ү Һ І", "height": "Выше героя",
+                        "taboo": ["Сохранить лицо"], "refs": [
+                            {"path": "assets/aliya.png", "role": "identity"},
+                            {"path": "https://example.test/costume.png", "role": "costume"},
+                            {"path": "assets/yurt.png", "role": "environment"},
+                            {"path": "assets/frame.png", "role": "composition"}],
+                        "status": "locked", "scenes": [1, 2], "translations": {
+                            "ru": {"name": "Алия", "role": "Главная", "taboo": ["Сохранить лицо"]},
+                            "kk": {"name": "Әлия", "identity": "Келбет", "height": "Бойы"}}}
+                updated = self.api("PATCH", base + "/" + first["id"], body)["data"]
+                self.assertEqual({k: updated[k] for k in body}, body)
+                self.assertEqual(updated["createdAt"], first["createdAt"])
+                self.assertEqual(self.api("GET", base + "/" + first["id"])["data"], updated)
+                listed = self.api("GET", base + "?offset=1&limit=1")
+                self.assertEqual(listed["pagination"]["total"], 2)
+                self.assertEqual(listed["data"], [second])
+                before = self.project_bytes()
+                self.api("PATCH", base + "/" + second["id"], {"name": " ӘЛИЯ "}, 409)
+                self.assertEqual(self.project_bytes(), before)
+                deleted = self.api("DELETE", base + "/" + first["id"])["data"]
+                self.assertEqual(deleted["id"], first["id"])
+                self.api("GET", base + "/" + first["id"], status=404)
+                self.api("DELETE", base + "/missing", status=404)
+                self.api("PUT", base + "/" + second["id"], {"name": "Другое"}, 405)
+                events = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+                own = [e for e in events if e["object"] == {"type": kind, "id": first["id"]}]
+                self.assertEqual([e["action"] for e in own],
+                                 [kind + ".created", kind + ".updated", kind + ".deleted"])
+                self.assertTrue(all(e["keyId"] == "admin" and e["contentHash"] for e in own))
+        stored = {c: self.api("GET", f"/api/projects/film/{c}")["data"] for c in ("characters", "locations")}
+        self.stop_server()
+        self.start_server()
+        self.assertEqual({c: self.api("GET", f"/api/projects/film/{c}")["data"] for c in stored}, stored)
+
+    def test_import_and_passport_permissions_apply_role_membership_and_section_scopes(self):
+        self.create()
+        configured = json.loads(self.keys.read_text(encoding="utf-8"))
+        configured["keys"].extend([
+            {"id": "assistant", "key": "temporary-assistant", "role": "assistant_director",
+             "projects": ["film"], "sections": ["overview", "breakdown"]},
+            {"id": "outside", "key": "temporary-outside", "role": "producer",
+             "projects": ["elsewhere"], "sections": ["*"]},
+        ])
+        self.keys.write_text(json.dumps(configured), encoding="utf-8")
+        before = self.project_bytes()
+        self.import_breakdown(key="temporary-assistant", status=403)
+        self.import_breakdown(key="temporary-outside", status=403)
+        self.assertEqual(self.project_bytes(), before)
+        assistant = self.api("POST", "/api/projects/film/members", {
+            "name": "Второй режиссёр", "role": "assistant_director", "keyId": "assistant",
+            "sections": ["overview", "breakdown"]}, 201)["data"]
+        self.import_breakdown(key="temporary-assistant")
+        assistant_events = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        self.assertEqual(assistant_events[-1]["keyId"], "assistant")
+        self.assertEqual(assistant_events[-1]["name"], assistant["name"])
+        self.api("POST", "/api/projects/film/characters", {"name": "Нельзя"}, 403, "temporary-assistant")
+        self.api("PATCH", f"/api/projects/film/members/{assistant['id']}", {"sections": ["overview"]})
+        self.import_breakdown(key="temporary-assistant", status=403)
+        writer = self.issue("writer", ["overview", "script", "breakdown"])["key"]
+        artist = self.issue("artist", ["overview", "heroes", "locations"], email="artist@example.test")["key"]
+        viewer = self.issue("viewer", ["overview", "breakdown", "heroes", "locations"],
+                            email="viewer@example.test")["key"]
+        for key in (writer, artist, viewer):
+            with self.subTest(key_role=key[:10]):
+                self.api("GET", "/api/projects/film/characters", key=key)
+                self.api("GET", "/api/projects/film/locations", key=key)
+                before = self.project_bytes()
+                self.import_breakdown(key=key, status=403)
+                self.assertEqual(self.project_bytes(), before)
+        for key in (writer, viewer):
+            for collection in ("characters", "locations"):
+                with self.subTest(role_key=key[:10], collection=collection):
+                    before = self.project_bytes()
+                    self.api("POST", f"/api/projects/film/{collection}", {"name": "Нельзя"}, 403, key)
+                    self.assertEqual(self.project_bytes(), before)
+        for collection in ("characters", "locations"):
+            passport = self.api("POST", f"/api/projects/film/{collection}",
+                                {"name": "Художник заполняет"}, 201, artist)["data"]
+            self.api("PATCH", f"/api/projects/film/{collection}/{passport['id']}",
+                     {"identity": "Замок"}, key=artist)
+            self.api("DELETE", f"/api/projects/film/{collection}/{passport['id']}", key=artist)
+        for role in ("producer", "director"):
+            issued = self.issue(role, ["overview", "breakdown"], email=role + "@example.test")
+            self.import_breakdown(key=issued["key"])
+
+    def test_passport_reads_require_overview_and_each_write_requires_its_own_section(self):
+        self.create()
+        overview = self.issue("viewer", ["overview"], email="overview@example.test")["key"]
+        heroes = self.issue("artist", ["heroes"], email="heroes@example.test")["key"]
+        locations = self.issue("artist", ["locations"], email="locations@example.test")["key"]
+        for collection, own_key, other_key in (("characters", heroes, locations),
+                                               ("locations", locations, heroes)):
+            with self.subTest(collection=collection):
+                base = "/api/projects/film/" + collection
+                item = self.api("POST", base, {"name": "Паспорт"}, 201, own_key)["data"]
+                path = base + "/" + item["id"]
+                self.api("GET", base, key=overview)
+                self.api("GET", path, key=overview)
+                self.api("GET", base, status=403, key=own_key)
+                self.api("GET", path, status=403, key=own_key)
+                for key in (overview, other_key):
+                    before = self.project_bytes()
+                    self.api("POST", base, {"name": "Запрещено"}, 403, key)
+                    self.api("PATCH", path, {"identity": "Запрещено"}, 403, key)
+                    self.api("DELETE", path, status=403, key=key)
+                    self.assertEqual(self.project_bytes(), before)
+                self.api("PATCH", path, {"identity": "Свой раздел"}, key=own_key)
+                self.api("DELETE", path, key=own_key)
+
+    def test_invalid_breakdown_returns_422_without_any_persisted_changes(self):
+        self.create()
+        self.import_breakdown()
+        before = self.project_bytes()
+        valid = self.parsed_breakdown()
+        invalid = []
+        for field, value in (("scenes", {}), ("characters", None), ("locations", "list"),
+                             ("title", "title"), ("pages_est", True),
+                             ("caps_mentions", [{"word": "ВЕЩЬ", "scenes": [9]}]),
+                             ("unexpected", True)):
+            invalid.append(dict(valid, **{field: value}))
+        missing = copy.deepcopy(valid)
+        del missing["locations"]
+        invalid.append(missing)
+        invalid.append(dict(valid, scenes=valid["scenes"] + [valid["scenes"][0]]))
+        for field, value in (("n", True), ("heading", " "), ("location", ""), ("act", []),
+                             ("page_from", 0), ("page_to", 0), ("line_to", 1),
+                             ("chars", ["ӘЛИЯ", " әлия "]), ("intros", [{"name": "ГЕРОЙ", "age": 200}]),
+                             ("id", "forged")):
+            document = copy.deepcopy(valid)
+            document["scenes"][1][field] = value
+            invalid.append(document)
+        missing = copy.deepcopy(valid)
+        del missing["scenes"][0]["page_to"]
+        invalid.append(missing)
+        for collection, fields_to_reject in (
+                ("characters", (("name", " "), ("age", True), ("age", 151), ("lines", -1),
+                                ("scenes", [1, 1]), ("scenes", [9]), ("first_scene", 9),
+                                ("identity", "Импорт не принимает авторский паспорт"))),
+                ("locations", (("parent", ""), ("types", ["ИНТ", "инт"]), ("times", [False]),
+                               ("scenes", [9]), ("name", [])))):
+            for field, value in fields_to_reject:
+                document = copy.deepcopy(valid)
+                document[collection][-1][field] = value
+                invalid.append(document)
+            duplicate = copy.deepcopy(valid)
+            duplicate[collection].append(dict(duplicate[collection][0],
+                                               name=" " + duplicate[collection][0]["name"].lower() + " "))
+            invalid.append(duplicate)
+        for index, document in enumerate(invalid):
+            with self.subTest(case=index):
+                result = self.import_breakdown(document, status=422)
+                self.assertEqual(result["error"]["code"], "VALIDATION_ERROR")
+                self.assertEqual(self.project_bytes(), before)
+                self.assertEqual(list(self.data.rglob("*.tmp")), [])
+
+    def test_invalid_passports_return_422_and_never_change_entities_revision_or_activity(self):
+        self.create()
+        invalid = ({"name": " "}, {"name": False}, {"role": []}, {"identity": "x" * 2001},
+                   {"height": 170}, {"status": "approved"}, {"status": []}, {"taboo": "нет"},
+                   {"taboo": [" "]}, {"taboo": ["x"] * 11}, {"scenes": [True]},
+                   {"scenes": [1, 1]}, {"refs": [{"path": "../secret", "role": "identity"}]},
+                   {"refs": [{"path": "javascript:alert(1)", "role": "identity"}]},
+                   {"refs": [{"path": "file:///tmp/secret", "role": "identity"}]},
+                   {"refs": [{"path": "/Users/local/ref.png", "role": "identity"}]},
+                   {"refs": [{"path": "//example.test/image", "role": "identity"}]},
+                   {"refs": [{"path": "assets\\image.png", "role": "identity"}]},
+                   {"refs": [{"path": "assets/image.png", "role": "invalid"}]},
+                   {"refs": [{"path": "assets/image.png"}]},
+                   {"translations": {"en": {"name": "English"}}},
+                   {"translations": {"kk": {"identity": []}}},
+                   {"translations": {"ru": {"unknown": "value"}}},
+                   {"id": "forged"}, {"studio_id": "forged"}, {"age": 25})
+        for collection in ("characters", "locations"):
+            base = "/api/projects/film/" + collection
+            item = self.api("POST", base, {"name": "Существующий паспорт", "identity": "Не терять"}, 201)["data"]
+            before = self.project_bytes()
+            self.api("POST", base, {}, 422)
+            for changes in invalid:
+                with self.subTest(collection=collection, changes=changes):
+                    for method, path, body in (("POST", base, dict({"name": "Новый"}, **changes)),
+                                               ("PATCH", base + "/" + item["id"], changes)):
+                        result = self.api(method, path, body, 422)
+                        self.assertEqual(result["error"]["code"], "VALIDATION_ERROR")
+                        self.assertEqual(self.project_bytes(), before)
+
+    def test_stale_if_match_rejects_import_and_passport_changes_without_side_effects(self):
+        self.create()
+        _, _, _, headers = self.request("GET", "/api/projects/film", include_headers=True)
+        stale = headers["ETag"]
+        item = self.api("POST", "/api/projects/film/characters", {"name": "Әлия"}, 201,
+                        headers={"If-Match": stale})["data"]
+        before = self.project_bytes()
+        operations = (("POST", "/api/projects/film/breakdown", self.parsed_breakdown()),
+                      ("POST", "/api/projects/film/locations", {"name": "ЮРТА"}),
+                      ("PATCH", f"/api/projects/film/characters/{item['id']}", {"identity": "Устарело"}),
+                      ("DELETE", f"/api/projects/film/characters/{item['id']}", None))
+        for method, path, payload in operations:
+            with self.subTest(method=method, path=path):
+                result = self.api(method, path, payload, 409, headers={"If-Match": stale})
+                self.assertEqual(result["error"]["code"], "REVISION_CONFLICT")
+                self.assertEqual(self.project_bytes(), before)
+        _, _, _, headers = self.request("GET", "/api/projects/film/characters", include_headers=True)
+        self.import_breakdown(headers={"If-Match": headers["ETag"]})
+        before = self.project_bytes()
+        self.import_breakdown(status=400, headers={"If-Match": "1"})
+        self.assertEqual(self.project_bytes(), before)
+
+    def test_failed_writes_leave_no_partial_import_passport_or_activity(self):
+        self.create()
+        item = self.api("POST", "/api/projects/film/characters",
+                        {"name": "Әлия", "identity": "Сохранённый паспорт"}, 201)["data"]
+        before = self.project_bytes()
+        operations = (("POST", "/api/projects/film/breakdown", self.parsed_breakdown()),
+                      ("POST", "/api/projects/film/locations", {"name": "ЮРТА"}),
+                      ("PATCH", f"/api/projects/film/characters/{item['id']}", {"identity": "Не записалось"}),
+                      ("DELETE", f"/api/projects/film/characters/{item['id']}", None))
+        for boundary in ("fsync", "replace"):
+            for method, path, payload in operations:
+                with self.subTest(boundary=boundary, method=method, path=path):
+                    with patch.object(app.os, boundary, side_effect=OSError("Отказ диска")):
+                        result = self.api(method, path, payload, 500)
+                    self.assertEqual(result["error"]["code"], "STORAGE_WRITE_FAILED")
+                    self.assertEqual(self.project_bytes(), before)
+                    self.assertEqual(list(self.data.rglob("*.tmp")), [])
+        self.assertEqual(self.api("GET", "/api/projects/film/scenes")["data"], [])
+        self.assertEqual(self.api("GET", "/api/projects/film/locations")["data"], [])
+        self.import_breakdown()
+        self.assertEqual(len(self.api("GET", "/api/projects/film/scenes")["data"]), 2)
+
+    def test_legacy_projects_read_empty_collections_without_rewrite_and_import_migrates_them(self):
+        self.create()
+        path = self.data / "film" / "project.json"
+        project = json.loads(path.read_text(encoding="utf-8"))
+        for field in ("characters", "locations", "studio_id"):
+            project.pop(field, None)
+        # Старые записи журнала без studio_id и с прежним ID остаются достоверными.
+        project["activity"][0].pop("studio_id", None)
+        project["activity"][0]["id"] = "legacy-event-id"
+        project["activity"][0]["hash"] = app.content_hash({
+            k: v for k, v in project["activity"][0].items() if k != "hash"})
+        legacy_event = copy.deepcopy(project["activity"][0])
+        path.write_text(json.dumps(project, ensure_ascii=False), encoding="utf-8")
+        before = self.project_bytes()
+        for collection in ("characters", "locations"):
+            self.assertEqual(self.api("GET", "/api/projects/film/" + collection)["data"], [])
+        self.assertEqual(self.project_bytes(), before)
+        self.assertEqual(self.api("GET", "/api/projects/film/activity")["data"], [legacy_event])
+        self.import_breakdown()
+        migrated = json.loads(self.project_bytes())
+        self.assertTrue(migrated["studio_id"])
+        for collection in ("scenes", "characters", "locations"):
+            self.assertEqual(len(migrated[collection]), 2)
+            self.assertTrue(all(row["studio_id"] == migrated["studio_id"] for row in migrated[collection]))
+        self.assertEqual(migrated["activity"][0], legacy_event)
+        self.assertEqual(migrated["activity"][1]["previousHash"], legacy_event["hash"])
+        self.assertTrue(all(e["studio_id"] == migrated["studio_id"] for e in migrated["activity"][1:]))
 
 
 class AtomicWriteTests(unittest.TestCase):
