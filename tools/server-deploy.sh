@@ -11,7 +11,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEYS="$HOME/.config/neyra-studio/keys-prod.json"
 [ -f "$KEYS" ] || { echo "нет $KEYS"; exit 2; }
 ssh -o BatchMode=yes "$HOST" 'mkdir -p /opt/neyra-studio/server /opt/neyra-studio/data'
-scp -q "$ROOT/server/app.py" "$HOST:/opt/neyra-studio/server/app.py"
+# на сервер идёт ПРИНЯТАЯ версия (последний коммит), не рабочее дерево: там могут лежать незавершённые правки Codex
+TMP="$(mktemp -d)"; git -C "$ROOT" show HEAD:server/app.py > "$TMP/app.py"
+scp -q "$TMP/app.py" "$HOST:/opt/neyra-studio/server/app.py"; rm -rf "$TMP"
 scp -q "$KEYS" "$HOST:/opt/neyra-studio/keys.json"
 ssh -o BatchMode=yes "$HOST" 'chmod 600 /opt/neyra-studio/keys.json
 cat > /etc/systemd/system/neyra-studio.service <<UNIT
