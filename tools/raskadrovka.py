@@ -155,8 +155,12 @@ def main():
         shots = shots_for_scene(lines, sc, hero_names)
         for k, sh in enumerate(shots, 1):
             sid = f"{sc['n']:02d}-{k:02d}"
+            prev = out / "kadry" / f"{sid}.md"; action_en = ""
+            if prev.exists():  # перевод действия, вписанный ассистентом, переживает пересборку
+                m_en = re.search(r"^deystvie_en:\s*(.+)$", prev.read_text(encoding="utf-8"), flags=re.M)
+                action_en = m_en.group(1).strip() if m_en else ""
             if K:
-                prompt, krefs = kanon.sobrat(K, "karandash", {"id": sid, "size_en": SIZE_EN.get(sh["size"], "medium shot"), "move_en": MOVE_EN.get(sh["move"].split(" (")[0], "static camera"), "chars": list(dict.fromkeys(sh["chars"])), "loc_name": sc["location"], "vo": sh["vo"]}, time_en=(sc["time"] or "day").lower())
+                prompt, krefs = kanon.sobrat(K, "karandash", {"id": sid, "size_en": SIZE_EN.get(sh["size"], "medium shot"), "move_en": MOVE_EN.get(sh["move"].split(" (")[0], "static camera"), "chars": list(dict.fromkeys(sh["chars"])), "loc_name": sc["location"], "vo": sh["vo"]}, action_en=action_en, time_en=(sc["time"] or "day").lower())
             else:
                 prompt, krefs = build_prompt(sh, heroes, loc, sc["location"], sc["time"]), []
             who = ", ".join(dict.fromkeys(sh["chars"]))
@@ -173,7 +177,7 @@ def main():
                     if h and h["zamok_img"]: refs.append({"path": h["zamok_img"], "role": "identity"})
                 if loc and loc["zamok_img"]: refs.append({"path": loc["zamok_img"], "role": "staging"})
             card = ("---\n" + f"kadr: {sid}\nscena: {sc['n']}\nkrupnost: {sh['size']}\ndvizhenie: {sh['move']}\nobektiv: {lens}\ndlitelnost: {sh['sec']} с\n"
-                    f"status: draft\nprinyal: \ndeystvie: {action}\ndeystvie_en: \nzamechanie: \ngeroi: {who}\nlokaciya: {sc['location']}\nkanon: {K['version'] if K else ''}\n---\n" + prompt + "\n")
+                    f"status: draft\nprinyal: \ndeystvie: {action}\ndeystvie_en: {action_en}\nzamechanie: \ngeroi: {who}\nlokaciya: {sc['location']}\nkanon: {K['version'] if K else ''}\n---\n" + prompt + "\n")
             (out / "kadry" / f"{sid}.md").write_text(card, encoding="utf-8")
             cards.append(sid)
             job = generator.Job(kind="karandash", project=a.slug, target=f"shot:{sc['n']}.{k}", prompt=prompt, negative=NEGATIVE,
