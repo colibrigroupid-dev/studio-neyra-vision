@@ -264,7 +264,7 @@ function landing() {
 }
 
 function pageHeading(title, description, actions = '') { return `<div class='page-heading'><div><h1>${title}</h1>${description ? `<p>${description}</p>` : ''}</div><div class='row'>${actions}</div></div>`; }
-const simpleOverview = () => new URLSearchParams(location.search).get('prostoy') === '1';
+const simpleOverview = () => /(?:^|[?&])prostoy=1(?:&|$)/.test(String(location.search || ''));
 function overview() {
   const p = project();
   if (simpleOverview()) return `<div class='simple-head'><h1>${t('Что снимаем сегодня?', 'Бүгін не түсіреміз?')}</h1><p class='lead'>${t('Скажите помощнику внизу или откройте раздел слева. Всё, что ждёт вашего решения, — здесь.', 'Төмендегі көмекшіге айтыңыз немесе сол жақтан бөлімді ашыңыз. Шешіміңізді күткеннің бәрі — осында.')}</p></div>${awaitingSheet()}`;
