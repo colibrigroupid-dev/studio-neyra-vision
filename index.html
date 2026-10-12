@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ru" data-lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neyra Vision Studio — от сценария до экрана за дни</title>
+<meta name="description" content="Препродакшн для кино и сериалов в Казахстане: разбор сценария, герои и мир, раскадровка, аниматик, страница проекта для команды, каждый кадр отдельно. На русском и казахском. Права остаются у автора.">
+<meta name="theme-color" content="#121110">
+<meta property="og:title" content="Neyra Vision Studio — от сценария до экрана за дни">
+<meta property="og:description" content="Увидьте весь фильм до съёмок: герои, мир, каждый кадр, аниматик и тизер. Казахстан · RU / KZ · права у автора.">
+<meta property="og:image" content="https://studio.neyra.vision/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/favicon-64.png" sizes="64x64">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;500;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:oklch(0.14 0.008 70);
+  --bg-2:oklch(0.17 0.009 70);
+  --surface:oklch(0.20 0.010 70);
+  --line:oklch(0.30 0.010 70);
+  --line-soft:oklch(0.25 0.010 70);
+  --text:oklch(0.95 0.008 85);
+  --muted:oklch(0.70 0.012 85);
+  --dim:oklch(0.66 0.012 85);
+  --accent:oklch(0.82 0.13 80);
+  --accent-ink:oklch(0.18 0.03 80);
+  --ok:oklch(0.78 0.14 150);
+  --rec:oklch(0.65 0.20 25);
+  --disp:"Geologica","Onest",system-ui,sans-serif;
+  --body:"Onest",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --step--1:clamp(0.80rem,0.78rem + 0.12vw,0.86rem);
+  --step-0:clamp(1.00rem,0.96rem + 0.22vw,1.15rem);
+  --step-1:clamp(1.20rem,1.08rem + 0.60vw,1.60rem);
+  --step-2:clamp(1.50rem,1.25rem + 1.30vw,2.30rem);
+  --step-3:clamp(2.00rem,1.45rem + 2.80vw,3.60rem);
+  --step-4:clamp(2.70rem,1.55rem + 5.80vw,5.80rem);
+  --gutter:clamp(1rem,4vw,3rem);
+  --section:clamp(4.5rem,10vw,9rem);
+  --ease-out:cubic-bezier(0.16,1,0.3,1);
+  --r:6px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--text);font:400 var(--step-0)/1.55 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+::selection{background:var(--accent);color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+img,video{display:block;max-width:100%}
+a{color:inherit}
+h1,h2,h3{font-family:var(--disp);font-weight:500;line-height:1.02;letter-spacing:-0.025em;margin:0;text-wrap:balance}
+h1{font-size:var(--step-4)}
+h2{font-size:var(--step-3)}
+h3{font-size:var(--step-1);letter-spacing:-0.01em}
+p{margin:0;max-width:62ch;text-wrap:pretty}
+.wrap{width:min(100% - 2*var(--gutter),1240px);margin-inline:auto}
+section{padding-block:var(--section)}
+.caps{font-family:var(--mono);font-size:var(--step--1);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.caps.ok{color:var(--ok)}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+/* language pairs: both in DOM, one visible */
+html[data-lang="ru"] .kz{display:none!important}
+html[data-lang="kz"] .ru{display:none!important}
+.btn{display:inline-flex;align-items:center;gap:.5em;min-height:48px;padding:.75em 1.4em;border-radius:999px;border:1px solid transparent;font:500 var(--step-0)/1 var(--body);text-decoration:none;cursor:pointer;transition:transform .2s var(--ease-out),background-color .2s,border-color .2s}
+.btn:active{transform:scale(.97)}
+.btn--main{background:var(--accent);color:var(--accent-ink)}
+.btn--main:hover{background:oklch(0.88 0.12 82)}
+.btn--ghost{background:transparent;color:var(--text);border-color:var(--line)}
+.btn--ghost:hover{border-color:var(--muted)}
+.btn .arr{font-family:var(--mono)}
+/* header */
+.top{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);background:color-mix(in oklch,var(--bg) 78%,transparent);border-bottom:1px solid var(--line-soft)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:64px}
+.brand{display:flex;align-items:center;gap:.7rem;text-decoration:none}
+.brand img{width:34px;height:34px}
+.brand b{font:600 .95rem/1 var(--disp);letter-spacing:.14em;text-transform:uppercase}
+.brand small{display:block;font:400 .7rem/1 var(--mono);letter-spacing:.2em;color:var(--dim);margin-top:.35em}
+.nav{display:flex;align-items:center;gap:.9rem}
+.nav a.link{font-size:.9rem;color:var(--muted);text-decoration:none;padding:.4em .2em}
+.nav a.link:hover{color:var(--text)}
+.lang{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px}
+.lang button{appearance:none;background:none;border:0;color:var(--muted);font:500 .8rem/1 var(--mono);letter-spacing:.08em;padding:.5em .85em;border-radius:999px;cursor:pointer;min-height:44px;min-width:44px}
+.lang button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+@media (max-width:760px){.nav a.link{display:none}.nav .btn{display:none}.brand small{display:none}.brand b{font-size:.82rem;white-space:nowrap}}
+/* hero */
+.hero{position:relative;padding-block:clamp(3rem,8vh,6rem) 0;text-align:center}
+.hero p,.final p{margin-inline:auto}
+.hero .kicker{margin-bottom:1.6rem}
+.hero h1 .l2{display:block;color:var(--muted)}
+.hero .lead{margin:1.4rem auto 0;font-size:var(--step-1);max-width:34ch;line-height:1.35}
+.hero .line{margin:1.2rem auto 0;color:var(--muted);font-size:var(--step-0)}
+.hero .line span+span::before{content:"·";margin-inline:.6em;color:var(--line)}
+.hero .actions{display:flex;flex-wrap:wrap;justify-content:center;gap:.7rem;margin-top:2rem}
+.hero .trust{margin:1rem auto 0;color:var(--dim);font-size:var(--step-0)}
+.monitor{position:relative;margin:clamp(2.5rem,7vh,5rem) auto 0;width:min(100%,1060px);aspect-ratio:16/9;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.monitor img{width:100%;height:100%;object-fit:cover;filter:saturate(.9) contrast(1.02)}
+.monitor::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,color-mix(in oklch,var(--bg) 55%,transparent),transparent 45%)}
+.monitor .tag{position:absolute;z-index:2;font:500 .68rem/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:oklch(0.92 0.01 85);padding:.5em .7em;background:rgb(0 0 0/.45);border-radius:4px}
+.monitor .tl{left:1rem;top:1rem}.monitor .tr{right:1rem;top:1rem;display:flex;align-items:center;gap:.5em}
+.monitor .bl{left:1rem;bottom:1rem}.monitor .br{right:1rem;bottom:1rem}
+.monitor .dot{width:.55em;height:.55em;border-radius:50%;background:var(--rec);box-shadow:0 0 8px var(--rec)}
+.monitor .corner{position:absolute;z-index:2;width:22px;height:22px;border:1px solid rgb(255 255 255/.45)}
+.monitor .c1{left:2.6rem;top:2.6rem;border-right:0;border-bottom:0}.monitor .c2{right:2.6rem;top:2.6rem;border-left:0;border-bottom:0}
+.monitor .c3{left:2.6rem;bottom:2.6rem;border-right:0;border-top:0}.monitor .c4{right:2.6rem;bottom:2.6rem;border-left:0;border-top:0}
+.hero .under{margin:1rem auto 0;color:var(--dim);font-size:var(--step-0)}
+@media (max-width:600px){.monitor{border-radius:8px}.monitor .tag{font-size:.56rem}.monitor .corner{display:none}}
+/* path (signature) */
+.path .head{display:grid;gap:1rem;grid-template-columns:1fr;align-items:end;margin-bottom:2.5rem}
+@media (min-width:900px){.path .head{grid-template-columns:7fr 5fr}}
+.path .head p{margin-top:.6rem}
+.strip{display:grid;grid-auto-flow:column;grid-auto-columns:min(82vw,420px);gap:1rem;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:1rem;scrollbar-width:thin;scrollbar-color:var(--line) transparent;width:100vw;margin-inline:calc(50% - 50vw);padding-inline:max(var(--gutter),calc(50vw - 620px));scroll-padding-inline:max(var(--gutter),calc(50vw - 620px))}
+.stage{scroll-snap-align:start;display:grid;grid-template-rows:auto auto 1fr auto;gap:.9rem;border:1px solid var(--line-soft);border-radius:10px;padding:1rem;background:var(--bg-2)}
+.stage .frame{position:relative;aspect-ratio:16/9;border-radius:6px;overflow:hidden;background:var(--surface);border:1px solid var(--line-soft)}
+.stage .frame img{width:100%;height:100%;object-fit:cover;filter:saturate(.85)}
+.stage .frame .tc{position:absolute;left:.6rem;top:.6rem;font:500 .62rem/1 var(--mono);letter-spacing:.14em;color:oklch(0.92 0.01 85);background:rgb(0 0 0/.5);padding:.45em .6em;border-radius:3px;text-transform:uppercase}
+.stage .n{display:flex;justify-content:space-between;align-items:center}
+.stage .n .caps{color:var(--accent)}
+.stage h3{font-size:var(--step-1)}
+.stage p{font-size:var(--step-0);color:var(--muted)}
+.stage .out{border-top:1px solid var(--line-soft);padding-top:.8rem;font-size:var(--step-0);color:var(--muted)}
+.stage .out b{font-weight:500;color:var(--text)}
+.stage .gate{font-family:var(--mono);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.hint{margin-top:1rem;font-size:var(--step-0);color:var(--dim)}
+/* works + boards */
+.works__head{display:grid;gap:1rem;grid-template-columns:1fr;align-items:end;margin-bottom:2rem}
+@media (min-width:900px){.works__head{grid-template-columns:7fr 5fr}}
+.lenta{display:grid;grid-auto-flow:column;grid-auto-columns:min(78vw,440px);gap:1rem;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:1rem;scrollbar-width:thin;scrollbar-color:var(--line) transparent;width:100vw;margin-inline:calc(50% - 50vw);padding-inline:max(var(--gutter),calc(50vw - 620px));scroll-padding-inline:max(var(--gutter),calc(50vw - 620px))}
+.clip{scroll-snap-align:start;display:grid;gap:.5rem;color:inherit;text-decoration:none}
+.clip__frame{position:relative;display:block;aspect-ratio:16/9;background:var(--surface);overflow:hidden;border-radius:6px;border:1px solid var(--line-soft)}
+.clip__frame img{width:100%;height:100%;object-fit:cover;transition:transform .6s var(--ease-out);filter:saturate(.9)}
+.clip:hover .clip__frame img{transform:scale(1.04)}
+.clip__kind{position:absolute;left:.6rem;bottom:.6rem;padding:.4em .6em;background:rgb(0 0 0/.6);font:500 .62rem/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;border-radius:3px}
+.clip__title{font:500 var(--step-1)/1.15 var(--disp);letter-spacing:-.01em;margin-top:.3rem}
+.clip__sub{font-size:var(--step-0);color:var(--muted)}
+.kadr{background:var(--bg-2);border-block:1px solid var(--line-soft)}
+.boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem 1.25rem;list-style:none;margin:0;padding:0}
+.board{display:grid;gap:.6rem}
+.board__frame{position:relative;aspect-ratio:16/9;background:var(--surface);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.board__frame img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.85)}
+.board__id{position:absolute;left:.5rem;top:.5rem;padding:.3em .55em;background:rgb(0 0 0/.7);font:500 .78rem/1 var(--mono);border-radius:3px}
+.board__st{position:absolute;right:.5rem;top:.5rem;padding:.35em .6em;background:rgb(0 0 0/.7);font:500 .62rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;border-radius:3px;border:1px solid transparent}
+.board__st.g{color:var(--ok);border-color:color-mix(in oklch,var(--ok) 50%,transparent)}
+.board__st.y{color:var(--accent);border-color:color-mix(in oklch,var(--accent) 50%,transparent)}
+.board__st.r{color:oklch(0.78 0.16 25);border-color:oklch(0.55 0.16 25/.6)}
+.board__specs{display:flex;flex-wrap:wrap;gap:.3rem .9rem;font:.74rem var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.board__action{margin:0;font-size:var(--step-0);color:var(--muted)}
+/* receive */
+.receive{background:var(--bg-2);border-block:1px solid var(--line-soft)}
+.receive .grid{display:grid;gap:2.5rem;grid-template-columns:1fr}
+@media (min-width:900px){.receive .grid{grid-template-columns:5fr 7fr;gap:4rem}}
+.receive ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.6rem 1.5rem}
+.receive li{padding:.75rem 0;border-top:1px solid var(--line-soft);font-size:var(--step-0)}
+.receive li .caps{display:block;margin-bottom:.25rem;font-size:.66rem}
+.panel{margin-top:1.5rem;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.panel .bar{display:flex;gap:1rem;align-items:center;justify-content:space-between;padding:.7rem 1rem;border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.panel .rows{display:grid;grid-template-columns:1fr}
+.panel .row{display:grid;grid-template-columns:5.5rem 1fr auto;gap:1rem;align-items:center;padding:.7rem 1rem;border-bottom:1px solid var(--line-soft);font-size:var(--step-0)}
+.panel .row:last-child{border-bottom:0}
+.panel .row .k{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;color:var(--dim)}
+.panel .row .s{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase}
+.s.g{color:var(--ok)}.s.y{color:var(--accent)}.s.d{color:var(--dim)}
+@media (max-width:480px){.panel .row{grid-template-columns:4.5rem 1fr;gap:.5rem}.panel .row .s{grid-column:2}}
+/* why */
+.why .cols{display:grid;gap:1rem;grid-template-columns:1fr}
+@media (min-width:860px){.why .cols{grid-template-columns:1fr 1fr;gap:1.5rem}}
+.why .col{border:1px solid var(--line-soft);border-radius:10px;padding:1.4rem;background:var(--bg-2)}
+.why .col.one{border-color:color-mix(in oklch,var(--accent) 45%,var(--line))}
+.why .col .caps{display:flex;justify-content:space-between;margin-bottom:1rem}
+.why ol{margin:0;padding:0;list-style:none;display:grid;gap:.4rem;font-size:var(--step-0);color:var(--muted)}
+.why ol li{display:flex;gap:.8rem;align-items:baseline}
+.why ol li::before{content:"→";font-family:var(--mono);color:var(--dim)}
+.why .big{font-family:var(--disp);font-size:var(--step-2);font-weight:500;letter-spacing:-.02em;line-height:1.05}
+.why .three{display:grid;gap:1.5rem 2rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-top:3rem}
+.why .three h3{margin-bottom:.4rem}
+.why .three p{font-size:var(--step-0);color:var(--muted)}
+/* crew */
+.crew{background:var(--bg-2);border-block:1px solid var(--line-soft)}
+.crew .lead{margin-top:.8rem;color:var(--muted)}
+.depts{margin-top:2.5rem;display:grid;gap:1.4rem 2rem;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+.dept .caps{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:.5rem;margin-bottom:.6rem}
+.dept ul{list-style:none;margin:0;padding:0;display:grid;gap:.25rem}
+.dept li{font-size:var(--step-0);display:flex;gap:.6rem;align-items:baseline}
+.dept li i{font:400 .68rem/1 var(--mono);letter-spacing:.1em;color:var(--dim);min-width:3.6em}
+.crew .rule{margin-top:2.5rem;display:grid;gap:1.2rem 2rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.crew .rule p{font-size:var(--step-0);color:var(--muted)}
+.crew .rule b{display:block;color:var(--text);font-weight:500;margin-bottom:.2rem}
+/* packages */
+.pilot{display:grid;gap:1rem;grid-template-columns:1fr;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:1.4rem;margin:2.5rem 0 1rem}
+@media (min-width:860px){.pilot{grid-template-columns:1fr auto}}
+.pilot p{color:var(--muted);font-size:var(--step-0);margin-top:.3rem}
+.pack{display:grid;gap:1rem;grid-template-columns:1fr}
+@media (min-width:860px){.pack{grid-template-columns:1fr 1.15fr 1fr;align-items:stretch}}
+.card{border:1px solid var(--line-soft);border-radius:10px;padding:1.4rem;background:var(--bg-2);display:grid;grid-template-rows:auto auto auto 1fr auto;gap:.6rem}
+.card.main{border-color:color-mix(in oklch,var(--accent) 55%,var(--line));background:color-mix(in oklch,var(--accent) 6%,var(--bg-2))}
+.card .tag{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.card .price{font-family:var(--disp);font-size:var(--step-2);font-weight:500;letter-spacing:-.02em}
+.card .scope{color:var(--muted);font-size:var(--step-0)}
+.card .scope span+span::before{content:"·";margin-inline:.5em;color:var(--line)}
+.card p{font-size:var(--step-0);color:var(--muted)}
+.card .btn{justify-self:start;margin-top:.6rem}
+.incl{margin-top:2.5rem;display:grid;gap:1.5rem;grid-template-columns:1fr}
+@media (min-width:860px){.incl{grid-template-columns:1fr 2fr}}
+.incl ul{list-style:none;margin:0;padding:0;columns:2;column-gap:2rem;font-size:var(--step-0);color:var(--muted)}
+.incl li{break-inside:avoid;padding:.35rem 0;border-top:1px solid var(--line-soft)}
+@media (max-width:600px){.incl ul{columns:1}}
+.incl .add{margin-top:1rem;font-size:var(--step-0);color:var(--dim)}
+/* steps */
+.steps{background:var(--bg-2);border-block:1px solid var(--line-soft)}
+.steps ol{list-style:none;margin:2.5rem 0 0;padding:0;display:grid;gap:1.2rem;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));counter-reset:s}
+.steps li{counter-increment:s;border-top:1px solid var(--line);padding-top:1rem}
+.steps li::before{content:counter(s,decimal-leading-zero);font:400 .72rem/1 var(--mono);letter-spacing:.14em;color:var(--accent);display:block;margin-bottom:.8rem}
+.steps h3{margin-bottom:.35rem}
+.steps p{font-size:var(--step-0);color:var(--muted)}
+.steps .note{margin-top:2.5rem;font-size:var(--step-0);color:var(--dim);max-width:70ch}
+/* faq */
+.faq .list{margin-top:2rem;border-top:1px solid var(--line)}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:1rem;align-items:center;padding:1.1rem 0;font:500 var(--step-1)/1.25 var(--disp);letter-spacing:-.01em}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-family:var(--mono);color:var(--dim);transition:transform .2s var(--ease-out)}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{padding:0 0 1.2rem;color:var(--muted);max-width:70ch}
+/* final */
+.final{text-align:center;position:relative;overflow:hidden}
+.final h2{font-size:var(--step-4)}
+.final h2 .l2{display:block;color:var(--muted)}
+.final .actions{display:flex;flex-wrap:wrap;justify-content:center;gap:.7rem;margin-top:2rem}
+.final .trust{margin:1.2rem auto 0;color:var(--dim);font-size:var(--step-0)}
+/* footer */
+footer{border-top:1px solid var(--line-soft);padding:2.5rem 0 calc(2rem + env(safe-area-inset-bottom));font-size:var(--step-0);color:var(--muted)}
+footer .wrap{display:grid;gap:1.5rem;grid-template-columns:1fr}
+@media (min-width:760px){footer .wrap{grid-template-columns:2fr 1fr 1fr}}
+footer .logos{display:flex;gap:1rem;align-items:center;margin-bottom:.8rem}
+footer .logos img{height:36px;width:auto;opacity:.9}
+footer ul{list-style:none;margin:0;padding:0;display:grid;gap:.3rem}
+footer a{text-decoration:none;color:var(--muted)}
+footer a:hover{color:var(--text)}
+footer .legal{grid-column:1/-1;border-top:1px solid var(--line-soft);padding-top:1rem;font-size:.78rem;color:var(--dim);display:flex;flex-wrap:wrap;gap:.5rem 1.5rem}
+/* mobile sticky cta */
+.sticky{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:.6rem var(--gutter) calc(.6rem + env(safe-area-inset-bottom));background:color-mix(in oklch,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line-soft);display:none}
+.sticky .btn{width:100%;justify-content:center}
+@media (max-width:760px){.sticky{display:block}body{padding-bottom:84px}}
+/* reveal */
+.js [data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .8s var(--ease-out),transform .8s var(--ease-out)}
+.js [data-reveal].in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.js [data-reveal]{opacity:1;transform:none;transition:none}*,*::before,*::after{transition:none!important;animation:none!important}.clip:hover .clip__frame img{transform:none}.btn:active{transform:none}.faq details[open] summary::after{transform:none}}
+.grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;opacity:.045;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");mix-blend-mode:overlay}
+</style>
+</head>
+<body class="grain">
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Neyra Vision Studio">
+      <img src="assets/logo-nv-512.png" width="34" height="34" alt="">
+      <span><b>Neyra Vision</b><small>STUDIO · ALMATY</small></span>
+    </a>
+    <nav class="nav" aria-label="Разделы">
+      <a class="link" href="#put"><span class="ru">Путь проекта</span><span class="kz">Жоба жолы</span></a>
+      <a class="link" href="#proekty"><span class="ru">Проекты</span><span class="kz">Жобалар</span></a>
+      <a class="link" href="#komanda"><span class="ru">Команда</span><span class="kz">Топ</span></a>
+      <a class="link" href="#pakety"><span class="ru">Пакеты</span><span class="kz">Пакеттер</span></a>
+      <a class="link" href="#voprosy"><span class="ru">Вопросы</span><span class="kz">Сұрақтар</span></a>
+      <a class="link" href="studio/#/studio/overview"><span class="ru">Демопроект</span><span class="kz">Деможоба</span></a>
+      <div class="lang" role="group" aria-label="Язык / Тіл">
+        <button type="button" data-set="ru" aria-pressed="true">RU</button>
+        <button type="button" data-set="kz" aria-pressed="false">KZ</button>
+      </div>
+      <a class="btn btn--main" href="https://t.me/mis_ter_bro"><span class="ru">Прислать сценарий</span><span class="kz">Сценарий жіберу</span></a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="caps kicker"><span class="ru">Neyra Vision · Препродакшн для кино и сериалов · Казахстан</span><span class="kz">Neyra Vision · Кино мен сериалдарға препродакшн · Қазақстан</span></p>
+    <h1>
+      <span class="ru">От сценария.<span class="l2">До экрана за дни.</span></span>
+      <span class="kz">Сценарийден.<span class="l2">Экранға — бірнеше күнде.</span></span>
+    </h1>
+    <p class="lead">
+      <span class="ru">Увидьте весь фильм до съёмок: героев, мир, каждый кадр в раскадровке, аниматик и&nbsp;тизер.</span>
+      <span class="kz">Фильмді түсірілімге дейін толық көріңіз: кейіпкерлер, әлем, раскадровкадағы әр кадр, аниматик және&nbsp;тизер.</span>
+    </p>
+    <p class="line">
+      <span class="ru">Короткий метр</span><span class="kz">Қысқа метраж</span>
+      <span class="ru">Полный метр</span><span class="kz">Толық метраж</span>
+      <span class="ru">Сериал</span><span class="kz">Сериал</span>
+      <span class="ru">Под NDA, права остаются у&nbsp;автора</span><span class="kz">NDA бойынша, құқықтар авторда қалады</span>
+    </p>
+    <div class="actions">
+      <a class="btn btn--main" href="https://t.me/mis_ter_bro"><span class="ru">Прислать сценарий</span><span class="kz">Сценарий жіберу</span> <span class="arr">→</span></a>
+      <a class="btn btn--ghost" href="studio/#/studio/overview"><span class="ru">Открыть демопроект</span><span class="kz">Деможобаны ашу</span></a>
+    </div>
+    <p class="trust"><span class="ru">Первое чтение — бесплатно. Продюсер отвечает в течение суток.</span><span class="kz">Алғашқы оқу — тегін. Продюсер бір тәулік ішінде жауап береді.</span></p>
+
+    <figure class="monitor" aria-label="Кадр из аниматика">
+      <img src="assets/kadr-aul-leto.jpg" width="1600" height="893" alt="Кадр: казахский аул летом, золотой свет" fetchpriority="high">
+      <span class="tag tl"><span class="ru">Сцена 01 · Нат. Аул · Утро</span><span class="kz">Сахна 01 · Сырт. Ауыл · Таң</span></span>
+      <span class="tag tr"><span class="dot" aria-hidden="true"></span>REC</span>
+      <span class="tag bl"><span class="ru">Аниматик · V1 · 24 к/с</span><span class="kz">Аниматик · V1 · 24 к/с</span></span>
+      <span class="tag br num">TC 00:00:09:20</span>
+      <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
+    </figure>
+    <p class="under"><span class="ru">Каждый кадр здесь начинался со страницы сценария.</span><span class="kz">Мұндағы әр кадр сценарий бетінен басталды.</span></p>
+  </div>
+</section>
+
+<section class="path" id="put">
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <p class="caps ok"><span class="ru">Путь проекта · 01 → 06</span><span class="kz">Жоба жолы · 01 → 06</span></p>
+        <h2 style="margin-top:.8rem"><span class="ru">От первой страницы до последнего кадра.</span><span class="kz">Бірінші беттен соңғы кадрға дейін.</span></h2>
+      </div>
+      <p class="muted"><span class="ru">Одна память проекта. Шесть этапов, четыре вехи с вашим одобрением. Пока веха не закрыта, следующий этап не начинается. Всё, что сделано, живёт на странице проекта, а не в чатах.</span><span class="kz">Жобаның бір жады. Алты кезең, сіз бекітетін төрт меже. Меже жабылмайынша келесі кезең басталмайды. Жасалғанның бәрі чатта емес, жоба бетінде сақталады.</span></p>
+    </div>
+
+    <div class="strip" role="list">
+      <article class="stage" role="listitem">
+        <div class="n"><span class="caps">01</span><span class="gate">◆ <span class="ru">Веха 1</span><span class="kz">Меже 1</span></span></div>
+        <div class="frame"><img src="assets/kadr-kebek.jpg" width="1600" height="893" alt="" loading="lazy"><span class="tc"><span class="ru">Сценарий</span><span class="kz">Сценарий</span></span></div>
+        <div>
+          <h3><span class="ru">Сценарий приходит.</span><span class="kz">Сценарий келеді.</span></h3>
+          <p><span class="ru">PDF, FDX, DOCX или Fountain — под взаимным NDA. Станция читает его как сценарный редактор: сцены, герои, локации, биты. Слабые места возвращаются с предложением, как починить, — до первого кадра.</span><span class="kz">PDF, FDX, DOCX немесе Fountain — өзара NDA бойынша. Станция оны сценарий редакторындай оқиды: сахналар, кейіпкерлер, локациялар, биттер. Әлсіз тұстар бірінші кадрға дейін түзету ұсынысымен қайтады.</span></p>
+        </div>
+        <p class="out"><b><span class="ru">Выход ·</span><span class="kz">Нәтиже ·</span></b> <span class="ru">читательское заключение, разбор по сценам, оценка</span><span class="kz">оқырман қорытындысы, сахналар бойынша талдау, бағалау</span></p>
+      </article>
+
+      <article class="stage" role="listitem">
+        <div class="n"><span class="caps">02</span><span class="gate"></span></div>
+        <div class="frame"><img src="assets/kadr-tostik-geroi.jpg" width="960" height="407" alt="" loading="lazy"><span class="tc"><span class="ru">Герои и мир</span><span class="kz">Кейіпкерлер мен әлем</span></span></div>
+        <div>
+          <h3><span class="ru">Герои и мир — закреплены.</span><span class="kz">Кейіпкерлер мен әлем — бекітілді.</span></h3>
+          <p><span class="ru">Портрет и замок внешности каждого героя, голос, библия мира: локации, реквизит, костюм. Один и тот же человек в каждом кадре — от первой сцены до последней.</span><span class="kz">Әр кейіпкердің портреті мен сырт келбет құлпы, дауысы, әлем библиясы: локациялар, реквизит, костюм. Бірінші сахнадан соңғысына дейін — сол бір адам.</span></p>
+        </div>
+        <p class="out"><b><span class="ru">Выход ·</span><span class="kz">Нәтиже ·</span></b> <span class="ru">каст, библия героев и мира, пластины локаций</span><span class="kz">каст, кейіпкерлер мен әлем библиясы, локация пластиналары</span></p>
+      </article>
+
+      <article class="stage" role="listitem">
+        <div class="n"><span class="caps">03</span><span class="gate">◆ <span class="ru">Веха 2</span><span class="kz">Меже 2</span></span></div>
+        <div class="frame"><img src="assets/kadr-aidahar-1.jpg" width="1600" height="690" alt="" loading="lazy"><span class="tc"><span class="ru">Раскадровка · аниматик</span><span class="kz">Раскадровка · аниматик</span></span></div>
+        <div>
+          <h3><span class="ru">Картинки для аниматика.</span><span class="kz">Аниматикке арналған кадрлар.</span></h3>
+          <p><span class="ru">Один выбранный кадр на сцену, шот-лист с крупностью, движением камеры и длительностью, черновые голоса — и фильм впервые движется. Темп слышно до того, как потрачен рендер.</span><span class="kz">Әр сахнаға таңдалған бір кадр, ірілігі, камера қозғалысы мен ұзақтығы көрсетілген шот-лист, қаралама дауыстар — фильм алғаш рет қозғалады. Рендерге дейін темп естіледі.</span></p>
+        </div>
+        <p class="out"><b><span class="ru">Выход ·</span><span class="kz">Нәтиже ·</span></b> <span class="ru">лист кадров по сценам, шот-лист, аниматик</span><span class="kz">сахналар бойынша кадр парағы, шот-лист, аниматик</span></p>
+      </article>
+
+      <article class="stage" role="listitem">
+        <div class="n"><span class="caps">04</span><span class="gate"></span></div>
+        <div class="frame"><img src="assets/reel-14.jpg" width="1280" height="720" alt="" loading="lazy"><span class="tc"><span class="ru">Страница проекта</span><span class="kz">Жоба беті</span></span></div>
+        <div>
+          <h3><span class="ru">Страница проекта для команды.</span><span class="kz">Топқа арналған жоба беті.</span></h3>
+          <p><span class="ru">Закрытая страница по ключу: продюсер видит смету и план, режиссёр — кадры и замечания, сценарист — драфты, оператор — камеру. Каждый работает в своём разделе, все видят одно состояние.</span><span class="kz">Кілтпен ашылатын жабық бет: продюсер сметаны мен жоспарды, режиссёр кадрлар мен ескертулерді, сценарист драфттарды, оператор камераны көреді. Әркім өз бөлімінде жұмыс істейді, бәрі бір күйді көреді.</span></p>
+        </div>
+        <p class="out"><b><span class="ru">Выход ·</span><span class="kz">Нәтиже ·</span></b> <span class="ru">страница проекта с разделами и ключами ролей · </span><span class="kz">бөлімдері мен рөл кілттері бар жоба беті · </span><a href="studio/#/studio/overview"><span class="ru">открыть демопроект →</span><span class="kz">деможобаны ашу →</span></a></p>
+      </article>
+
+      <article class="stage" role="listitem">
+        <div class="n"><span class="caps">05</span><span class="gate">◆ <span class="ru">Веха 3</span><span class="kz">Меже 3</span></span></div>
+        <div class="frame"><img src="assets/bro-jakarta.jpg" width="1280" height="720" alt="" loading="lazy"><span class="tc"><span class="ru">Кадр 12.3 · Крупный</span><span class="kz">Кадр 12.3 · Ірі план</span></span></div>
+        <div>
+          <h3><span class="ru">Каждый кадр — отдельно.</span><span class="kz">Әр кадр — жеке.</span></h3>
+          <p><span class="ru">Карточка кадра: объектив, высота, движение, свет, промпт, варианты. Красный кадр не идёт в рендер, пока режиссёр не сделал его зелёным. Сложные мизансцены ставим в 3D до генерации.</span><span class="kz">Кадр карточкасы: объектив, биіктік, қозғалыс, жарық, промпт, нұсқалар. Қызыл кадр режиссёр оны жасылға айналдырмайынша рендерге кетпейді. Күрделі мизансценаларды генерацияға дейін 3D-да қоямыз.</span></p>
+        </div>
+        <p class="out"><b><span class="ru">Выход ·</span><span class="kz">Нәтиже ·</span></b> <span class="ru">принятые кадры и клипы 16:9, промпт на каждый</span><span class="kz">қабылданған 16:9 кадрлар мен клиптер, әрқайсысына промпт</span></p>
+      </article>
+
+      <article class="stage" role="listitem">
+        <div class="n"><span class="caps">06</span><span class="gate">◆ <span class="ru">Веха 4</span><span class="kz">Меже 4</span></span></div>
+        <div class="frame"><img src="assets/bro-still.jpg" width="1280" height="720" alt="" loading="lazy"><span class="tc"><span class="ru">Мастер · 4K</span><span class="kz">Мастер · 4K</span></span></div>
+        <div>
+          <h3><span class="ru">Звук, монтаж, мастер.</span><span class="kz">Дыбыс, монтаж, мастер.</span></h3>
+          <p><span class="ru">Голоса героев, музыка по эмоциональной дуге, шумы и атмосфера, монтаж и цвет. Тизер — сразу, мастер для кино, стриминга и соцсетей — когда утверждён финальный монтаж.</span><span class="kz">Кейіпкерлердің дауысы, эмоциялық доғаға сай музыка, шу мен атмосфера, монтаж бен түс. Тизер — бірден, кино, стриминг пен әлеуметтік желіге арналған мастер — соңғы монтаж бекітілгенде.</span></p>
+        </div>
+        <p class="out"><b><span class="ru">Выход ·</span><span class="kz">Нәтиже ·</span></b> <span class="ru">тизер, финальный микс, мастер</span><span class="kz">тизер, соңғы микс, мастер</span></p>
+      </article>
+    </div>
+    <p class="hint"><span class="ru">◆ — точки, где без вашего «да» работа не идёт дальше.</span><span class="kz">◆ — сіздің «иә» дегеніңізсіз жұмыс әрі қарай жүрмейтін нүктелер.</span></p>
+  </div>
+</section>
+
+<section class="works" id="proekty">
+  <div class="wrap">
+    <div class="works__head">
+      <div>
+        <p class="caps"><span class="ru">В работе</span><span class="kz">Жұмыста</span></p>
+        <h2 style="margin-top:.8rem"><span class="ru">Проекты, которые уже идут этим путём.</span><span class="kz">Осы жолмен жүріп жатқан жобалар.</span></h2>
+      </div>
+      <p class="muted"><span class="ru">Страницы проектов закрыты и открываются по коду команды.</span><span class="kz">Жоба беттері жабық, топ кодымен ашылады.</span></p>
+    </div>
+    <div class="lenta">
+      <a class="clip" href="https://neyra.vision/er-tostik/"><span class="clip__frame"><img src="assets/kadr-tostik-geroi.jpg" width="960" height="407" alt="Ер Төстік — герои" loading="lazy"><span class="clip__kind"><span class="ru">Анимация</span><span class="kz">Анимация</span></span></span><span class="clip__title">Ер Төстік</span><span class="clip__sub"><span class="ru">Казахская сказка · 7 стилей</span><span class="kz">Қазақ ертегісі · 7 стиль</span></span></a>
+      <a class="clip" href="https://neyra.vision/aidahar/"><span class="clip__frame"><img src="assets/kadr-aidahar-1.jpg" width="1600" height="690" alt="Айдахар — кадр" loading="lazy"><span class="clip__kind"><span class="ru">Сериал</span><span class="kz">Сериал</span></span></span><span class="clip__title">Айдахар</span><span class="clip__sub"><span class="ru">Степная сага</span><span class="kz">Дала дастаны</span></span></a>
+      <a class="clip" href="https://neyra.vision/"><span class="clip__frame"><img src="assets/bro-still.jpg" width="1280" height="720" alt="BRO — кадр" loading="lazy"><span class="clip__kind"><span class="ru">Полный метр</span><span class="kz">Толық метраж</span></span></span><span class="clip__title">BRO</span><span class="clip__sub"><span class="ru">Джакарта · технология NEYRA</span><span class="kz">Джакарта · NEYRA технологиясы</span></span></a>
+      <a class="clip" href="https://colibristudio.ai/baby-sharp/"><span class="clip__frame"><img src="assets/baby-sharp-still.jpg" width="1280" height="548" alt="BABY SHARP — кадр" loading="lazy"><span class="clip__kind"><span class="ru">Сериал</span><span class="kz">Сериал</span></span></span><span class="clip__title">BABY SHARP</span><span class="clip__sub"><span class="ru">Ара Аруш</span><span class="kz">Ара Аруш</span></span></a>
+    </div>
+  </div>
+</section>
+
+<section class="kadr" id="kadr">
+  <div class="wrap">
+    <div class="works__head">
+      <div>
+        <p class="caps"><span class="ru">Этап 05 · карточка кадра · пример</span><span class="kz">05-кезең · кадр карточкасы · мысал</span></p>
+        <h2 style="margin-top:.8rem"><span class="ru">Каждый кадр — своя карточка. Красный не рендерится.</span><span class="kz">Әр кадрдың өз карточкасы. Қызыл рендерге кетпейді.</span></h2>
+      </div>
+      <p class="muted"><span class="ru">Номер сцены и кадра, крупность, движение, объектив, длительность, действие, промпт и варианты. Режиссёр ставит зелёный — только тогда кадр идёт в видео.</span><span class="kz">Сахна мен кадр нөмірі, ірілігі, қозғалысы, объективі, ұзақтығы, әрекеті, промпты мен нұсқалары. Режиссёр жасыл қойғанда ғана кадр видеоға кетеді.</span></p>
+    </div>
+    <ol class="boards">
+      <li class="board">
+        <div class="board__frame"><img src="assets/kadr-kebek.jpg" width="1600" height="893" alt="" loading="lazy"><span class="board__id">12.1</span><span class="board__st g"><span class="ru">принят</span><span class="kz">қабылданды</span></span></div>
+        <div class="board__specs"><span><span class="ru">Общий</span><span class="kz">Жалпы</span></span><span><span class="ru">Дрон, облёт</span><span class="kz">Дрон, айналып ұшу</span></span><span>24 мм</span><span>6 с</span></div>
+        <p class="board__action"><span class="ru">Всадник выезжает из аула на рассвете, камера облетает слева.</span><span class="kz">Салт атты таңда ауылдан шығады, камера сол жақтан айналып ұшады.</span></p>
+      </li>
+      <li class="board">
+        <div class="board__frame"><img src="assets/bro-jakarta.jpg" width="1280" height="720" alt="" loading="lazy"><span class="board__id">12.2</span><span class="board__st y"><span class="ru">на одобрении</span><span class="kz">бекітуде</span></span></div>
+        <div class="board__specs"><span><span class="ru">Средний</span><span class="kz">Орташа</span></span><span><span class="ru">Статика</span><span class="kz">Статика</span></span><span>50 мм</span><span>4 с</span></div>
+        <p class="board__action"><span class="ru">Герой останавливается, смотрит назад. Вариант 3 из 5.</span><span class="kz">Кейіпкер тоқтап, артына қарайды. 5 нұсқаның 3-сі.</span></p>
+      </li>
+      <li class="board">
+        <div class="board__frame"><img src="assets/kadr-aidahar-1.jpg" width="1600" height="690" alt="" loading="lazy"><span class="board__id">12.3</span><span class="board__st r"><span class="ru">на доработку</span><span class="kz">пысықтауға</span></span></div>
+        <div class="board__specs"><span><span class="ru">Крупный</span><span class="kz">Ірі план</span></span><span><span class="ru">Наезд</span><span class="kz">Жақындау</span></span><span>85 мм</span><span>3 с</span></div>
+        <p class="board__action"><span class="ru">Замечание режиссёра: свет слишком тёплый, не совпадает с 12.1.</span><span class="kz">Режиссёр ескертуі: жарық тым жылы, 12.1-мен сәйкес емес.</span></p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="receive" id="poluchaete">
+  <div class="wrap grid">
+    <div data-reveal>
+      <p class="caps"><span class="ru">Что вы получаете</span><span class="kz">Не аласыз</span></p>
+      <h2 style="margin-top:.8rem"><span class="ru">Не папку с файлами. Страницу проекта, где всё на месте.</span><span class="kz">Файлдар папкасы емес. Бәрі орнында тұрған жоба беті.</span></h2>
+      <p class="muted" style="margin-top:1rem"><span class="ru">Каждый пакет открывает закрытую страницу проекта: разбор, герои, мир, кадры, аниматик, смета и план. Сценарий продолжает улучшаться сцена за сценой, и каждое изменение утверждаете вы.</span><span class="kz">Әр пакет жабық жоба бетін ашады: талдау, кейіпкерлер, әлем, кадрлар, аниматик, смета мен жоспар. Сценарий сахна сайын жақсара береді, әр өзгерісті сіз бекітесіз.</span></p>
+    </div>
+    <div data-reveal>
+      <ul>
+        <li><span class="caps">01</span><span class="ru">Разбор сценария и оценка по сценам</span><span class="kz">Сценарий талдауы және сахна бойынша бағалау</span></li>
+        <li><span class="caps">02</span><span class="ru">Герои, связи и эмоциональная дуга</span><span class="kz">Кейіпкерлер, байланыстар және эмоциялық доға</span></li>
+        <li><span class="caps">03</span><span class="ru">Библия истории и мира</span><span class="kz">Оқиға мен әлем библиясы</span></li>
+        <li><span class="caps">04</span><span class="ru">Виртуальный кастинг и локации</span><span class="kz">Виртуалды кастинг және локациялар</span></li>
+        <li><span class="caps">05</span><span class="ru">Раскадровка и шот-лист</span><span class="kz">Раскадровка және шот-лист</span></li>
+        <li><span class="caps">06</span><span class="ru">Промпт на каждый кадр</span><span class="kz">Әр кадрға промпт</span></li>
+        <li><span class="caps">07</span><span class="ru">Аниматик всего фильма</span><span class="kz">Бүкіл фильмнің аниматигі</span></li>
+        <li><span class="caps">08</span><span class="ru">Тизер</span><span class="kz">Тизер</span></li>
+        <li><span class="caps">09</span><span class="ru">Смета и план производства</span><span class="kz">Смета мен өндіріс жоспары</span></li>
+        <li><span class="caps">10</span><span class="ru">Ключи доступа для каждой роли</span><span class="kz">Әр рөлге қолжетімділік кілттері</span></li>
+      </ul>
+      <div class="panel" aria-label="Пример состояния проекта">
+        <div class="bar"><span><span class="ru">Пример · проект · состояние</span><span class="kz">Мысал · жоба · күйі</span></span><span class="num">12 / 36 <span class="ru">сцен</span><span class="kz">сахна</span></span></div>
+        <div class="rows">
+          <div class="row"><span class="k">01</span><span><span class="ru">Сценарий · драфт 04</span><span class="kz">Сценарий · драфт 04</span></span><span class="s g"><span class="ru">принят</span><span class="kz">қабылданды</span></span></div>
+          <div class="row"><span class="k">02</span><span><span class="ru">Герои и мир · 6 героев, 9 локаций</span><span class="kz">Кейіпкерлер мен әлем · 6 кейіпкер, 9 локация</span></span><span class="s g"><span class="ru">закреплены</span><span class="kz">бекітілді</span></span></div>
+          <div class="row"><span class="k">03</span><span><span class="ru">Раскадровка · 12 из 36 сцен</span><span class="kz">Раскадровка · 36 сахнаның 12-сі</span></span><span class="s y"><span class="ru">в работе</span><span class="kz">жұмыста</span></span></div>
+          <div class="row"><span class="k">05</span><span><span class="ru">Кадр 12.3 · крупный · ждёт режиссёра</span><span class="kz">Кадр 12.3 · ірі план · режиссёрді күтеді</span></span><span class="s y"><span class="ru">на одобрении</span><span class="kz">бекітуде</span></span></div>
+          <div class="row"><span class="k">06</span><span><span class="ru">Звук и мастер</span><span class="kz">Дыбыс пен мастер</span></span><span class="s d"><span class="ru">после вехи 3</span><span class="kz">3-межеден кейін</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="why" id="pochemu">
+  <div class="wrap">
+    <p class="caps"><span class="ru">Почему это важно</span><span class="kz">Неге бұл маңызды</span></p>
+    <h2 style="margin:.8rem 0 2.5rem"><span class="ru">Раньше препродакшн занимал месяцы. Теперь — дни.</span><span class="kz">Бұрын препродакшн айларға созылатын. Енді — күндер.</span></h2>
+    <div class="cols">
+      <div class="col" data-reveal>
+        <div class="caps"><span><span class="ru">Обычный путь · семь передач</span><span class="kz">Әдеттегі жол · жеті тапсыру</span></span><span><span class="ru">месяцы</span><span class="kz">айлар</span></span></div>
+        <ol>
+          <li><span class="ru">Разбор сценария</span><span class="kz">Сценарий бөлінісі</span></li>
+          <li><span class="ru">Художники раскадровки</span><span class="kz">Раскадровка суретшілері</span></li>
+          <li><span class="ru">Кастинг-пробы</span><span class="kz">Кастинг сынамалары</span></li>
+          <li><span class="ru">Группа превиза</span><span class="kz">Превиз тобы</span></li>
+          <li><span class="ru">Монтаж и временная музыка</span><span class="kz">Монтаж және уақытша музыка</span></li>
+          <li><span class="ru">Исследование рынка</span><span class="kz">Нарық зерттеуі</span></li>
+          <li><span class="ru">Питч-дек</span><span class="kz">Питч-дек</span></li>
+        </ol>
+      </div>
+      <div class="col one" data-reveal>
+        <div class="caps"><span><span class="ru">Neyra Vision · одна система, одна память</span><span class="kz">Neyra Vision · бір жүйе, бір жады</span></span><span><span class="ru">дни</span><span class="kz">күндер</span></span></div>
+        <p class="big"><span class="ru">История, герои и облик живут в одном месте. Никто ничего не пересказывает между отделами.</span><span class="kz">Оқиға, кейіпкерлер мен келбет бір жерде. Бөлімдер арасында ешкім ештеңені қайта айтып жүрмейді.</span></p>
+      </div>
+    </div>
+    <div class="three">
+      <div data-reveal><h3><span class="ru">Одна память</span><span class="kz">Бір жады</span></h3><p><span class="ru">Сценарист поменял сцену — художник по костюмам и оператор видят это сразу. Кадр 400 совпадает с кадром 1.</span><span class="kz">Сценарист сахнаны өзгертті — костюм суретшісі мен оператор мұны бірден көреді. 400-кадр 1-кадрмен сәйкес.</span></p></div>
+      <div data-reveal><h3><span class="ru">Решайте до того, как платить</span><span class="kz">Төлемей тұрып шешіңіз</span></h3><p><span class="ru">Фильм, его оценки и смету видно до того, как деньги уйдут в съёмку или полный рендер.</span><span class="kz">Фильм, оның бағалары мен сметасы ақша түсірілімге немесе толық рендерге кетпей тұрып көрінеді.</span></p></div>
+      <div data-reveal><h3><span class="ru">Закрыто по умолчанию</span><span class="kz">Әдепкі бойынша жабық</span></h3><p><span class="ru">Взаимное NDA с первой загрузки. Ваши материалы никогда не используются для обучения публичных моделей.</span><span class="kz">Алғашқы жүктеуден бастап өзара NDA. Материалдарыңыз жалпыға қолжетімді модельдерді оқытуға ешқашан пайдаланылмайды.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section class="crew" id="komanda">
+  <div class="wrap">
+    <p class="caps"><span class="ru">Съёмочная группа ИИ · 28 специалистов</span><span class="kz">ЖИ түсіру тобы · 28 маман</span></p>
+    <h2 style="margin-top:.8rem"><span class="ru">Полная группа. На связи для каждого кадра.</span><span class="kz">Толық топ. Әр кадр үшін байланыста.</span></h2>
+    <p class="lead"><span class="ru">Специалисты по отделам: история, сценарий, режиссура, камера, дизайн, звук, монтаж, контроль качества. Они работают на технологии NEYRA с одной памятью о вашем фильме, а продюсер-человек подписывает каждую передачу.</span><span class="kz">Бөлімдер бойынша мамандар: оқиға, сценарий, режиссура, камера, дизайн, дыбыс, монтаж, сапа бақылауы. Олар NEYRA технологиясында фильміңіз туралы бір жадымен жұмыс істейді, ал адам-продюсер әр тапсыруға қол қояды.</span></p>
+
+    <div class="depts">
+      <div class="dept" data-reveal>
+        <div class="caps"><span><span class="ru">Творческое руководство</span><span class="kz">Шығармашылық басшылық</span></span><span>8</span></div>
+        <ul>
+          <li><i>01</i><span class="ru">Креативный директор</span><span class="kz">Креатив директор</span></li>
+          <li><i>02</i><span class="ru">Режиссёр</span><span class="kz">Режиссёр</span></li>
+          <li><i>03</i><span class="ru">Режиссёр рекламы</span><span class="kz">Жарнама режиссёрі</span></li>
+          <li><i>04</i><span class="ru">Сценарист и скрипт-доктор</span><span class="kz">Сценарист және скрипт-доктор</span></li>
+          <li><i>05</i><span class="ru">Целитель сценария</span><span class="kz">Сценарий емшісі</span></li>
+          <li><i>06</i><span class="ru">Шоураннер вертикальной драмы</span><span class="kz">Тік драма шоураннері</span></li>
+          <li><i>07</i><span class="ru">Психолог персонажей</span><span class="kz">Кейіпкер психологы</span></li>
+          <li><i>08</i><span class="ru">Архитектор истории</span><span class="kz">Оқиға сәулетшісі</span></li>
+        </ul>
+      </div>
+      <div class="dept" data-reveal>
+        <div class="caps"><span><span class="ru">Непрерывность и библия мира</span><span class="kz">Сабақтастық және әлем библиясы</span></span><span>2</span></div>
+        <ul>
+          <li><i>09</i><span class="ru">Специалист по разбору сценария</span><span class="kz">Сценарий бөлінісі маманы</span></li>
+          <li><i>10</i><span class="ru">Супервайзер непрерывности</span><span class="kz">Сабақтастық супервайзері</span></li>
+        </ul>
+        <div class="caps" style="margin-top:1.2rem"><span><span class="ru">Техническое мастерство</span><span class="kz">Техникалық шеберлік</span></span><span>4</span></div>
+        <ul>
+          <li><i>11</i><span class="ru">Главный оператор</span><span class="kz">Бас оператор</span></li>
+          <li><i>12</i><span class="ru">Фотограф и оператор камеры</span><span class="kz">Фотограф және камера операторы</span></li>
+          <li><i>13</i><span class="ru">Мастер промпта для кадра</span><span class="kz">Кадр промптының шебері</span></li>
+          <li><i>14</i><span class="ru">Инженер видео-промптов</span><span class="kz">Видео-промпт инженері</span></li>
+        </ul>
+      </div>
+      <div class="dept" data-reveal>
+        <div class="caps"><span><span class="ru">Постпродакшн</span><span class="kz">Постпродакшн</span></span><span>3</span></div>
+        <ul>
+          <li><i>15</i><span class="ru">Монтажёр</span><span class="kz">Монтажёр</span></li>
+          <li><i>16</i><span class="ru">Колорист</span><span class="kz">Колорист</span></li>
+          <li><i>17</i><span class="ru">Супервайзер VFX</span><span class="kz">VFX супервайзері</span></li>
+        </ul>
+        <div class="caps" style="margin-top:1.2rem"><span><span class="ru">Дизайн и анимация</span><span class="kz">Дизайн және анимация</span></span><span>4</span></div>
+        <ul>
+          <li><i>18</i><span class="ru">Арт-директор</span><span class="kz">Арт-директор</span></li>
+          <li><i>19</i><span class="ru">Аниматор и моушн-дизайнер</span><span class="kz">Аниматор және моушн-дизайнер</span></li>
+          <li><i>20</i><span class="ru">Художник по костюмам</span><span class="kz">Костюм суретшісі</span></li>
+          <li><i>21</i><span class="ru">Режиссёр аниматика</span><span class="kz">Аниматик режиссёрі</span></li>
+        </ul>
+      </div>
+      <div class="dept" data-reveal>
+        <div class="caps"><span><span class="ru">Звук · Производство · Качество</span><span class="kz">Дыбыс · Өндіріс · Сапа</span></span><span>4</span></div>
+        <ul>
+          <li><i>22</i><span class="ru">Звукорежиссёр</span><span class="kz">Дыбыс режиссёрі</span></li>
+          <li><i>23</i><span class="ru">Исполнительный продюсер</span><span class="kz">Атқарушы продюсер</span></li>
+          <li><i>24</i><span class="ru">Локейшн-менеджер и виртуальный скаут</span><span class="kz">Локация менеджері және виртуалды скаут</span></li>
+          <li><i>25</i><span class="ru">Критик и страж качества</span><span class="kz">Сыншы және сапа күзетшісі</span></li>
+        </ul>
+        <div class="caps" style="margin-top:1.2rem"><span><span class="ru">Игры и интерактив</span><span class="kz">Ойындар және интерактив</span></span><span>3</span></div>
+        <ul>
+          <li><i>26</i><span class="ru">Геймдизайнер</span><span class="kz">Геймдизайнер</span></li>
+          <li><i>27</i><span class="ru">Художник уровней</span><span class="kz">Деңгей суретшісі</span></li>
+          <li><i>28</i><span class="ru">Хореограф геймплея</span><span class="kz">Геймплей хореографы</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="rule">
+      <p data-reveal><b><span class="ru">Одна память</span><span class="kz">Бір жады</span></b><span class="ru">Каждый специалист читает и пишет один граф истории: правка в сценарии доходит до кастинга, камеры и монтажа.</span><span class="kz">Әр маман бір оқиға графын оқиды және жазады: сценарийдегі түзету кастингке, камераға және монтажға жетеді.</span></p>
+      <p data-reveal><b><span class="ru">Настоящие передачи</span><span class="kz">Нағыз тапсырулар</span></b><span class="ru">Сценарист передаёт аналитику, кастинг — костюмам, оператор — раскадровке. Как на площадке, по цепочке.</span><span class="kz">Сценарист аналитикке, кастинг костюмге, оператор раскадровкаға тапсырады. Алаңдағыдай, тізбекпен.</span></p>
+      <p data-reveal><b><span class="ru">Ваше одобрение</span><span class="kz">Сіздің бекітуіңіз</span></b><span class="ru">Ничего не доходит до вас без проверки продюсера-человека, и ничего не идёт на следующую веху без вашего «да».</span><span class="kz">Адам-продюсердің тексеруінсіз сізге ештеңе жетпейді, сіздің «иә» дегеніңізсіз ештеңе келесі межеге өтпейді.</span></p>
+    </div>
+  </div>
+</section>
+
+<section class="packages" id="pakety">
+  <div class="wrap">
+    <p class="caps"><span class="ru">Этап 1 · Препродакшн</span><span class="kz">1-кезең · Препродакшн</span></p>
+    <h2 style="margin-top:.8rem"><span class="ru">Один пакет. Весь фильм — спланирован.</span><span class="kz">Бір пакет. Бүкіл фильм — жоспарланды.</span></h2>
+
+    <div class="pilot" data-reveal>
+      <div>
+        <p class="caps"><span class="ru">Не готовы к полному пакету? · Пилот</span><span class="kz">Толық пакетке дайын емессіз бе? · Пилот</span></p>
+        <h3 style="margin-top:.5rem"><span class="ru">До 3 минут вашего сценария → разбор страниц, два закреплённых героя, раскадровка и аниматик с голосами.</span><span class="kz">Сценарийіңіздің 3 минутына дейін → беттер талдауы, екі бекітілген кейіпкер, раскадровка және дауыстары бар аниматик.</span></h3>
+        <p><span class="ru">Стоимость пилота полностью засчитывается в любой пакет в течение 30 дней.</span><span class="kz">Пилот құны 30 күн ішінде кез келген пакетке толық есептеледі.</span></p>
+      </div>
+      <a class="btn btn--ghost" href="https://t.me/mis_ter_bro"><span class="ru">Начать с пилота</span><span class="kz">Пилоттан бастау</span></a>
+    </div>
+
+    <div class="pack">
+      <article class="card" data-reveal>
+        <span class="tag"><span class="ru">Короткий метр</span><span class="kz">Қысқа метраж</span></span>
+        <span class="price"><span class="ru">По смете</span><span class="kz">Смета бойынша</span></span>
+        <span class="scope"><span class="ru">до 10 минут</span><span class="kz">10 минутқа дейін</span></span>
+        <p><span class="ru">Три вехи: разбор, разработка, аниматик и релиз. Ничего не списывается, пока мы не подтвердили объём.</span><span class="kz">Үш меже: талдау, әзірлеу, аниматик және релиз. Көлемді растамайынша ештеңе есептелмейді.</span></p>
+        <a class="btn btn--ghost" href="https://t.me/mis_ter_bro"><span class="ru">Подать с этим пакетом</span><span class="kz">Осы пакетпен өтінім</span></a>
+      </article>
+      <article class="card main" data-reveal>
+        <span class="tag"><span class="ru">Полный метр</span><span class="kz">Толық метраж</span></span>
+        <span class="price"><span class="ru">По смете</span><span class="kz">Смета бойынша</span></span>
+        <span class="scope"><span class="ru">до 30 минут экранного времени</span><span class="kz">30 минут экран уақытына дейін</span></span>
+        <p><span class="ru">Три вехи: разбор, разработка, аниматик и релиз. Срок и стоимость называем после первого чтения сценария.</span><span class="kz">Үш меже: талдау, әзірлеу, аниматик және релиз. Мерзім мен құнын сценарийді алғаш оқығаннан кейін айтамыз.</span></p>
+        <a class="btn btn--main" href="https://t.me/mis_ter_bro"><span class="ru">Подать с этим пакетом</span><span class="kz">Осы пакетпен өтінім</span></a>
+      </article>
+      <article class="card" data-reveal>
+        <span class="tag"><span class="ru">Сериал · эпос</span><span class="kz">Сериал · эпос</span></span>
+        <span class="price"><span class="ru">По смете</span><span class="kz">Смета бойынша</span></span>
+        <span class="scope"><span class="ru">до 90 минут</span><span class="kz">90 минутқа дейін</span><span class="ru">график с вами</span><span class="kz">кестесі сізбен</span></span>
+        <p><span class="ru">Сезон, сага, многосерийный проект. Планируем по сериям, вехи — по вашему графику.</span><span class="kz">Маусым, дастан, көп сериялы жоба. Сериялар бойынша жоспарлаймыз, межелер — сіздің кестеңіз бойынша.</span></p>
+        <a class="btn btn--ghost" href="https://t.me/mis_ter_bro"><span class="ru">Подать с этим пакетом</span><span class="kz">Осы пакетпен өтінім</span></a>
+      </article>
+    </div>
+
+    <div class="incl">
+      <p class="caps"><span class="ru">В каждом пакете</span><span class="kz">Әр пакетте</span></p>
+      <div>
+        <ul>
+          <li><span class="ru">Полный разбор сценария и оценка</span><span class="kz">Сценарийдің толық талдауы мен бағасы</span></li>
+          <li><span class="ru">Герои, связи и эмоциональная дуга</span><span class="kz">Кейіпкерлер, байланыстар, эмоциялық доға</span></li>
+          <li><span class="ru">Библия истории и мира</span><span class="kz">Оқиға мен әлем библиясы</span></li>
+          <li><span class="ru">Виртуальный кастинг</span><span class="kz">Виртуалды кастинг</span></li>
+          <li><span class="ru">Локации</span><span class="kz">Локациялар</span></li>
+          <li><span class="ru">Раскадровка и шот-листы</span><span class="kz">Раскадровка және шот-листтер</span></li>
+          <li><span class="ru">Промпт на каждую сцену</span><span class="kz">Әр сахнаға промпт</span></li>
+          <li><span class="ru">Аниматик всего фильма</span><span class="kz">Бүкіл фильмнің аниматигі</span></li>
+          <li><span class="ru">Тизер</span><span class="kz">Тизер</span></li>
+          <li><span class="ru">Закрытая страница проекта</span><span class="kz">Жабық жоба беті</span></li>
+        </ul>
+        <p class="add"><span class="ru">Дополнительно: ускоренная сдача, 3D-аниматик с голосами, скрипт-доктор, полировка диалогов, звуковой дизайн, презентация для инвесторов из материалов страницы проекта. Этап 2 — производство (мизансцена, камера, гибридные съёмки, VFX, рендер, пост) — считается отдельно после препродакшна.</span><span class="kz">Қосымша: жедел тапсыру, дауысты 3D-аниматик, скрипт-доктор, диалогтарды жылтырату, дыбыс дизайны, жоба беті материалдарынан инвесторларға презентация. 2-кезең — өндіріс (мизансцена, камера, гибридті түсірілім, VFX, рендер, пост) — препродакшннан кейін бөлек есептеледі.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="steps" id="kak">
+  <div class="wrap">
+    <p class="caps"><span class="ru">Как это работает</span><span class="kz">Қалай жұмыс істейді</span></p>
+    <h2 style="margin-top:.8rem"><span class="ru">Пять шагов от заявки до страницы проекта.</span><span class="kz">Өтінімнен жоба бетіне дейін бес қадам.</span></h2>
+    <ol>
+      <li data-reveal><h3><span class="ru">Заявка</span><span class="kz">Өтінім</span></h3><p><span class="ru">Выбираете пакет, подписываем NDA, присылаете сценарий.</span><span class="kz">Пакет таңдайсыз, NDA-ға қол қоямыз, сценарий жібересіз.</span></p></li>
+      <li data-reveal><h3><span class="ru">Подтверждаем</span><span class="kz">Растаймыз</span></h3><p><span class="ru">Читаем сценарий и подтверждаем объём, срок и смету в течение суток.</span><span class="kz">Сценарийді оқып, көлемді, мерзімді және сметаны бір тәулік ішінде растаймыз.</span></p></li>
+      <li data-reveal><h3><span class="ru">Оплата по вехам</span><span class="kz">Межелер бойынша төлем</span></h3><p><span class="ru">Три платежа: после подтверждения объёма, после разбора и после разработки. Работа начинается с первого.</span><span class="kz">Үш төлем: көлем расталғаннан, талдаудан және әзірлеуден кейін. Жұмыс біріншісінен басталады.</span></p></li>
+      <li data-reveal><h3><span class="ru">Делаем</span><span class="kz">Жасаймыз</span></h3><p><span class="ru">Группа специалистов и наша команда разбирают и разрабатывают фильм. Вы утверждаете каждую веху.</span><span class="kz">Мамандар тобы мен біздің команда фильмді талдап, әзірлейді. Әр межені сіз бекітесіз.</span></p></li>
+      <li data-reveal><h3><span class="ru">Релиз</span><span class="kz">Релиз</span></h3><p><span class="ru">Аниматик и тизер приняты — вы входите на страницу проекта со всеми материалами.</span><span class="kz">Аниматик пен тизер қабылданды — сіз барлық материалдары бар жоба бетіне кіресіз.</span></p></li>
+    </ol>
+    <p class="note"><span class="ru">Взаимное NDA с первой загрузки. Материалы хранятся закрыто, никогда не используются для обучения публичных моделей, и все результаты переходят к вам после полной оплаты.</span><span class="kz">Алғашқы жүктеуден бастап өзара NDA. Материалдар жабық сақталады, жалпыға қолжетімді модельдерді оқытуға ешқашан пайдаланылмайды, толық төлемнен кейін барлық нәтиже сізге өтеді.</span></p>
+  </div>
+</section>
+
+<section class="faq" id="voprosy">
+  <div class="wrap">
+    <p class="caps"><span class="ru">Вопросы</span><span class="kz">Сұрақтар</span></p>
+    <h2 style="margin-top:.8rem"><span class="ru">До того, как прислать сценарий.</span><span class="kz">Сценарий жібермес бұрын.</span></h2>
+    <div class="list">
+      <details><summary><span class="ru">Сколько длится препродакшн?</span><span class="kz">Препродакшн қанша уақыт алады?</span></summary><p><span class="ru">Короткий метр до 10 минут — дни, полный метр до 30 минут — около недели. Длинные фильмы до 90 минут, сериалы и эпосы планируем с вами по графику. Точный срок называем после первого чтения.</span><span class="kz">10 минутқа дейінгі қысқа метраж — бірнеше күн, 30 минутқа дейінгі толық метраж — шамамен бір апта. 90 минутқа дейінгі фильмдерді, сериалдар мен эпостарды сізбен кесте бойынша жоспарлаймыз. Нақты мерзімді алғашқы оқудан кейін айтамыз.</span></p></details>
+      <details><summary><span class="ru">Что я получу?</span><span class="kz">Мен не аламын?</span></summary><p><span class="ru">Разбор сценария и оценку, героев и эмоциональную дугу, библию истории и мира, виртуальный кастинг, локации, раскадровку и шот-листы, промпт на каждую сцену, аниматик всего фильма, тизер и закрытую страницу проекта.</span><span class="kz">Сценарий талдауы мен бағасын, кейіпкерлер мен эмоциялық доғаны, оқиға мен әлем библиясын, виртуалды кастингті, локацияларды, раскадровка мен шот-листтерді, әр сахнаға промптты, бүкіл фильмнің аниматигін, тизерді және жабық жоба бетін.</span></p></details>
+      <details><summary><span class="ru">Сколько это стоит?</span><span class="kz">Бұл қанша тұрады?</span></summary><p><span class="ru">Смету считаем по сценарию: хронометраж, число героев и локаций, сложность сцен. Оплата в три вехи: разбор, разработка, затем аниматик и релиз. При подаче заявки ничего не списывается.</span><span class="kz">Сметаны сценарий бойынша есептейміз: хронометраж, кейіпкерлер мен локациялар саны, сахналардың күрделілігі. Төлем үш межемен: талдау, әзірлеу, содан кейін аниматик және релиз. Өтінім бергенде ештеңе есептелмейді.</span></p></details>
+      <details><summary><span class="ru">Можно попробовать до полного пакета?</span><span class="kz">Толық пакетке дейін байқап көруге бола ма?</span></summary><p><span class="ru">Да. Пилот берёт до 3 минут вашего сценария: разбор, два закреплённых героя, раскадровка и аниматик с голосами. Его стоимость полностью засчитывается в любой пакет в течение 30 дней.</span><span class="kz">Иә. Пилот сценарийіңіздің 3 минутына дейін алады: талдау, екі бекітілген кейіпкер, раскадровка және дауысты аниматик. Оның құны 30 күн ішінде кез келген пакетке толық есептеледі.</span></p></details>
+      <details><summary><span class="ru">Кому принадлежат фильм и права?</span><span class="kz">Фильм мен құқықтар кімге тиесілі?</span></summary><p><span class="ru">Вам. Все результаты переходят к вам после полной оплаты, и вы сохраняете полные права на свою интеллектуальную собственность.</span><span class="kz">Сізге. Барлық нәтиже толық төлемнен кейін сізге өтеді, және сіз зияткерлік меншігіңізге толық құқықты сақтайсыз.</span></p></details>
+      <details><summary><span class="ru">Мой сценарий останется закрытым?</span><span class="kz">Сценарийім жабық қала ма?</span></summary><p><span class="ru">Да. Взаимное NDA покрывает сценарий и всё, что из него сделано. Материалы хранятся закрыто, их видит только команда проекта, и они никогда не используются для обучения публичных моделей.</span><span class="kz">Иә. Өзара NDA сценарийді және одан жасалғанның бәрін қамтиды. Материалдар жабық сақталады, оларды тек жоба командасы көреді және олар жалпыға қолжетімді модельдерді оқытуға ешқашан пайдаланылмайды.</span></p></details>
+      <details><summary><span class="ru">Что после препродакшна?</span><span class="kz">Препродакшннан кейін не болады?</span></summary><p><span class="ru">Этап 2 — производство: мизансцена, управление камерой, гибридные съёмки с живыми актёрами, VFX, рендер и пост. Считается отдельно, когда препродакшн завершён.</span><span class="kz">2-кезең — өндіріс: мизансцена, камераны басқару, тірі актёрлермен гибридті түсірілім, VFX, рендер және пост. Препродакшн аяқталғанда бөлек есептеледі.</span></p></details>
+      <details><summary><span class="ru">На каком языке идёт работа?</span><span class="kz">Жұмыс қай тілде жүреді?</span></summary><p><span class="ru">На русском и казахском: сценарий, заключения, страница проекта и диалоги героев. Язык интерфейса и язык сценария выбираются отдельно: авторский текст остаётся вашим, когда вы переключаете язык платформы. Казахские имена, топонимы и реалии держим точно, без подмены на «универсальные».</span><span class="kz">Орыс және қазақ тілдерінде: сценарий, қорытындылар, жоба беті және кейіпкерлер диалогтары. Интерфейс тілі мен сценарий тілі бөлек таңдалады: платформа тілін ауыстырғанда авторлық мәтін өзгеріссіз қалады. Қазақ есімдерін, жер-су атауларын және болмысты дәл сақтаймыз, «әмбебаппен» алмастырмаймыз.</span></p></details>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <p class="caps"><span class="ru">Взаимное NDA · никогда не используется для обучения публичных моделей</span><span class="kz">Өзара NDA · жалпыға қолжетімді модельдерді оқытуға ешқашан пайдаланылмайды</span></p>
+    <h2 style="margin-top:1.2rem">
+      <span class="ru">Пришлите сценарий.<span class="l2">Получите фильм.</span></span>
+      <span class="kz">Сценарийді жіберіңіз.<span class="l2">Фильмді алыңыз.</span></span>
+    </h2>
+    <div class="actions">
+      <a class="btn btn--main" href="https://t.me/mis_ter_bro"><span class="ru">Написать в Telegram</span><span class="kz">Telegram-ға жазу</span> <span class="arr">→</span></a>
+      <a class="btn btn--ghost" href="mailto:alex@neyra.ai?subject=Сценарий%20для%20Neyra%20Vision%20Studio"><span class="ru">Прислать на почту</span><span class="kz">Поштаға жіберу</span></a>
+    </div>
+    <p class="trust"><span class="ru">При подаче ничего не списывается. Права на вашу историю остаются у вас.</span><span class="kz">Өтінім бергенде ештеңе есептелмейді. Оқиғаңызға құқық сізде қалады.</span></p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="logos"><img src="assets/logo-neyra-vision.png" width="36" height="36" alt="Neyra Vision"><img src="assets/logo-taurus.png" width="36" height="36" alt="Digital Taurus Asia"></div>
+      <p><span class="ru">Neyra Vision Studio — AI-препродакшн и производство кино и сериалов на технологии NEYRA. Digital Taurus Asia · Алматы, Казахстан.</span><span class="kz">Neyra Vision Studio — NEYRA технологиясында кино мен сериалдарды AI-препродакшн және өндіру. Digital Taurus Asia · Алматы, Қазақстан.</span></p>
+    </div>
+    <ul>
+      <li><a href="#put"><span class="ru">Путь проекта</span><span class="kz">Жоба жолы</span></a></li>
+      <li><a href="#komanda"><span class="ru">Команда ИИ</span><span class="kz">ЖИ тобы</span></a></li>
+      <li><a href="#pakety"><span class="ru">Пакеты</span><span class="kz">Пакеттер</span></a></li>
+      <li><a href="#voprosy"><span class="ru">Вопросы</span><span class="kz">Сұрақтар</span></a></li>
+    </ul>
+    <ul>
+      <li><a href="https://neyra.vision/">neyra.vision</a></li>
+      <li><a href="https://neyra.vision/team/"><span class="ru">Команда студии</span><span class="kz">Студия командасы</span></a></li>
+      <li><a href="https://neyra.vision/kino/"><span class="ru">Киностанция для авторов</span><span class="kz">Авторларға киностанция</span></a></li>
+      <li><a href="mailto:alex@neyra.ai">alex@neyra.ai</a></li>
+    </ul>
+    <div class="legal"><span>© 2026 Neyra Vision · Digital Taurus Asia</span><span class="ru">Сделано для тех, кто хочет вернуть себе время на кино.</span><span class="kz">Киноға уақытын қайтарғысы келетіндерге арналған.</span></div>
+  </div>
+</footer>
+
+<div class="sticky" aria-hidden="false">
+  <a class="btn btn--main" href="https://t.me/mis_ter_bro"><span class="ru">Прислать сценарий</span><span class="kz">Сценарий жіберу</span> <span class="arr">→</span></a>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  root.classList.add('js');
+  function setLang(l){
+    root.setAttribute('data-lang',l);
+    root.setAttribute('lang', l==='kz'?'kk':'ru');
+    document.querySelectorAll('.lang button').forEach(function(b){b.setAttribute('aria-pressed', b.dataset.set===l?'true':'false');});
+    try{localStorage.setItem('nv-lang',l);}catch(e){}
+  }
+  var saved=null; try{saved=localStorage.getItem('nv-lang');}catch(e){}
+  var q=new URLSearchParams(location.search).get('lang');
+  if(q==='kz'||q==='ru') setLang(q); else if(saved==='kz'||saved==='ru') setLang(saved);
+  document.querySelectorAll('.lang button').forEach(function(b){b.addEventListener('click',function(){setLang(b.dataset.set);});});
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{rootMargin:'0px 0px -8% 0px'});
+    document.querySelectorAll('[data-reveal]').forEach(function(el){io.observe(el);});
+  }else{document.querySelectorAll('[data-reveal]').forEach(function(el){el.classList.add('in');});}
+})();
+</script>
+</body>
+</html>
