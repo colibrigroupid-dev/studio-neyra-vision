@@ -5,6 +5,7 @@
     python3 tools/sync-project.py <slug> pull      сервер → папка (новый драфт файлом, карта в PROEKT.md)
     python3 tools/sync-project.py <slug> status    что различается
     python3 tools/sync-project.py <slug> razbivka [--draft <файл.fountain>]   разбивка + паспорта → сервер (№21.a: /breakdown, /characters, /locations)
+    python3 tools/sync-project.py <slug> pasporta [--apply]   паспорта с сервера → канон: показать расхождения; --apply переносит правки команды в KANON.md
 
 Доступ: ~/.config/neyra-studio/sync.json  →  {"url": "http://127.0.0.1:8770", "key": "…"}  (или переменные NV_URL, NV_KEY).
 Источник правды — папка; сервер — рабочая копия команды. Ничего не затирается: сценарий с сервера ложится новым файлом
@@ -200,6 +201,41 @@ def razbivka_push(slug, draft=None):
                 if st != 201: print(f"  {coll} {h['imya']}: {st} {r.get('error', {}).get('message', '')}")
         print(f"{coll}: создано {made}, обновлено {upd}, было {len(have)}")
 
+def pasporta_pull(slug, apply=False):
+    """Правки паспортов, сделанные командой в окне (role/identity/taboo/height/status), → KANON.md. Без --apply только показывает."""
+    import kanon
+    proj = PROEKTY / slug; K = kanon.read_kanon(proj)
+    if not K: sys.exit("канона нет")
+    kp = proj / "03-vizual" / "KANON.md"; text = kp.read_text(encoding="utf-8"); changes = []
+    for coll, items, field_names in (("characters", K["heroes"], ("identity", "taboo", "height")), ("locations", K["locs"], ("identity",))):
+        st, r = api("GET", f"/api/projects/{slug}/{coll}")
+        if st != 200: print(f"{coll}: {st}"); continue
+        srv = r.get("data", []); srv = srv if isinstance(srv, list) else srv.get("items", [])
+        by_name = {x.get("name", "").upper(): x for x in srv}
+        for tag, h in items.items():
+            x = by_name.get(h["imya"].upper())
+            if not x: continue
+            for f in field_names:
+                sv = x.get(f); lv = h.get(f)
+                if isinstance(sv, list): sv = "; ".join(sv); lv = "; ".join(lv or [])
+                sv = (sv or "").strip(); lv = (lv or "").strip()
+                if sv and sv != lv:
+                    changes.append((tag, f, lv, sv))
+    if not changes: print("паспорта: расхождений с сервером нет"); return
+    for tag, f, lv, sv in changes: print(f"  {tag} · {f}: «{lv[:60] or '—'}» → «{sv[:60]}»")
+    if not apply: print(f"расхождений {len(changes)} — применить: pasporta --apply"); return
+    for tag, f, lv, sv in changes:
+        m = re.search(rf"(^### {re.escape(tag)} ·[^\n]*\n)((?:(?!^### |^## )[^\n]*\n)*)", text, flags=re.M)
+        if not m: continue
+        block = m.group(2)
+        if re.search(rf"^{f}:.*$", block, flags=re.M): block = re.sub(rf"^{f}:.*$", f"{f}: {sv}", block, count=1, flags=re.M)
+        else: block = block.rstrip("\n") + f"\n{f}: {sv}\n"
+        text = text[:m.start(2)] + block + text[m.end(2):]
+    kp.write_text(text, encoding="utf-8")
+    with (proj / "ZHURNAL.md").open("a", encoding="utf-8") as z:
+        z.write(f"\n- {datetime.date.today():%d.%m.%Y} · sync: правки паспортов команды с сервера перенесены в KANON.md ({len(changes)}): " + "; ".join(f"{t} {f}" for t, f, _, _ in changes) + "\n")
+    print(f"применено {len(changes)}; версия канона изменилась — `kanon.py reestr {slug}` покажет устаревшие кадры")
+
 def status(slug):
     proj = PROEKTY / slug
     st, r = api("GET", f"/api/projects/{slug}")
@@ -209,7 +245,8 @@ def status(slug):
     st, m = api("GET", f"/api/projects/{slug}/map"); print("клеток карты:", len((m.get("data") or {}).get("cells") or []) if st == 200 else st)
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("slug"); ap.add_argument("action", choices=["push", "pull", "status", "razbivka"]); ap.add_argument("--draft")
+    ap = argparse.ArgumentParser(); ap.add_argument("slug"); ap.add_argument("action", choices=["push", "pull", "status", "razbivka", "pasporta"]); ap.add_argument("--draft"); ap.add_argument("--apply", action="store_true")
     a = ap.parse_args()
     if a.action == "razbivka": razbivka_push(a.slug, a.draft)
+    elif a.action == "pasporta": pasporta_pull(a.slug, a.apply)
     else: {"push": push, "pull": pull, "status": status}[a.action](a.slug)
