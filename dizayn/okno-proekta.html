@@ -22,13 +22,13 @@ a{color:inherit;text-decoration:none}button,input,textarea,select{font:inherit;c
 .proj{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
 .proj b{font-weight:500}.proj .mono{color:var(--dim);font-size:var(--fs-label)}
 .nav{display:flex;flex-direction:column;gap:2px}
-.nav .label{padding:10px 12px 6px}
-.nav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:var(--r-sm);color:var(--muted);transition:background .15s var(--ease),color .15s var(--ease)}
+.nav .glabel{padding:14px 12px 6px;font-size:var(--fs-label);color:var(--dim);font-family:var(--body);text-transform:none;letter-spacing:0}
+.nav a{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:var(--r-sm);color:var(--muted);font-size:var(--fs-small);transition:background .15s var(--ease),color .15s var(--ease)}
 .nav a:hover{background:var(--surface);color:var(--text)}
 .nav a[aria-current]{background:var(--surface-2);color:var(--text)}
 .nav a svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.nav a .n{margin-left:auto;font:500 var(--fs-label)/1 var(--mono);color:var(--dim)}
-.nav a .n.hot{color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:4px 8px}
+.nav a .n{margin-left:auto;font:400 var(--fs-label)/1 var(--body);color:var(--dim)}
+.nav a .n.hot{color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:3px 8px;font-weight:500}
 .side .me{margin-top:auto;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-top:1px solid var(--line-soft)}
 .ava{width:28px;height:28px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font:500 .75rem/1 var(--mono)}
 .main{display:flex;flex-direction:column;min-width:0}
@@ -36,11 +36,11 @@ a{color:inherit;text-decoration:none}button,input,textarea,select{font:inherit;c
 .slate{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:0;min-height:56px;padding:0 20px}
 .slate .cell{display:flex;flex-direction:column;justify-content:center;padding:6px 16px 6px 0;margin-right:16px;border-right:1px solid var(--line-soft);min-height:40px}
 .slate .cell:last-of-type{border:0}
-.slate .cell span{font:500 var(--fs-label)/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
-.slate .cell b{font:500 var(--fs-text)/1.2 var(--mono);margin-top:4px}
+.slate .cell span{font:400 .6875rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.slate .cell b{font:500 .875rem/1.2 var(--mono);margin-top:4px;letter-spacing:.02em}
 .slate .tools{margin-left:auto;display:flex;gap:6px}
-.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer;transition:background .15s var(--ease),border-color .15s var(--ease)}
-.btn:hover{background:var(--surface-2)}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:var(--fs-small);font-weight:500;cursor:pointer;transition:background .15s var(--ease),border-color .15s var(--ease)}
+.btn:hover{background:oklch(0.30 0 0)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:500}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
 .btn.icon{width:44px;padding:0;justify-content:center}
@@ -49,16 +49,20 @@ a{color:inherit;text-decoration:none}button,input,textarea,select{font:inherit;c
 .seg button{min-height:44px;min-width:44px;padding:0 12px;border:0;background:transparent;color:var(--muted);cursor:pointer}
 .seg button[aria-pressed=true]{background:var(--surface-2);color:var(--text)}
 /* ---------- рабочее поле ---------- */
-.work{flex:1;padding:24px 20px 140px;display:grid;gap:20px;max-width:960px;width:100%;margin:0 auto}
-h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.01em;margin:0}
+.work{flex:1;padding:40px 24px 160px;display:grid;gap:36px;max-width:900px;width:100%;margin:0 auto}
+h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.015em;margin:0 0 6px}
 .lead{color:var(--muted);max-width:62ch;margin:0}
-.sheet{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);box-shadow:var(--shadow)}
+.group{display:grid;gap:12px}
+.group>header{display:flex;align-items:baseline;gap:12px;padding:0 2px}
+.group>header h2{font:500 var(--fs-lead)/1.2 var(--body);margin:0}
+.group>header .label{margin-left:auto;font-family:var(--body);text-transform:none;letter-spacing:0;color:var(--muted)}
+.sheet{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;box-shadow:var(--shadow)}
 .sheet>header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-soft)}
 .sheet>header h2{font:500 var(--fs-lead)/1.2 var(--disp);margin:0}
 .sheet>header .label{margin-left:auto}
-.row{display:grid;grid-template-columns:1fr auto;gap:4px 16px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line-soft);min-height:60px}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 24px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line-soft);min-height:64px}
 .row:last-child{border-bottom:0}
-.row .t{grid-column:1;font-weight:500}.row .d{grid-column:1;color:var(--muted)}
+.row .t{grid-column:1;font-weight:600;font-size:var(--fs-text)}.row .d{grid-column:1;color:var(--muted);font-size:var(--fs-small);line-height:1.45;max-width:62ch}
 .row .c{grid-column:2;grid-row:1/3;display:flex;align-items:center;gap:10px;justify-content:flex-end}
 .row.action{cursor:pointer}.row.action:hover{background:var(--surface-2)}
 /* лампы статуса — пульт */
@@ -66,8 +70,8 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.01em;margin:0}
 .lamp.r{background:var(--lamp-red)}.lamp.a{background:var(--lamp-amber)}.lamp.g{background:var(--lamp-green)}
 .lamps{display:inline-flex;gap:6px;align-items:center}
 .lamps .mono{font-size:var(--fs-label);color:var(--muted);margin-left:4px}
-.pill{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--line);font:500 var(--fs-label)/1 var(--mono);color:var(--muted)}
-.pill.amber{border-color:transparent;background:oklch(from var(--lamp-amber) l c h / .18);color:var(--lamp-amber)}
+.pill{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--line);font:400 var(--fs-label)/1 var(--body);color:var(--muted)}
+.pill.amber{border-color:transparent;background:oklch(from var(--lamp-amber) l c h / .16);color:var(--lamp-amber)}
 .pill.green{border-color:transparent;background:oklch(from var(--lamp-green) l c h / .16);color:var(--lamp-green)}
 .pill.red{border-color:transparent;background:oklch(from var(--lamp-red) l c h / .18);color:var(--lamp-red)}
 /* переключатель как в настройках Codex */
@@ -75,22 +79,22 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.01em;margin:0}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--text);transition:transform .2s var(--ease)}
 .sw:checked{background:var(--accent)}.sw:checked::after{transform:translateX(18px);background:var(--accent-ink)}
 /* кадры: сетка 16:9 */
-.frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:18px}
+.frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;padding:20px}
 .frame{display:grid;gap:8px}
 .frame .img{aspect-ratio:16/9;border-radius:var(--r-sm);background:repeating-linear-gradient(45deg,var(--surface-2) 0 10px,var(--surface) 10px 20px);border:1px solid var(--line-soft);position:relative}
 .frame .img b{position:absolute;left:8px;top:6px;font:500 var(--fs-label)/1 var(--mono);color:var(--muted)}
 .frame .img .lamp{position:absolute;right:8px;top:8px}
-.frame p{margin:0;color:var(--muted)}
+.frame p{margin:0;color:var(--muted);font-size:var(--fs-small)}
 /* ---------- помощник: одно окно на все этапы ---------- */
 .helper{position:fixed;left:var(--side-w);right:0;bottom:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
-.helper .box{max-width:960px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 10px 8px}
+.helper .box{max-width:900px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:10px 10px 8px}
 .helper textarea{display:block;width:100%;min-height:44px;max-height:40vh;resize:none;border:0;background:transparent;padding:8px 8px 4px;line-height:1.45}
 .helper textarea::placeholder{color:var(--dim)}
 .helper .bar{display:flex;align-items:center;gap:6px}
-.helper .mode{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.helper .mode{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;border-radius:999px;color:var(--muted);font-size:var(--fs-small);white-space:nowrap}
 .helper .mode i{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
 .helper .send{margin-left:auto}
-.helper .tc{display:flex;justify-content:space-between;gap:12px;padding:8px 8px 0;font:400 var(--fs-label)/1 var(--mono);color:var(--dim)}
+.helper .tc{display:flex;justify-content:space-between;gap:12px;padding:8px 8px 0;font:400 .6875rem/1 var(--mono);letter-spacing:.04em;color:var(--dim)}
 /* меню аккаунта: простое, главные функции, как у рабочих приложений */
 .menu{position:relative;margin-top:auto;border-top:1px solid var(--line-soft);padding-top:8px}
 .menu summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:var(--r-sm);cursor:pointer;color:var(--text)}
@@ -114,6 +118,7 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.01em;margin:0}
 /* ---------- телефон: колонка прячется в нижнюю панель ---------- */
 .tabbar{display:none}
 @media (max-width:860px){
+  .row .d,.btn,.nav a,.frame p{font-size:1rem}.btn{min-height:44px}
   .app{grid-template-columns:1fr}.side{display:none}
   .helper{left:0;bottom:60px;padding-bottom:8px}
   .work{padding-bottom:200px}
@@ -155,21 +160,21 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.01em;margin:0}
   <button class="proj" type="button" aria-label="Сменить проект"><span><b>Ер Төстік</b><br><span class="mono">анимация · 90 мин · этап 1</span></span><span class="mono">⌄</span></button>
   <nav class="nav" aria-label="Разделы проекта">
    <a href="#" aria-current="page"><svg><use href="#i-home"/></svg>Обзор<span class="n hot">3</span></a>
-   <span class="label">Девелопмент</span>
+   <span class="glabel">Девелопмент</span>
    <a href="#"><svg><use href="#i-script"/></svg>Сценарий<span class="n">v3</span></a>
    <a href="#"><svg><use href="#i-map"/></svg>Разбивка<span class="n">31 сц</span></a>
-   <span class="label">Препродакшн</span>
+   <span class="glabel">Препродакшн</span>
    <a href="#"><svg><use href="#i-people"/></svg>Герои<span class="n">6</span></a>
    <a href="#"><svg><use href="#i-pin"/></svg>Локации<span class="n">3</span></a>
    <a href="#"><svg><use href="#i-board"/></svg>Раскадровка<span class="n">17</span></a>
-   <span class="label">Производство</span>
+   <span class="glabel">Производство</span>
    <a href="#"><svg><use href="#i-frame"/></svg>Кадры<span class="n">0</span></a>
    <a href="#"><svg><use href="#i-sound"/></svg>Звук</a>
    <a href="#"><svg><use href="#i-cut"/></svg>Монтаж</a>
-   <span class="label">Команда</span>
+   <span class="glabel">Команда</span>
    <a href="#"><svg><use href="#i-people"/></svg>Люди и права<span class="n">4</span></a>
    <a href="#"><svg><use href="#i-map"/></svg>Карта производства<span class="n hot">1</span></a>
-   <span class="label">Выпуск</span>
+   <span class="glabel">Выпуск</span>
    <a href="#stranica"><svg><use href="#i-globe"/></svg>Страница проекта<span class="n">№35</span></a>
   </nav>
   <details class="menu" id="menu">
@@ -208,33 +213,37 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.01em;margin:0}
     <p class="lead">Где мы, что ждёт решения, кто чем занят. Всё остальное — в разделах слева.</p>
    </div>
 
-   <div class="sheet">
+   <div class="group">
     <header><h2>Ждёт меня</h2><span class="label">3 решения</span></header>
+    <div class="sheet">
     <div class="row action"><div class="t">Сценарий · акт 1 · draft-01</div><div class="d">Лена сдала на проверку. Принимает продюсер.</div><div class="c"><span class="pill amber">ждёт решения</span><button class="btn primary" type="button">Открыть</button></div></div>
     <div class="row action"><div class="t">Герои · Ерке · замок внешности</div><div class="d">Паспорт заполнен, портрета нет. Нужно «да» на 4 варианта (≈ 8 кредитов).</div><div class="c"><span class="pill">до «да»</span><button class="btn" type="button">Смотреть план</button></div></div>
     <div class="row action"><div class="t">Раскадровка · сцены 1–2 · 17 кадров</div><div class="d">Контактный лист готов, картинок нет. Карандаш запустится после «да».</div><div class="c"><span class="pill">до «да»</span><button class="btn" type="button">Контактный лист</button></div></div>
-   </div>
+   </div></div>
 
-   <div class="sheet">
+   <div class="group">
     <header><h2>Карта производства</h2><span class="label">5 объектов · 9 этапов</span></header>
+    <div class="sheet">
     <div class="row"><div class="t">Концепция и синопсис</div><div class="d">Сценарий принят 12.10 · разбивка не начата</div><div class="c"><span class="lamps"><i class="lamp g"></i><i class="lamp"></i><i class="lamp"></i><span class="mono">1/9</span></span></div></div>
     <div class="row"><div class="t">Акт 1 · аул</div><div class="d">Поэпизодник у Лены · возвращено с замечанием</div><div class="c"><span class="lamps"><i class="lamp r"></i><i class="lamp a"></i><i class="lamp"></i><span class="mono">0/9</span></span></div></div>
     <div class="row"><div class="t">Акт 2 · степь и подземный мир</div><div class="d">В работе: цель акта — 3 варианта</div><div class="c"><span class="lamps"><i class="lamp a"></i><i class="lamp"></i><i class="lamp"></i><span class="mono">0/9</span></span></div></div>
     <div class="row action"><div class="t">Открыть всю карту</div><div class="d">Объекты × этапы, кто тормозит, лента решений</div><div class="c"><span class="mono" style="color:var(--dim)">→</span></div></div>
-   </div>
+   </div></div>
 
-   <div class="sheet">
+   <div class="group">
     <header><h2>Раскадровка · сцены 1–2</h2><span class="label">карандаш · сухой прогон</span></header>
+    <div class="sheet">
     <div class="frames">
      <div class="frame"><div class="img"><b>01-01</b><i class="lamp"></i></div><p>Темно. Вспыхивает огонь очага. На войлочной стене — тени.</p></div>
      <div class="frame"><div class="img"><b>01-03</b><i class="lamp"></i></div><p>Над очагом покачивается ортеке — деревянный козлик на нитке.</p></div>
      <div class="frame"><div class="img"><b>02-01</b><i class="lamp"></i></div><p>Солнце. Ветер в траве. Янтарная степь до горизонта.</p></div>
      <div class="frame"><div class="img"><b>02-06</b><i class="lamp"></i></div><p>Шалқұйрық кладёт морду на изгородь и медленно моргает.</p></div>
     </div>
-   </div>
+   </div></div>
 
-   <div class="sheet" id="stranica">
-    <header><h2>Страница проекта</h2><span class="label mono">studio.neyra.vision/p/er-tostik</span></header>
+   <div class="group" id="stranica">
+    <header><h2>Страница проекта</h2><span class="label mono" style="font-family:var(--mono)">studio.neyra.vision/p/er-tostik</span></header>
+    <div class="sheet">
     <div class="row"><div class="t">Код команды</div><div class="d">Открывает всю страницу. Показывается один раз, меняется кнопкой «Новый код» — старый перестаёт работать.</div><div class="c"><span class="pill mono">TOS···</span><button class="btn" type="button">Показать</button><button class="btn ghost" type="button">Новый код</button></div></div>
     <div class="row"><div class="t">Код PRO</div><div class="d">Открывает смету и план. Пока не задан — раздел «Смета» никому не виден.</div><div class="c"><span class="pill">не задан</span><button class="btn" type="button">Задать</button></div></div>
     <div class="row"><div class="t">Кадр первого экрана</div><div class="d">16:9, из референсов проекта. Сейчас: степь на рассвете.</div><div class="c"><span class="pill mono">steppe.jpg</span><button class="btn" type="button">Выбрать</button></div></div>
@@ -242,14 +251,15 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.01em;margin:0}
     <div class="row"><div class="t">Контакт на странице</div><div class="d">Александр Андреянов · Telegram · alex@neyra.ai</div><div class="c"><button class="btn" type="button">Изменить</button></div></div>
     <div class="row"><div class="t">Последняя публикация</div><div class="d">13.10 · 02:50 · прод №35 · 84 КБ · референсов 14 · паспортов 9</div><div class="c"><button class="btn" type="button">Открыть страницу</button><button class="btn primary" type="button">Опубликовать</button></div></div>
     <div class="row"><div class="t">Настроить с помощником</div><div class="d">Скажите внизу, что нужно: «сделай страницу для инвесторов», «спрячь поэпизодник», «поменяй код команды», «добавь Лену в команду с ролью сценарист». Помощник покажет, что изменится, и опубликует после «да».</div></div>
-   </div>
+   </div></div>
 
-   <div class="sheet">
+   <div class="group">
     <header><h2>Настройки проекта</h2></header>
+    <div class="sheet">
     <div class="row"><div class="t">Показывать команде смету</div><div class="d">Раздел «План и смета» виден только продюсеру и по PRO-коду</div><div class="c"><input class="sw" type="checkbox" aria-label="Показывать команде смету"></div></div>
     <div class="row"><div class="t">Платные генерации только после «да»</div><div class="d">Любая картинка и видео показывают цену и ждут подтверждения касанием</div><div class="c"><input class="sw" type="checkbox" checked aria-label="Платные генерации только после да"></div></div>
     <div class="row"><div class="t">Голосовые команды</div><div class="d">Микрофон в каждом разделе; «принять 12.3», «вернуть 12.2, свет не совпадает»</div><div class="c"><input class="sw" type="checkbox" checked aria-label="Голосовые команды"></div></div>
-   </div>
+   </div></div>
   </section>
 
   <div class="helper" aria-label="Помощник проекта">
