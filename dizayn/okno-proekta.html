@@ -15,7 +15,7 @@ a{color:inherit;text-decoration:none}button,input,textarea,select{font:inherit;c
 .label{font:500 var(--fs-label)/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
 /* ---------- каркас: боковая колонка · рабочее поле · помощник снизу ---------- */
 .app{display:grid;grid-template-columns:var(--side-w) 1fr;min-height:100dvh}
-.side{background:var(--bg-side);border-right:1px solid var(--line-soft);padding:12px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100dvh;overflow:auto}
+.side{background:var(--bg-side);padding:12px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100dvh;overflow:auto}
 .side .brand{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 8px}
 .side .brand b{font:600 .95rem/1 var(--disp);letter-spacing:.12em;text-transform:uppercase}
 .side .brand small{display:block;font:400 .72rem/1 var(--mono);letter-spacing:.2em;color:var(--dim);margin-top:.35em}
@@ -39,9 +39,9 @@ a{color:inherit;text-decoration:none}button,input,textarea,select{font:inherit;c
 .slate .cell span{font:400 .6875rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
 .slate .cell b{font:500 .875rem/1.2 var(--mono);margin-top:4px;letter-spacing:.02em}
 .slate .tools{margin-left:auto;display:flex;gap:6px}
-.btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:var(--fs-small);font-weight:500;cursor:pointer;transition:background .15s var(--ease),border-color .15s var(--ease)}
-.btn:hover{background:oklch(0.30 0 0)}
-.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:500}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:var(--r-pill);border:1px solid var(--line);background:transparent;color:var(--text);font-size:var(--fs-small);font-weight:500;cursor:pointer;transition:background .15s var(--ease),border-color .15s var(--ease)}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
 .btn.icon{width:44px;padding:0;justify-content:center}
 .btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
@@ -56,7 +56,7 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.015em;margin:0 0 6
 .group>header{display:flex;align-items:baseline;gap:12px;padding:0 2px}
 .group>header h2{font:500 var(--fs-lead)/1.2 var(--body);margin:0}
 .group>header .label{margin-left:auto;font-family:var(--body);text-transform:none;letter-spacing:0;color:var(--muted)}
-.sheet{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;box-shadow:var(--shadow)}
+.sheet{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r)}
 .sheet>header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-soft)}
 .sheet>header h2{font:500 var(--fs-lead)/1.2 var(--disp);margin:0}
 .sheet>header .label{margin-left:auto}
@@ -87,7 +87,7 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.015em;margin:0 0 6
 .frame p{margin:0;color:var(--muted);font-size:var(--fs-small)}
 /* ---------- помощник: одно окно на все этапы ---------- */
 .helper{position:fixed;left:var(--side-w);right:0;bottom:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
-.helper .box{max-width:900px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:10px 10px 8px}
+.helper .box{max-width:900px;margin:0 auto;background:var(--field);border:1px solid transparent;border-radius:var(--r-field);padding:10px 10px 8px}.helper .box:focus-within{border-color:var(--line)}
 .helper textarea{display:block;width:100%;min-height:44px;max-height:40vh;resize:none;border:0;background:transparent;padding:8px 8px 4px;line-height:1.45}
 .helper textarea::placeholder{color:var(--dim)}
 .helper .bar{display:flex;align-items:center;gap:6px}
