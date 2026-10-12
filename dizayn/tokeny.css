@@ -1,0 +1,42 @@
+/* Токены окна проекта studio.neyra.vision · графит · 13.10.2026
+   Одна правда для studio/ (Codex) и страниц проекта (Claude). Менять здесь, не в экранах. */
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Geologica:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{
+  /* графит: тёплый нейтральный, как у рабочих приложений (ChatGPT/Codex), но без синевы */
+  --bg:        oklch(0.17 0.004 80);   /* фон окна */
+  --bg-side:   oklch(0.15 0.004 80);   /* левая колонка */
+  --surface:   oklch(0.21 0.004 80);   /* карточка-лист */
+  --surface-2: oklch(0.25 0.005 80);   /* поле, строка при наведении */
+  --line:      oklch(0.31 0.005 80);
+  --line-soft: oklch(0.26 0.005 80);
+  --text:      oklch(0.93 0.010 85);   /* тёплый off-white */
+  --muted:     oklch(0.72 0.012 85);   /* 16px на --surface: контраст ≥ 4.5 */
+  --dim:       oklch(0.58 0.012 85);   /* только для моно-подписей ≥ 14px капсом */
+  --accent:    oklch(0.80 0.12 70);    /* янтарь: одно главное действие на экран */
+  --accent-ink:oklch(0.20 0.03 70);
+  /* лампы статуса — как на пульте: приглушённые, не кислотные */
+  --lamp-red:  oklch(0.62 0.17 25);
+  --lamp-amber:oklch(0.78 0.14 80);
+  --lamp-green:oklch(0.72 0.13 150);
+  --lamp-off:  oklch(0.40 0.005 80);
+  /* шрифты: текст Onest, заголовки разделов Geologica, цифры/коды/таймкоды JetBrains Mono (все с казахскими буквами) */
+  --body: Onest, system-ui, sans-serif;
+  --disp: Geologica, Onest, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  /* тихая шкала: 4 размера, как у дорогих интерфейсов */
+  --fs-label: 0.8125rem;  /* 13px моно капсом, только подписи */
+  --fs-text:  1rem;       /* 16px — всё, что читают */
+  --fs-lead:  1.125rem;   /* 18px — заголовок строки/карточки */
+  --fs-title: 1.5rem;     /* 24px — заголовок раздела */
+  --r: 10px; --r-sm: 6px;
+  --side-w: 272px;
+  --ease: cubic-bezier(0.16,1,0.3,1);
+  --shadow: 0 1px 0 oklch(0 0 0 / .25), 0 8px 24px -12px oklch(0 0 0 / .6);
+  color-scheme: dark;
+}
+/* бумажный режим (день): те же роли, другие значения */
+:root[data-theme="paper"]{
+  --bg:oklch(0.95 0.008 85);--bg-side:oklch(0.92 0.008 85);--surface:oklch(0.985 0.005 85);--surface-2:oklch(0.93 0.008 85);
+  --line:oklch(0.80 0.01 85);--line-soft:oklch(0.87 0.008 85);--text:oklch(0.22 0.01 80);--muted:oklch(0.45 0.01 80);--dim:oklch(0.55 0.01 80);
+  --accent:oklch(0.62 0.13 70);--accent-ink:oklch(0.98 0.01 85);--lamp-off:oklch(0.78 0.005 85);color-scheme:light;
+}
