@@ -368,7 +368,7 @@ console.log('External single-language draft and consistent concurrent reload: pa
 // Execute the actual app with a tiny event surface. This verifies saving and
 // rendering behavior without claiming browser layout or native DOM coverage.
 const appSource = (await readFile(new URL('./app.js', import.meta.url), 'utf8')).replace(/^import .*;\n/gm, '');
-async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch = false, hash = '#/studio/script', failStorage = false } = {}) {
+async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch = false, hash = '#/studio/script', failStorage = false, systemDark = false } = {}) {
   const timers = new Map();
   let timerId = 0;
   const handlers = new Map();
@@ -382,21 +382,26 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     showModal() { this.open = true; }, close() { this.open = false; this.listeners.get('close')?.({}); },
     focus() {}, click() {}, setAttribute() {}, querySelector() { return null; }
   });
-  const app = element(), dialog = element(), toast = element(), draft = element();
-  let markup = '';
+  const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element();
+  paperControl.id = 'script-paper-mode'; paperControl.dataset.paperMode = '';
+  let markup = '', markupWrites = 0;
   Object.defineProperty(app, 'innerHTML', { get: () => markup, set: value => {
-    markup = value;
+    markup = value; markupWrites += 1;
     label.textContent = /data-storage-label[^>]*>([^<]*)/.exec(value)?.[1] || '';
+    const options = /<select\b[^>]*id=['"]script-paper-mode['"][^>]*>([\s\S]*?)<\/select>/.exec(value)?.[1];
+    paperControl.value = options ? /<option\b[^>]*value=['"]([^'"]+)['"][^>]*\bselected\b/.exec(options)?.[1] || 'light' : '';
   } });
   const localStorage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => { if (failStorage) throw new Error('Quota exceeded'); stored.set(key, value); } };
   class TestServer extends StudioServer { constructor(settings) { super({ ...settings, fetchImpl: fetchImpl || api?.fetchImpl || (async () => { throw new TypeError('Offline'); }) }); } }
   const document = {
-    documentElement: {}, activeElement: null, title: '',
-    querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft })[selector] || (selector.startsWith('.') ? element() : null); },
-    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : []; },
+    documentElement: { dataset: {} }, activeElement: null, title: '',
+    querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft, '#script-paper-mode': paperControl.value ? paperControl : null })[selector] || (selector.startsWith('.') ? element() : null); },
+    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : selector === '[data-paper-mode]' && paperControl.value ? [paperControl] : []; },
     createElement() { return element(); }
   };
-  const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler) };
+  const schemeListeners = new Set();
+  const scheme = { media: '(prefers-color-scheme: dark)', matches: systemDark, addEventListener(type, handler) { if (type === 'change') schemeListeners.add(handler); } };
+  const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler), matchMedia: () => scheme };
   const context = vm.createContext({
     makeDemo, frameAt, totalDuration, StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
     location: { hash }, crypto: globalThis.crypto, console, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
@@ -411,18 +416,114 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   };
   const dispatch = async (surface, type, target) => surface.listeners.get(type)?.({ target, preventDefault() {} });
   const click = action => dispatch(app, 'click', { closest: selector => selector === '[data-action]' ? { dataset: { action } } : null });
+  const clickData = (attribute, value) => dispatch(app, 'click', { closest: selector => selector === `[data-${attribute}]` ? { dataset: { [attribute]: value } } : null });
   const input = (id, value) => dispatch(app, 'input', { id, value });
+  const change = (id, value) => dispatch(app, 'change', { id, value, dataset: id === paperControl.id ? paperControl.dataset : {} });
   const submit = (id, fields, dataset = {}) => dispatch(dialog, 'submit', { id, fields, dataset });
   const flushInput = async () => { for (const [id, timer] of [...timers]) if (timer.delay === 350) { timers.delete(id); timer.callback(); } await settle(); };
   await settle();
-  return { app, dialog, toast, label, storageErrorNode, stored, context, click, input, submit, flushInput, settle, timers, downloads,
+  return { app, dialog, toast, label, storageErrorNode, stored, context, document, paperControl, click, clickData, input, change, submit, flushInput, settle, timers, downloads,
+    get markupWrites() { return markupWrites; },
     navigate: async page => { context.location.hash = `#/studio/${page}`; await handlers.get('hashchange')?.(); },
+    setSystemDark: async value => { scheme.matches = value; for (const listener of schemeListeners) await listener({ matches: value, media: scheme.media }); },
     setStorageFailure: value => { failStorage = value; }
   };
 }
 const localState = p => ({ locale: 'ru', scriptLang: 'ru', activeId: 'existing', projects: { existing: p } });
 const workspaceKey = 'neyra-vision-prototype-v1';
 const settingsStorageKey = 'neyra-vision-server-settings-v1';
+const paperStorageKey = 'neyra-vision-script-paper-v1';
+
+// Paper belongs to this device: it follows the system until an explicit choice,
+// survives reload and never rewrites the editor or changes author/server data.
+{
+  for (const systemDark of [false, true]) {
+    const expected = systemDark ? 'graphite' : 'light';
+    const defaults = await appHarness({ systemDark });
+    assert.equal(defaults.document.documentElement.dataset.scriptPaper, expected);
+    assert.equal(defaults.paperControl.value, expected);
+    const invalid = await appHarness({ systemDark, stored: new Map([[paperStorageKey, 'unknown']]) });
+    assert.equal(invalid.document.documentElement.dataset.scriptPaper, expected, 'An invalid preference falls back to the system');
+    const savedMode = systemDark ? 'light' : 'graphite';
+    const saved = await appHarness({ systemDark, stored: new Map([[paperStorageKey, savedMode]]) });
+    assert.equal(saved.document.documentElement.dataset.scriptPaper, savedMode, 'A saved choice overrides the system');
+  }
+
+  const p = makeDemo();
+  const author = '<script>Автор & Ә Ғ Қ Ң Ө Ұ Ү Һ І</script>\n\n"Реплика"';
+  p.scenes[0].text.ru = author;
+  p.snapshots = [{ version: p.version, date, scenes: clone(p.scenes) }];
+  const originalWorkspace = JSON.stringify(localState(p));
+  const stored = new Map([[workspaceKey, originalWorkspace]]);
+  const api = nativeApi();
+  const ui = await appHarness({ stored, api, systemDark: true });
+  assert.match(ui.app.innerHTML, /for='script-paper-mode'>Бумага:/);
+  assert.match(ui.app.innerHTML, /value='light'[^>]*>светлая<\/option>/);
+  assert.match(ui.app.innerHTML, /value='graphite'[^>]*>графит<\/option>/);
+  await ui.setSystemDark(false);
+  assert.equal(ui.document.documentElement.dataset.scriptPaper, 'light');
+  assert.equal(ui.paperControl.value, 'light', 'The control follows a system change before a manual choice');
+  await ui.setSystemDark(true);
+  assert.equal(ui.document.documentElement.dataset.scriptPaper, 'graphite');
+  const beforeChange = ui.markupWrites;
+  const originalModel = vm.runInContext('JSON.stringify(state)', ui.context);
+  await ui.change('script-paper-mode', 'light');
+  assert.equal(ui.document.documentElement.dataset.scriptPaper, 'light');
+  assert.equal(ui.paperControl.value, 'light');
+  assert.equal(ui.markupWrites, beforeChange, 'Changing paper preserves the current editor DOM and cursor');
+  assert.equal(vm.runInContext('JSON.stringify(state)', ui.context), originalModel, 'The author model is unchanged');
+  assert.equal(stored.get(workspaceKey), originalWorkspace);
+  assert.equal(stored.get(settingsStorageKey), undefined);
+  assert.equal(stored.get(paperStorageKey), 'light');
+  assert.equal(api.calls.length, 0);
+  await ui.setSystemDark(false); await ui.setSystemDark(true);
+  assert.equal(ui.document.documentElement.dataset.scriptPaper, 'light', 'System changes preserve the manual choice');
+  const reloaded = await appHarness({ stored, systemDark: true });
+  assert.equal(reloaded.document.documentElement.dataset.scriptPaper, 'light', 'The device choice survives a reload');
+
+  // Both read-only script surfaces retain escaped author text and use the same
+  // themed paper class. The UI language does not choose the script language.
+  await ui.clickData('shot', p.shots[0].id);
+  const scenePreview = /<section class='script-paper script-preview'[\s\S]*?<\/section>/.exec(ui.dialog.innerHTML)?.[0];
+  assert.ok(scenePreview?.includes('&lt;script&gt;Автор &amp; Ә Ғ Қ Ң Ө Ұ Ү Һ І&lt;/script&gt;'));
+  assert.ok(!scenePreview.includes('<textarea'), 'The shot shows a read-only linked scene');
+  ui.dialog.close();
+  await ui.click('versions');
+  assert.match(ui.dialog.innerHTML, /<pre class='script-preview'>/);
+  assert.ok(ui.dialog.innerHTML.includes('&lt;script&gt;Автор &amp; Ә Ғ Қ Ң Ө Ұ Ү Һ І&lt;/script&gt;'));
+  ui.dialog.close();
+
+  ui.setStorageFailure(true);
+  await ui.change('script-paper-mode', 'graphite');
+  assert.equal(ui.document.documentElement.dataset.scriptPaper, 'graphite', 'A failed device write still applies the current choice');
+  assert.equal(stored.get(paperStorageKey), 'light');
+  assert.match(ui.toast.textContent, /не сохранён/);
+  ui.setStorageFailure(false);
+  await ui.clickData('lang', 'kk');
+  assert.match(ui.app.innerHTML, /for='script-paper-mode'>Қағаз:/);
+  assert.match(ui.app.innerHTML, /value='light'[^>]*>ашық<\/option>/);
+  assert.match(ui.app.innerHTML, /value='graphite'[^>]*>графит<\/option>/);
+  assert.equal(vm.runInContext('project().scenes[0].text.ru', ui.context), author);
+  ui.setStorageFailure(true);
+  await ui.change('script-paper-mode', 'light');
+  assert.match(ui.toast.textContent, /сақталмады/);
+  ui.setStorageFailure(false);
+  await ui.change('script-paper-mode', 'graphite');
+
+  const localBeforeConnect = stored.get(workspaceKey);
+  await ui.click('server');
+  await ui.submit('server-form', { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
+  assert.equal(ui.document.documentElement.dataset.scriptPaper, 'graphite', 'Connecting retains the device paper choice');
+  assert.equal(ui.paperControl.value, 'graphite');
+  const callsBeforePaper = api.calls.length;
+  const serverBeforePaper = JSON.stringify(api.projects.get('film'));
+  await ui.change('script-paper-mode', 'light');
+  assert.equal(api.calls.length, callsBeforePaper, 'Changing paper does not write project data to the API');
+  assert.equal(JSON.stringify(api.projects.get('film')), serverBeforePaper);
+  assert.equal(stored.get(workspaceKey), localBeforeConnect);
+  assert.deepEqual(JSON.parse(stored.get(settingsStorageKey)), { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
+}
+console.log('Actual app device paper preference, system changes, editor preservation, RU/KZ and script previews: passed.');
 
 // Browser fetch requires its global receiver. Use the real client constructor
 // and its default fetch, rather than TestServer's injected arrow function.

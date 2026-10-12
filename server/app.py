@@ -34,6 +34,8 @@ ROLE_SECTIONS = {
 MANAGERS = frozenset(("admin", "director", "producer"))
 STATUSES = frozenset(("draft", "working", "review", "approved"))
 STAGES = ("script", "breakdown", "heroes", "locations", "storyboard", "shots", "video", "sound", "edit")
+STAGE_LABELS = dict(zip(STAGES, ("Сценарий", "Разбивка", "Герои", "Локации", "Раскадровка",
+                                      "Кадры", "Видео", "Звук", "Монтаж")))
 STAGE_SECTIONS = dict(zip(STAGES, ("script", "script", "storyboard", "storyboard", "storyboard",
                                         "shots", "animatic", "post", "post")))
 APPROVER_ROLES = {
@@ -368,6 +370,247 @@ def snapshot(project, principal, kind, label="", source=None):
     return version
 
 
+def content_hash(value):
+    canonical = json.dumps(value, ensure_ascii=False, allow_nan=False,
+                           sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def activity(project, principal, action, obj, data, stage=None, invalidated=()):
+    """История фиксируется вместе с результатом операции, без секретов и исходных текстов."""
+    journal = project["activity"]
+    member = next((m for m in project["members"] if m["keyId"] == principal["id"]), None)
+    event = {
+        "id": uuid.uuid4().hex, "sequence": len(journal) + 1,
+        "keyId": principal["id"], "name": member["name"] if member else principal["id"],
+        "createdAt": timestamp(), "action": action, "object": copy.deepcopy(obj),
+        "contentHash": content_hash(data), "previousHash": journal[-1]["hash"] if journal else None,
+    }
+    if stage is not None:
+        event["stage"] = stage
+        event.update(cellId=data.get("cellId", data["id"]), version=data["version"],
+                     variant=data["variant"], status=data.get("status", data.get("verdict")))
+        if "verdict" in data:
+            event["approvalId"] = data["id"]
+    if invalidated:
+        event["invalidatedCellIds"] = sorted(set(invalidated))
+    event["hash"] = content_hash(event)
+    journal.append(event)
+
+
+def object_input(value, project):
+    if not isinstance(value, dict):
+        invalid("object должен содержать type и id.")
+    fields(value, ("type", "id"), ("type", "id"))
+    obj = {"type": enum(value["type"], OBJECT_TYPES, "object.type"),
+           "id": identifier(value["id"])}
+    if obj["type"] in ("scene", "shot"):
+        get_item(project["scenes" if obj["type"] == "scene" else "shots"], obj["id"])
+    return obj
+
+
+def date_input(value):
+    if value is None:
+        return None
+    value = text(value, "dueAt", 80, required=True)
+    try:
+        if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            datetime.strptime(value, "%Y-%m-%d")
+        else:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if "T" not in value or parsed.tzinfo is None:
+                raise ValueError()
+    except ValueError:
+        invalid("dueAt: нужна дата YYYY-MM-DD или дата и время ISO 8601 с часовым поясом.")
+    return value
+
+
+def assignee_input(value, project, keys, stage):
+    if not isinstance(value, dict):
+        invalid("assignee должен содержать keyId и name.")
+    fields(value, ("keyId", "name"))
+    key_id = value.get("keyId")
+    name = text(value.get("name", ""), "assignee.name", 240)
+    if key_id is not None:
+        identifier(key_id)
+        target = keys.get(key_id)
+        if target is None:
+            invalid("Ключ исполнителя не найден.")
+        try:
+            authorize(target, project["slug"], STAGE_SECTIONS[stage], project, write=True)
+        except ApiError:
+            invalid("У исполнителя нет доступа к проекту или этапу.")
+        member = next((m for m in project["members"] if m["keyId"] == key_id), None)
+        if not name:
+            name = member["name"] if member else key_id
+    return {"keyId": key_id, "name": name}
+
+
+def map_cell(project, obj, stage):
+    return next((c for c in project["cells"] if c["object"] == obj and c["stage"] == stage), None)
+
+
+def dependency_blockers(project, cell):
+    obj, stage = cell["object"], cell["stage"]
+    if obj["type"] == "scene" and not any(s["id"] == obj["id"] for s in project["scenes"]):
+        return ["сцена отсутствует в текущей версии"]
+    if obj["type"] == "shot":
+        shot = next((s for s in project["shots"] if s["id"] == obj["id"]), None)
+        if shot is None:
+            return ["кадр отсутствует"]
+        obj = {"type": "scene", "id": shot["sceneId"]}
+        if not any(s["id"] == obj["id"] for s in project["scenes"]):
+            return ["сцена кадра отсутствует в текущей версии"]
+    if stage == "edit":
+        if not project["scenes"]:
+            return ["в проекте ещё нет сцен с утверждённым видео"]
+        required = [({"type": "scene", "id": s["id"]}, "video") for s in project["scenes"]]
+    elif stage == "shots":
+        required = [(obj, "storyboard"), (obj, "heroes")]
+    elif stage == "video":
+        required = [(obj, "shots")]
+    else:
+        required = []
+    blockers = []
+    for reference, prerequisite in required:
+        current = map_cell(project, reference, prerequisite)
+        if current is None or current["status"] != "approved":
+            kind = {"scene": "сцена", "shot": "кадр", "teaser": "тизер", "episode": "серия"}[reference["type"]]
+            blockers.append("не утверждён этап «" + STAGE_LABELS[prerequisite] + "»: " + kind + " " + reference["id"])
+    return blockers
+
+
+def check_dependencies(project, cell):
+    blockers = dependency_blockers(project, cell)
+    if blockers:
+        raise ApiError(409, "DEPENDENCY_CONFLICT", "Этап «" + STAGE_LABELS[cell["stage"]]
+                       + "» заблокирован: " + "; ".join(blockers) + ".")
+
+
+def cell_input(body, project, principal, keys, current=None):
+    create = current is None
+    names = ("object", "stage", "assignee", "approverRole", "status", "dueAt", "comment", "version", "variant")
+    fields(body, names if create else names[2:], ("object", "stage") if create else ())
+    result = copy.deepcopy(current) if current else {
+        "id": uuid.uuid4().hex, "project": project["slug"],
+        "object": object_input(body["object"], project),
+        "stage": enum(body["stage"], STAGES, "stage"), "createdAt": timestamp(),
+        "status": "empty", "dueAt": None, "comment": "", "version": None, "variant": None,
+    }
+    stage = result["stage"]
+    authorize(principal, project["slug"], STAGE_SECTIONS[stage], project, write=True)
+    manager = principal["role"] in MANAGERS
+    if (create and not manager) or (not create and not manager and
+            (result["assignee"]["keyId"] != principal["id"]
+             or set(body) - {"status", "comment", "version", "variant"})):
+        raise ApiError(403, "FORBIDDEN", "Менять задачу может её исполнитель, назначать — руководитель проекта.")
+    if create or "assignee" in body:
+        result["assignee"] = assignee_input(body.get("assignee", {}), project, keys, stage)
+    if create or "approverRole" in body:
+        result["approverRole"] = enum(body.get("approverRole", APPROVER_ROLES[stage][0]),
+                                      APPROVER_ROLES[stage], "approverRole")
+    if "status" in body:
+        result["status"] = enum(body["status"], CELL_STATUSES - {"approved", "returned"}, "status")
+    if "dueAt" in body:
+        result["dueAt"] = date_input(body["dueAt"])
+    if "comment" in body:
+        result["comment"] = text(body["comment"], "comment", 8000)
+    for name in ("version", "variant"):
+        if name in body:
+            result[name] = (None if body[name] is None else text(body[name], name, 240, required=True))
+    if current and any(result[k] != current[k] for k in ("version", "variant", "approverRole")):
+        if result["status"] in ("approved", "awaiting"):
+            # Новый вариант или новый утверждающий требуют отдельной отправки на апрув.
+            result["status"] = "done" if "status" not in body else result["status"]
+            if result["status"] == "approved":
+                result["status"] = "done"
+    if result["status"] == "awaiting" and not (result["version"] or result["variant"]):
+        invalid("Для апрува укажите version или variant.")
+    if (create or "status" in body) and result["status"] in ("working", "done", "awaiting"):
+        check_dependencies(project, result)
+    result["updatedAt"] = timestamp()
+    return result
+
+
+def can_approve(principal, project, cell):
+    authorize(principal, project["slug"], STAGE_SECTIONS[cell["stage"]], project, write=True)
+    if principal["role"] not in (cell["approverRole"], "admin", "producer"):
+        raise ApiError(403, "FORBIDDEN", "Вердикт может поставить роль " + cell["approverRole"]
+                       + ", администратор или продюсер.")
+
+
+def approval_input(body, project, principal):
+    fields(body, ("object", "stage", "version", "variant", "verdict", "comment"),
+           ("object", "stage", "verdict"))
+    obj = object_input(body["object"], project)
+    stage = enum(body["stage"], STAGES, "stage")
+    cell = map_cell(project, obj, stage)
+    if cell is None:
+        raise ApiError(404, "NOT_FOUND", "Клетка карты не найдена.")
+    can_approve(principal, project, cell)
+    result = {"id": uuid.uuid4().hex, "project": project["slug"], "cellId": cell["id"],
+              "object": obj, "stage": stage, "keyId": principal["id"], "createdAt": timestamp(),
+              "verdict": enum(body["verdict"], ("approved", "returned"), "verdict"),
+              "comment": text(body.get("comment", ""), "comment", 8000)}
+    for name in ("version", "variant"):
+        result[name] = None if body.get(name) is None else text(body[name], name, 240, required=True)
+    if not (result["version"] or result["variant"]):
+        invalid("Укажите утверждаемую версию или вариант.")
+    if any(result[name] != cell[name] for name in ("version", "variant")):
+        raise ApiError(409, "APPROVAL_CONFLICT", "Вариант или версия клетки изменились. Загрузите актуальные данные.")
+    if cell["status"] != "awaiting":
+        raise ApiError(409, "CELL_NOT_AWAITING", "Клетка не ждёт апрува. Сначала отправьте результат на утверждение.")
+    if result["verdict"] == "approved":
+        check_dependencies(project, cell)
+    cell.update(status=result["verdict"], comment=result["comment"], updatedAt=result["createdAt"])
+    return result
+
+
+def invalidate_cells(project, predicate):
+    invalidated = []
+    for cell in project["cells"]:
+        if cell["status"] in ("approved", "awaiting") and predicate(cell):
+            cell.update(status="done", updatedAt=timestamp())
+            invalidated.append(cell["id"])
+    return invalidated
+
+
+def invalidate_dependencies(project):
+    # Сначала кадры, затем видео, затем монтаж: каскад не зависит от порядка создания клеток.
+    invalidated = []
+    for stage in ("shots", "video", "edit"):
+        invalidated.extend(invalidate_cells(project, lambda c: c["stage"] == stage
+                                            and bool(dependency_blockers(project, c))))
+    return invalidated
+
+
+def production_map(project, principal):
+    objects = [{"type": "scene", "id": s["id"]} for s in project["scenes"]]
+    objects.extend({"type": "shot", "id": s["id"]} for s in project["shots"])
+    seen = {(obj["type"], obj["id"]) for obj in objects}
+    for cell in project["cells"]:
+        key = (cell["object"]["type"], cell["object"]["id"])
+        if key not in seen:
+            objects.append(cell["object"])
+            seen.add(key)
+    cells = project["cells"]
+    by_stage = {(c["object"]["type"], c["object"]["id"], c["stage"]): c for c in cells}
+    awaiting = []
+    for cell in cells:
+        if cell["status"] != "awaiting":
+            continue
+        try:
+            can_approve(principal, project, cell)
+        except ApiError:
+            continue
+        awaiting.append(cell)
+    return {"project": project["slug"], "stages": list(STAGES), "objects": objects, "cells": cells,
+            "grid": [{"object": obj, "stages": {s: by_stage.get((obj["type"], obj["id"], s)) for s in STAGES}}
+                     for obj in objects],
+            "myTasks": [c for c in cells if c["assignee"]["keyId"] == principal["id"]],
+            "awaitingMe": awaiting}
+
+
 class Store:
     def __init__(self, root):
         self.root = Path(root).resolve()
@@ -397,6 +640,18 @@ class Store:
                 if (not isinstance(project[collection], list)
                         or any(not isinstance(item, dict) or "id" not in item for item in project[collection])):
                     raise ValueError()
+            # Старые проекты читаются без записи на GET; прежнюю историю не выдумываем.
+            for collection in ("cells", "approvals", "activity"):
+                project.setdefault(collection, [])
+                if (not isinstance(project[collection], list)
+                        or any(not isinstance(item, dict) or "id" not in item for item in project[collection])):
+                    raise ValueError()
+            previous = None
+            for sequence, event in enumerate(project["activity"], 1):
+                if (event.get("sequence") != sequence or event.get("previousHash") != previous
+                        or event.get("hash") != content_hash({k: v for k, v in event.items() if k != "hash"})):
+                    raise ValueError()
+                previous = event["hash"]
             return project
         except FileNotFoundError:
             raise ApiError(404, "NOT_FOUND", "Проект не найден.") from None
@@ -564,7 +819,7 @@ class Handler(SimpleHTTPRequestHandler):
                     "synopsis": text(body.get("synopsis", ""), "synopsis", 8000),
                     "language": enum(body.get("language", "ru"), ("ru", "kk"), "language"),
                     "createdAt": date, "updatedAt": date, "revision": 1,
-                    "scenes": [], "shots": [], "versions": [],
+                    "scenes": [], "shots": [], "versions": [], "cells": [], "approvals": [], "activity": [],
                     "post": [{"id": task_id, "done": False} for task_id in ("edit", "color", "sound", "vfx")],
                     "members": [{"id": uuid.uuid4().hex, "name": "Создатель проекта",
                                  "role": principal["role"], "keyId": principal["id"],
@@ -574,6 +829,7 @@ class Handler(SimpleHTTPRequestHandler):
                                      "status": "draft", "updatedAt": date}
                 if "translations" in body:
                     project["translations"] = translations_input(body["translations"], {"title": 240, "synopsis": 8000})
+                activity(project, principal, "project.created", {"type": "project", "id": slug}, metadata(project))
                 store.save(project)
                 return 201, {"data": metadata(project)}, 1
             raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
@@ -584,13 +840,16 @@ class Handler(SimpleHTTPRequestHandler):
         if not project_scope(principal, slug):
             raise ApiError(403, "FORBIDDEN", "Нет доступа к проекту.")
         project = store.read(slug)
-        section = parts[3] if len(parts) > 3 else "overview"
-        section = {"versions": "script", "scenes": "script", "members": "team"}.get(section, section)
+        resource = parts[3] if len(parts) > 3 else "project"
+        section = {"versions": "script", "scenes": "script", "members": "team", "project": "overview",
+                   "map": "overview", "cells": "overview", "approvals": "overview",
+                   "activity": "overview"}.get(resource, resource)
         write = method != "GET"
         authorize(principal, slug, section, project, write=write,
-                  manager=write and section in ("overview", "team"))
+                  manager=write and resource in ("project", "members"))
         if write:
             self.check_revision(project)
+        invalidated = []
         if len(parts) == 3:
             if method == "GET":
                 return 200, {"data": metadata(project)}, project["revision"]
@@ -616,8 +875,45 @@ class Handler(SimpleHTTPRequestHandler):
                     or draft.get("translations") != project["script"].get("translations")):
                 for shot in project["shots"]:
                     shot["needsReview"] = True
+                invalidated.extend(invalidate_cells(project, lambda c: c["object"]["type"] in ("scene", "shot")))
             project["script"] = draft
             data, status = draft, 200
+        elif resource == "map" and len(parts) == 4:
+            if method != "GET":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Карту можно только читать; задачи меняются через cells.")
+            if query:
+                raise ApiError(400, "BAD_REQUEST", "Карта целиком возвращается по ключу X-Key без параметров.")
+            return 200, {"data": production_map(project, principal)}, project["revision"]
+        elif resource in ("activity", "approvals") and len(parts) in (4, 5):
+            if method == "GET":
+                data = ({"data": get_item(project[resource], parts[4])} if len(parts) == 5
+                        else self.listing(project[resource], query))
+                return 200, data, project["revision"]
+            if resource == "approvals" and method == "POST" and len(parts) == 4:
+                data = approval_input(self.body(), project, principal)
+                project["approvals"].append(data)
+                status = 201
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Историю нельзя менять или удалять; апрувы только добавляются.")
+        elif resource == "cells" and len(parts) in (4, 5):
+            items = project["cells"]
+            item = get_item(items, parts[4]) if len(parts) == 5 else None
+            if method == "GET":
+                return 200, ({"data": item} if item else self.listing(items, query)), project["revision"]
+            create = method == "POST" and item is None
+            if create or (method == "PATCH" and item is not None):
+                changes = cell_input(self.body(), project, principal, keys, item)
+                if create:
+                    if map_cell(project, changes["object"], changes["stage"]) is not None:
+                        raise ApiError(409, "ALREADY_EXISTS", "Клетка этого объекта и этапа уже существует.")
+                    items.append(changes)
+                else:
+                    if item["status"] in ("approved", "awaiting") and changes["status"] == "done":
+                        invalidated.append(item["id"])
+                    item.update(changes)
+                data, status = changes, 201 if create else 200
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Клетки создаются и изменяются без удаления истории.")
         elif parts[3] == "post" and len(parts) == 4:
             if method == "GET":
                 return 200, {"data": {"tasks": project.get("post", [])}}, project["revision"]
@@ -646,6 +942,7 @@ class Handler(SimpleHTTPRequestHandler):
                 project["scenes"] = copy.deepcopy(source["scenes"])
                 for shot in project["shots"]:
                     shot["needsReview"] = True
+                invalidated.extend(invalidate_cells(project, lambda c: c["object"]["type"] in ("scene", "shot")))
                 restored = snapshot(project, principal, "restored", source=source["id"])
                 data = {"script": project["script"], "backupVersionId": backup["id"],
                         "restoredVersionId": restored["id"]}
@@ -674,9 +971,24 @@ class Handler(SimpleHTTPRequestHandler):
                     if any(existing["id"] == changes["id"] for existing in items):
                         raise ApiError(409, "ALREADY_EXISTS", "Идентификатор уже существует.")
                     items.append(changes)
+                    if collection == "shots":
+                        invalidated.extend(invalidate_cells(project, lambda c:
+                            c["object"] == {"type": "scene", "id": changes["sceneId"]}
+                            and c["stage"] in ("shots", "video", "edit")))
                     data, status = changes, 201
                 else:
                     changed = any(item.get(k) != v for k, v in changes.items())
+                    if changed and collection == "scenes":
+                        shot_ids = {s["id"] for s in project["shots"] if s["sceneId"] == item["id"]}
+                        invalidated.extend(invalidate_cells(project, lambda c:
+                            c["object"] == {"type": "scene", "id": item["id"]}
+                            or (c["object"]["type"] == "shot" and c["object"]["id"] in shot_ids)))
+                    if changed and collection == "shots":
+                        scene_ids = {item["sceneId"], changes.get("sceneId", item["sceneId"])}
+                        invalidated.extend(invalidate_cells(project, lambda c:
+                            c["object"] == {"type": "shot", "id": item["id"]}
+                            or (c["object"]["type"] == "scene" and c["object"]["id"] in scene_ids
+                                and c["stage"] in ("shots", "video", "edit"))))
                     item.update(changes)
                     if collection == "scenes" and changed:
                         for shot in project["shots"]:
@@ -686,19 +998,40 @@ class Handler(SimpleHTTPRequestHandler):
                         item["needsReview"] = False
                     data, status = item, 200
             elif method == "DELETE" and item is not None:
+                if collection in ("scenes", "shots") and any(
+                        c["object"] == {"type": "scene" if collection == "scenes" else "shot", "id": item["id"]}
+                        for c in project["cells"]):
+                    raise ApiError(409, "OBJECT_IN_MAP", "Объект используется картой производства и не может быть удалён.")
                 if collection == "scenes" and any(s["sceneId"] == item["id"] for s in project["shots"]):
                     raise ApiError(409, "SCENE_IN_USE", "Сначала перенесите или удалите кадры этой сцены.")
+                if collection == "shots":
+                    invalidated.extend(invalidate_cells(project, lambda c:
+                        c["object"] == {"type": "scene", "id": item["sceneId"]}
+                        and c["stage"] in ("shots", "video", "edit")))
                 items.remove(item)
                 data, status = {"id": item["id"], "deleted": True}, 200
             else:
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
         else:
             raise ApiError(404, "NOT_FOUND", "Маршрут не найден.")
+        invalidated.extend(invalidate_dependencies(project))
         project["revision"] += 1
         project["updatedAt"] = timestamp()
-        store.save(project)
         if len(parts) == 3:
             data = metadata(project)
+        stage = None
+        if resource in ("cells", "approvals"):
+            obj, stage = data["object"], data["stage"]
+            action = ("approval." + data["verdict"] if resource == "approvals"
+                      else "cell." + ("created" if status == 201 else "updated"))
+        else:
+            kind = {"scenes": "scene", "shots": "shot", "members": "member", "versions": "version"}.get(resource, resource)
+            obj = {"type": kind, "id": data.get("id", slug)}
+            action = kind + "." + ("deleted" if method == "DELETE" else "created" if status == 201 else "updated")
+            if resource == "versions" and len(parts) == 6:
+                action, obj = "version.restored", {"type": "version", "id": data["restoredVersionId"]}
+        activity(project, principal, action, obj, data, stage, invalidated)
+        store.save(project)
         return status, {"data": data}, project["revision"]
 
     def static(self, path, head=False):

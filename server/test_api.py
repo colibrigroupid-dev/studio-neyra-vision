@@ -9,6 +9,8 @@
 """
 
 import concurrent.futures
+from datetime import datetime
+import hashlib
 import http.client
 import io
 import json
@@ -621,6 +623,582 @@ class ApiTests(unittest.TestCase):
                 status, _, raw = self.request("HEAD", path, key=None)
                 self.assertGreaterEqual(status, 400)
                 self.assertEqual(raw, b"")
+
+    def production_setup(self, scenes=("one",)):
+        """Участники и ключи из временного проекта, без внешних аккаунтов."""
+        self.create()
+        for scene_id in scenes:
+            self.api("POST", "/api/projects/film/scenes", {
+                "id": scene_id, "title": "Сцена " + scene_id}, 201)
+        config = json.loads(self.keys.read_text(encoding="utf-8"))
+        roles = (
+            ("director", "director", list(app.SECTIONS)),
+            ("producer", "producer", list(app.SECTIONS)),
+            ("assistant", "assistant_director", ["overview", "script"]),
+            ("camera", "cinematographer", ["overview", "storyboard", "shots"]),
+            ("editor", "editor", ["overview", "animatic", "post"]),
+            ("artist-two", "artist", ["overview", "storyboard", "shots"]),
+        )
+        for key_id, role, sections in roles:
+            config["keys"].append({"id": key_id, "key": "temporary-" + key_id,
+                "role": role, "projects": ["film"], "sections": sections})
+        self.keys.write_text(json.dumps(config), encoding="utf-8")
+        for key_id, role, sections in roles:
+            self.api("POST", "/api/projects/film/members", {
+                "name": "Участник " + key_id, "role": role, "sections": sections,
+                "keyId": key_id}, 201)
+        self.member("writer", ["overview", "script"])
+        self.member("artist", ["overview", "storyboard", "shots"])
+        self.member("viewer", ["overview", "script", "shots"])
+
+    def cell(self, stage, object_id="one", object_type="scene", **values):
+        body = {"object": {"type": object_type, "id": object_id}, "stage": stage,
+                "version": "v1"}
+        body.update(values)
+        return self.api("POST", "/api/projects/film/cells", body, 201)["data"]
+
+    def approval(self, cell, verdict="approved", key="temporary-admin", status=201,
+                 **values):
+        body = {"object": cell["object"], "stage": cell["stage"], "verdict": verdict,
+                "comment": "Принято" if verdict == "approved" else "Исправить свет"}
+        for field in ("version", "variant"):
+            if cell.get(field) is not None:
+                body[field] = cell[field]
+        body.update(values)
+        return self.api("POST", "/api/projects/film/approvals", body, status, key)
+
+    def approved_cell(self, stage, object_id="one", object_type="scene", **values):
+        cell = self.cell(stage, object_id, object_type, status="awaiting", **values)
+        self.approval(cell)
+        return cell
+
+    def project_bytes(self):
+        return (self.data / "film" / "project.json").read_bytes()
+
+    def test_production_cell_round_trip_defaults_references_and_unique_object_stage(self):
+        self.production_setup()
+        cell = self.cell("heroes", assignee={"keyId": "artist", "name": "Лена"},
+                         dueAt="2026-10-20T12:00:00+00:00", comment="Портрет героя")
+        self.assertEqual(cell["project"], "film")
+        self.assertEqual(cell["object"], {"type": "scene", "id": "one"})
+        self.assertEqual(cell["status"], "empty")
+        self.assertEqual(cell["approverRole"], "director")
+        self.assertEqual(cell["assignee"], {"keyId": "artist", "name": "Лена"})
+        self.assertEqual(cell["dueAt"], "2026-10-20T12:00:00+00:00")
+        self.assertEqual(cell["comment"], "Портрет героя")
+        self.assertTrue(cell["id"])
+        self.assertEqual(self.api("GET", f"/api/projects/film/cells/{cell['id']}")["data"], cell)
+        before = self.project_bytes()
+        self.api("POST", "/api/projects/film/cells", {
+            "object": cell["object"], "stage": "heroes"}, 409)
+        for object_type in ("scene", "shot"):
+            with self.subTest(object_type=object_type):
+                self.api("POST", "/api/projects/film/cells", {
+                    "object": {"type": object_type, "id": "missing"}, "stage": "script"}, 404)
+        self.assertEqual(self.project_bytes(), before)
+        for object_type in ("teaser", "episode"):
+            virtual = self.cell("script", "preview-" + object_type, object_type)
+            self.assertEqual(virtual["object"]["type"], object_type)
+
+    def test_production_cells_validate_input_and_cannot_forge_verdict_or_author(self):
+        self.production_setup()
+        valid = {"object": {"type": "scene", "id": "one"}, "stage": "heroes"}
+        invalid_values = (
+            {"status": "approved"}, {"status": "returned"}, {"status": "draft"},
+            {"stage": "unknown"}, {"object": {"type": "hero", "id": "one"}},
+            {"object": {"type": "scene", "id": "../outside"}},
+            {"object": ["scene", "one"]}, {"assignee": "artist"},
+            {"assignee": {"keyId": "artist", "name": "Лена", "role": "admin"}},
+            {"assignee": {"keyId": "missing", "name": "Никто"}},
+            {"approverRole": "viewer"}, {"approverRole": "writer"},
+            {"dueAt": "завтра"}, {"comment": 4},
+            {"version": []}, {"variant": {}}, {"keyId": "admin"}, {"project": "other"},
+        )
+        before = self.project_bytes()
+        for values in invalid_values:
+            with self.subTest(values=values):
+                self.api("POST", "/api/projects/film/cells", dict(valid, **values), 422)
+                self.assertEqual(self.project_bytes(), before)
+        cell = self.cell("heroes")
+        before = self.project_bytes()
+        for status in ("approved", "returned"):
+            self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {"status": status}, 422)
+        self.assertEqual(self.project_bytes(), before)
+
+    def test_production_grid_includes_scenes_and_shots_without_persisted_cells(self):
+        self.production_setup(scenes=("one", "two"))
+        self.api("POST", "/api/projects/film/shots", {
+            "id": "one-shot", "sceneId": "one", "title": "Кадр"}, 201)
+        result = self.api("GET", "/api/projects/film/map")["data"]
+        expected = {("scene", "one"), ("scene", "two"), ("shot", "one-shot")}
+        self.assertEqual({(obj["type"], obj["id"]) for obj in result["objects"]}, expected)
+        self.assertEqual(result["cells"], [])
+        self.assertEqual(len(result["grid"]), 3)
+        for row in result["grid"]:
+            self.assertEqual(set(row["stages"]), set(result["stages"]))
+            self.assertTrue(all(cell is None for cell in row["stages"].values()))
+        cell = self.cell("script", "preview", "teaser")
+        result = self.api("GET", "/api/projects/film/map")["data"]
+        self.assertEqual(len(result["grid"]), 4)
+        row = next(row for row in result["grid"] if row["object"] == cell["object"])
+        self.assertEqual(row["stages"]["script"], cell)
+        self.assertIsNone(row["stages"]["video"])
+
+    def test_production_only_managers_configure_cells_and_only_assignee_updates_work(self):
+        self.production_setup()
+        cell = self.cell("heroes", assignee={"keyId": "artist", "name": "Лена"})
+        path = f"/api/projects/film/cells/{cell['id']}"
+        before = self.project_bytes()
+        for key in ("temporary-writer", "temporary-artist", "temporary-viewer"):
+            self.api("POST", "/api/projects/film/cells", {
+                "object": {"type": "scene", "id": "one"}, "stage": "locations"}, 403, key)
+        self.api("PATCH", path, {"status": "working"}, 403, "temporary-artist-two")
+        self.api("PATCH", path, {"assignee": {"keyId": "artist-two", "name": "Другой"}},
+                 403, "temporary-artist")
+        self.api("PATCH", path, {"approverRole": "producer"}, 403, "temporary-artist")
+        self.api("PATCH", path, {"dueAt": None}, 403, "temporary-artist")
+        self.assertEqual(self.project_bytes(), before)
+        changed = self.api("PATCH", path, {"status": "working", "comment": "Эскиз готовлю",
+            "version": "v2", "variant": "portrait-a"}, key="temporary-artist")["data"]
+        self.assertEqual(changed["status"], "working")
+        self.assertEqual(changed["version"], "v2")
+        self.assertEqual(changed["variant"], "portrait-a")
+        self.api("PATCH", path, {"assignee": {"keyId": "artist-two", "name": "Айнур"}},
+                 key="temporary-director")
+        self.api("PATCH", path, {"status": "done"}, 403, "temporary-artist")
+        self.api("PATCH", path, {"status": "done"}, key="temporary-artist-two")
+
+    def test_production_map_is_complete_and_personal_lists_use_authenticated_key(self):
+        self.production_setup(scenes=())
+        cells = [self.cell("script", "preview-%02d" % i, "teaser", status="awaiting",
+                  assignee={"keyId": "writer", "name": "Сценарист"}, approverRole="writer")
+                 for i in range(55)]
+        unrelated = self.cell("script", "other", "episode",
+                              assignee={"keyId": "admin", "name": "Продюсер"})
+        result = self.api("GET", "/api/projects/film/map", key="temporary-writer")["data"]
+        self.assertEqual(result["project"], "film")
+        self.assertEqual(result["stages"], ["script", "breakdown", "heroes", "locations",
+            "storyboard", "shots", "video", "sound", "edit"])
+        self.assertEqual({cell["id"] for cell in result["cells"]},
+                         {cell["id"] for cell in cells} | {unrelated["id"]})
+        self.assertEqual({cell["id"] for cell in result["myTasks"]}, {cell["id"] for cell in cells})
+        self.assertEqual({cell["id"] for cell in result["awaitingMe"]}, {cell["id"] for cell in cells})
+        viewer = self.api("GET", "/api/projects/film/map", key="temporary-viewer")["data"]
+        self.assertEqual(viewer["myTasks"], [])
+        self.assertEqual(viewer["awaitingMe"], [])
+        self.assertEqual(len(viewer["cells"]), 56)
+        director = self.api("GET", "/api/projects/film/map", key="temporary-director")["data"]
+        self.assertEqual(director["awaitingMe"], [])
+        producer = self.api("GET", "/api/projects/film/map", key="temporary-producer")["data"]
+        self.assertEqual(len(producer["awaitingMe"]), 55)
+
+    def test_production_approval_default_roles_and_permitted_alternatives(self):
+        self.production_setup()
+        cases = (("script", "producer"), ("breakdown", "assistant_director"),
+                 ("heroes", "director"), ("locations", "director"),
+                 ("storyboard", "director"), ("shots", "director"),
+                 ("video", "director"), ("sound", "director"), ("edit", "producer"))
+        for stage, expected_role in cases:
+            with self.subTest(stage=stage):
+                cell = self.cell(stage)
+                self.assertEqual(cell["approverRole"], expected_role)
+        script = self.api("GET", "/api/projects/film/map")["data"]["cells"][0]
+        self.api("PATCH", f"/api/projects/film/cells/{script['id']}", {
+            "approverRole": "writer", "status": "awaiting"})
+        self.approval(script, key="temporary-writer")
+        camera_cell = self.cell("storyboard", "camera-preview", "teaser",
+                                approverRole="cinematographer", status="awaiting")
+        self.approval(camera_cell, key="temporary-camera")
+        breakdown = self.cell("breakdown", "breakdown-preview", "teaser", status="awaiting")
+        self.approval(breakdown, key="temporary-assistant")
+        edit = self.cell("edit", "director-preview", "teaser", approverRole="director")
+        self.assertEqual(edit["approverRole"], "director")
+
+    def test_production_wrong_approver_denied_admin_and_producer_override(self):
+        self.production_setup()
+        cell = self.cell("heroes", status="awaiting", assignee={"keyId": "artist", "name": "Лена"})
+        before = self.project_bytes()
+        for key in ("temporary-artist", "temporary-camera", "temporary-writer", "temporary-viewer"):
+            self.approval(cell, key=key, status=403)
+            self.assertEqual(self.project_bytes(), before)
+        approved = self.approval(cell, key="temporary-director")["data"]
+        self.assertEqual(approved["keyId"], "director")
+        datetime.fromisoformat(approved["createdAt"])
+        self.assertEqual(approved["verdict"], "approved")
+        for stage, key in (("locations", "temporary-producer"), ("storyboard", "temporary-admin")):
+            pending = self.cell(stage, status="awaiting")
+            self.assertEqual(self.approval(pending, key=key)["data"]["keyId"], key.removeprefix("temporary-"))
+
+    def test_production_approval_requires_awaiting_current_version_and_records_return(self):
+        self.production_setup()
+        cell = self.cell("heroes", assignee={"keyId": "artist", "name": "Лена"}, variant="portrait-a")
+        path = f"/api/projects/film/cells/{cell['id']}"
+        before = self.project_bytes()
+        self.approval(cell, status=409)
+        self.assertEqual(self.project_bytes(), before)
+        self.api("PATCH", path, {"status": "awaiting"}, key="temporary-artist")
+        before = self.project_bytes()
+        for stale in ({"version": "old"}, {"variant": "portrait-b"}, {"version": None}):
+            with self.subTest(stale=stale):
+                self.approval(cell, status=409, **stale)
+                self.assertEqual(self.project_bytes(), before)
+        returned = self.approval(cell, "returned", key="temporary-director")["data"]
+        self.assertEqual(returned["comment"], "Исправить свет")
+        self.assertEqual(self.api("GET", path)["data"]["status"], "returned")
+        before = self.project_bytes()
+        self.approval(cell, status=409)
+        self.assertEqual(self.project_bytes(), before)
+        revised = self.api("PATCH", path, {"status": "awaiting", "version": "v2"},
+                           key="temporary-artist")["data"]
+        self.approval(revised, key="temporary-director")
+        history = self.api("GET", "/api/projects/film/approvals")["data"]
+        self.assertEqual(history[0], returned)
+        self.assertEqual([entry["verdict"] for entry in history], ["returned", "approved"])
+        self.assertEqual([entry["version"] for entry in history], ["v1", "v2"])
+
+    def test_production_scene_shots_requires_own_storyboard_and_heroes(self):
+        self.production_setup(scenes=("one", "two"))
+        self.approved_cell("storyboard", "two")
+        self.approved_cell("heroes", "two")
+        shots = self.cell("shots", "one")
+        path = f"/api/projects/film/cells/{shots['id']}"
+        before = self.project_bytes()
+        for status in ("working", "done", "awaiting"):
+            result = self.api("PATCH", path, {"status": status}, 409)
+            self.assertTrue(result["error"]["message"])
+            self.assertEqual(self.project_bytes(), before)
+        self.approved_cell("storyboard", "one")
+        before = self.project_bytes()
+        self.api("PATCH", path, {"status": "working"}, 409)
+        self.assertEqual(self.project_bytes(), before)
+        self.approved_cell("heroes", "one")
+        self.assertEqual(self.api("PATCH", path, {"status": "working"})["data"]["status"], "working")
+        self.api("PATCH", path, {"status": "awaiting"})
+        self.approval(shots)
+
+    def test_production_dependencies_also_guard_creation_video_and_approval(self):
+        self.production_setup()
+        before = self.project_bytes()
+        for stage in ("shots", "video"):
+            for state in ("working", "done", "awaiting"):
+                with self.subTest(stage=stage, state=state):
+                    self.api("POST", "/api/projects/film/cells", {
+                        "object": {"type": "scene", "id": "one"}, "stage": stage,
+                        "status": state, "version": "v1"}, 409)
+                    self.assertEqual(self.project_bytes(), before)
+        storyboard = self.approved_cell("storyboard")
+        self.approved_cell("heroes")
+        shots = self.approved_cell("shots")
+        video = self.cell("video", status="awaiting")
+        # Другая версия кадра снимает прежний апрув перед новым решением по видео.
+        self.api("PATCH", f"/api/projects/film/cells/{shots['id']}", {"version": "v2", "status": "working"})
+        before = self.project_bytes()
+        self.approval(video, status=409)
+        self.assertEqual(self.project_bytes(), before)
+        self.api("PATCH", f"/api/projects/film/cells/{shots['id']}", {"status": "awaiting"})
+        revised = self.api("GET", f"/api/projects/film/cells/{shots['id']}")["data"]
+        self.approval(revised)
+        self.api("PATCH", f"/api/projects/film/cells/{video['id']}", {"status": "awaiting"})
+        self.approval(video)
+        self.assertEqual(self.api("GET", f"/api/projects/film/cells/{storyboard['id']}")["data"]["status"], "approved")
+
+    def test_production_shot_dependencies_inherit_parent_scene_and_teaser_shots_video_have_own_chain(self):
+        self.production_setup(scenes=("one", "two"))
+        self.api("POST", "/api/projects/film/shots", {
+            "id": "one-shot", "sceneId": "one", "title": "Кадр"}, 201)
+        self.approved_cell("heroes", "two")
+        self.approved_cell("storyboard", "two")
+        shot = self.cell("shots", "one-shot", "shot")
+        self.api("PATCH", f"/api/projects/film/cells/{shot['id']}", {"status": "working"}, 409)
+        self.approved_cell("heroes", "one")
+        self.approved_cell("storyboard", "one")
+        self.api("PATCH", f"/api/projects/film/cells/{shot['id']}", {"status": "working"})
+        video = self.cell("video", "one-shot", "shot")
+        self.api("PATCH", f"/api/projects/film/cells/{video['id']}", {"status": "working"}, 409)
+        self.approved_cell("shots", "one")
+        self.api("PATCH", f"/api/projects/film/cells/{video['id']}", {"status": "working"})
+        teaser = self.cell("shots", "preview", "teaser")
+        self.api("PATCH", f"/api/projects/film/cells/{teaser['id']}", {"status": "working"}, 409)
+        self.approved_cell("heroes", "preview", "teaser")
+        self.approved_cell("storyboard", "preview", "teaser")
+        self.api("PATCH", f"/api/projects/film/cells/{teaser['id']}", {"status": "awaiting"})
+        self.approval(teaser)
+        self.approved_cell("video", "preview", "teaser")
+        self.api("POST", "/api/projects/film/cells", {
+            "object": {"type": "teaser", "id": "preview"}, "stage": "edit", "status": "working"}, 409)
+
+    def test_production_edit_waits_for_video_of_every_scene_and_empty_project_is_blocked(self):
+        self.production_setup(scenes=("one", "two"))
+        for stage in ("heroes", "storyboard", "shots", "video"):
+            self.approved_cell(stage, "one")
+        edit = self.cell("edit", "cut", "episode")
+        path = f"/api/projects/film/cells/{edit['id']}"
+        before = self.project_bytes()
+        self.api("PATCH", path, {"status": "working"}, 409)
+        self.assertEqual(self.project_bytes(), before)
+        for stage in ("heroes", "storyboard", "shots", "video"):
+            self.approved_cell(stage, "two")
+        self.assertEqual(self.api("PATCH", path, {"status": "working"})["data"]["status"], "working")
+        self.create("empty")
+        result = self.api("POST", "/api/projects/empty/cells", {
+            "object": {"type": "episode", "id": "cut"}, "stage": "edit", "status": "working"}, 409)
+        self.assertTrue(result["error"]["message"])
+
+    def test_production_map_and_journals_respect_membership_project_and_section_scope(self):
+        self.production_setup()
+        self.create("other")
+        for resource in ("map", "cells", "approvals", "activity"):
+            with self.subTest(resource=resource):
+                self.api("GET", "/api/projects/film/" + resource, status=401, key=None)
+                self.api("GET", "/api/projects/other/" + resource, status=403, key="temporary-writer")
+        cell = self.cell("heroes", status="awaiting")
+        config = json.loads(self.keys.read_text(encoding="utf-8"))
+        next(k for k in config["keys"] if k["id"] == "director")["sections"] = ["overview"]
+        self.keys.write_text(json.dumps(config), encoding="utf-8")
+        before = self.project_bytes()
+        self.approval(cell, key="temporary-director", status=403)
+        self.assertEqual(self.project_bytes(), before)
+        result = self.api("GET", "/api/projects/film/map", key="temporary-director")["data"]
+        self.assertEqual(result["awaitingMe"], [])
+        self.assertIn(cell["id"], [entry["id"] for entry in result["cells"]])
+        writer_member = next(m for m in self.api("GET", "/api/projects/film/members")["data"]
+                             if m["keyId"] == "writer")
+        self.api("PATCH", f"/api/projects/film/members/{writer_member['id']}", {"sections": ["script"]})
+        self.api("GET", "/api/projects/film/map", status=403, key="temporary-writer")
+        self.api("GET", "/api/projects/film/activity", status=403, key="temporary-writer")
+        director_member = next(m for m in self.api("GET", "/api/projects/film/members")["data"]
+                               if m["keyId"] == "director")
+        self.api("DELETE", f"/api/projects/film/members/{director_member['id']}")
+        before = self.project_bytes()
+        self.approval(cell, key="temporary-director", status=403)
+        self.api("GET", "/api/projects/film/map", status=403, key="temporary-director")
+        self.assertEqual(self.project_bytes(), before)
+
+    def test_production_approvals_and_activity_are_append_only_and_paginated(self):
+        self.production_setup()
+        cell = self.cell("heroes", status="awaiting")
+        approval = self.approval(cell)["data"]
+        before = self.project_bytes()
+        activity = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        for resource, entry_id in (("approvals", approval["id"]), ("activity", activity[0]["id"])):
+            for suffix in ("", "/" + entry_id):
+                for method in ("PUT", "PATCH", "DELETE"):
+                    with self.subTest(resource=resource, suffix=suffix, method=method):
+                        self.api(method, "/api/projects/film/" + resource + suffix, {}, 405)
+                        self.assertEqual(self.project_bytes(), before)
+        self.assertEqual(self.api("GET", f"/api/projects/film/approvals/{approval['id']}")["data"], approval)
+        self.assertEqual(self.api("GET", f"/api/projects/film/activity/{activity[0]['id']}")["data"], activity[0])
+        self.api("POST", "/api/projects/film/activity", {"action": "forged", "keyId": "admin"}, 405)
+        page = self.api("GET", "/api/projects/film/activity?offset=1&limit=2")
+        self.assertEqual(page["data"], activity[1:3])
+        self.assertEqual(page["pagination"], {"offset": 1, "limit": 2, "total": len(activity)})
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals?offset=1&limit=1")["data"], [])
+
+    def test_production_activity_covers_old_and_new_mutations_and_keeps_history_on_restore(self):
+        self.production_setup()
+        initial = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        self.assertEqual(initial[0]["action"], "project.created")
+        self.api("PUT", "/api/projects/film/script", {"text": "Версия до возврата"}, key="temporary-writer")
+        version = self.api("POST", "/api/projects/film/versions", {"label": "Драфт"}, 201)["data"]
+        cell = self.cell("heroes", assignee={"keyId": "artist", "name": "Лена"})
+        self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {"status": "awaiting"}, key="temporary-artist")
+        approval = self.approval(cell, key="temporary-director")["data"]
+        before_restore = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        self.api("POST", f"/api/projects/film/versions/{version['id']}/restore", {}, 201)
+        events = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        self.assertEqual(events[:len(before_restore)], before_restore)
+        self.assertGreater(len(events), len(before_restore))
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], [approval])
+        self.assertEqual(self.api("GET", f"/api/projects/film/cells/{cell['id']}")["data"]["status"], "done")
+        accepted = next(event for event in events if event.get("approvalId") == approval["id"])
+        self.assertEqual(accepted["cellId"], cell["id"])
+        self.assertEqual(accepted["status"], "approved")
+        self.assertEqual(accepted["version"], "v1")
+        self.assertIsNone(accepted["variant"])
+        submitted = next(event for event in events if event["action"] == "cell.updated")
+        self.assertEqual(submitted["status"], "awaiting")
+        self.assertEqual(events[:len(initial)], initial)
+        self.assertEqual([event["sequence"] for event in events], list(range(1, len(events) + 1)))
+        self.assertEqual(len({event["id"] for event in events}), len(events))
+        for i, event in enumerate(events):
+            self.assertRegex(event["hash"], r"^[a-f0-9]{64}$")
+            self.assertRegex(event["contentHash"], r"^[a-f0-9]{64}$")
+            self.assertEqual(event["previousHash"], events[i - 1]["hash"] if i else None)
+            unhashed = {name: value for name, value in event.items() if name != "hash"}
+            canonical = json.dumps(unhashed, ensure_ascii=False, sort_keys=True,
+                                   separators=(",", ":")).encode("utf-8")
+            self.assertEqual(event["hash"], hashlib.sha256(canonical).hexdigest())
+            self.assertTrue(event["keyId"])
+            self.assertIsInstance(event["name"], str)
+            self.assertIsInstance(event["object"], dict)
+            datetime.fromisoformat(event["createdAt"])
+        self.assertIn("writer", [event["keyId"] for event in events])
+        self.assertIn("artist", [event["keyId"] for event in events])
+        self.assertIn("director", [event["keyId"] for event in events])
+        _, _, raw = self.request("GET", "/api/projects/film/activity?limit=100")
+        self.assertNotIn(b"temporary-", raw)
+        self.stop_server()
+        self.start_server()
+        self.assertEqual(self.api("GET", "/api/projects/film/activity?limit=100")["data"], events)
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], [approval])
+
+    def test_production_failed_writes_never_leave_partial_cell_approval_or_event(self):
+        self.production_setup()
+        cell = self.cell("heroes", status="awaiting")
+        before = self.project_bytes()
+        with patch.object(app.os, "replace", side_effect=OSError("имитация отказа диска")):
+            self.approval(cell, status=500)
+        self.assertEqual(self.project_bytes(), before)
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], [])
+        self.assertEqual(self.api("GET", f"/api/projects/film/cells/{cell['id']}")["data"]["status"], "awaiting")
+        with patch.object(app.os, "fsync", side_effect=OSError("имитация отказа fsync")):
+            self.api("PATCH", f"/api/projects/film/cells/{cell['id']}", {"status": "working"}, 500)
+        self.assertEqual(self.project_bytes(), before)
+        with patch.object(app.os, "replace", side_effect=OSError("имитация отказа диска")):
+            self.api("POST", "/api/projects/film/cells", {
+                "object": {"type": "scene", "id": "one"}, "stage": "locations"}, 500)
+        self.assertEqual(self.project_bytes(), before)
+        self.assertEqual(list(self.data.rglob("*.tmp")), [])
+
+    def test_production_legacy_project_gains_empty_map_without_rewriting_on_read(self):
+        self.create()
+        path = self.data / "film" / "project.json"
+        persisted = json.loads(path.read_text(encoding="utf-8"))
+        for field in ("cells", "approvals", "activity"):
+            persisted.pop(field, None)
+        path.write_text(json.dumps(persisted, ensure_ascii=False), encoding="utf-8")
+        before = path.read_bytes()
+        result = self.api("GET", "/api/projects/film/map")["data"]
+        self.assertEqual(result["cells"], [])
+        self.assertEqual(result["myTasks"], [])
+        self.assertEqual(result["awaitingMe"], [])
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], [])
+        self.assertEqual(self.api("GET", "/api/projects/film/activity")["data"], [])
+        self.assertEqual(path.read_bytes(), before)
+        cell = self.cell("script", "legacy-preview", "teaser", status="awaiting")
+        approval = self.approval(cell)["data"]
+        events = self.api("GET", "/api/projects/film/activity")["data"]
+        self.assertEqual(len(events), 2)
+        self.stop_server()
+        self.start_server()
+        self.assertEqual(self.api("GET", "/api/projects/film/map")["data"]["cells"][0]["status"], "approved")
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], [approval])
+        self.assertEqual(self.api("GET", "/api/projects/film/activity")["data"], events)
+
+    def test_production_concurrent_cells_keep_all_operations_in_activity(self):
+        self.production_setup(scenes=())
+        prior = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+
+        def add_cell(number):
+            return self.cell("script", "parallel-%02d" % number, "teaser")["id"]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            ids = set(pool.map(add_cell, range(12)))
+        cells = self.api("GET", "/api/projects/film/map")["data"]["cells"]
+        self.assertEqual({cell["id"] for cell in cells}, ids)
+        events = self.api("GET", "/api/projects/film/activity?limit=100")["data"]
+        self.assertEqual(events[:len(prior)], prior)
+        self.assertEqual(len(events), len(prior) + 12)
+        self.assertEqual([event["sequence"] for event in events], list(range(1, len(events) + 1)))
+
+    def test_production_legacy_shot_approved_cannot_open_map_gates_or_delete_mapped_objects(self):
+        self.production_setup()
+        self.api("POST", "/api/projects/film/shots", {
+            "id": "one-shot", "sceneId": "one", "title": "Кадр"}, 201,
+            "temporary-artist")
+        self.api("PATCH", "/api/projects/film/shots/one-shot", {"status": "approved"},
+                 key="temporary-artist")
+        shots = self.cell("shots")
+        video = self.cell("video")
+        shot_cell = self.cell("video", "one-shot", "shot")
+        before = self.project_bytes()
+        for cell in (shots, video, shot_cell):
+            with self.subTest(stage=cell["stage"], object=cell["object"]):
+                result = self.api("PATCH", f"/api/projects/film/cells/{cell['id']}",
+                                  {"status": "working"}, 409)
+                self.assertEqual(result["error"]["code"], "DEPENDENCY_CONFLICT")
+                self.assertEqual(self.project_bytes(), before)
+        for path in ("/api/projects/film/scenes/one", "/api/projects/film/shots/one-shot"):
+            result = self.api("DELETE", path, status=409)
+            self.assertEqual(result["error"]["code"], "OBJECT_IN_MAP")
+            self.assertEqual(self.project_bytes(), before)
+        self.assertEqual(self.api("GET", "/api/projects/film/shots/one-shot")["data"]["status"], "approved")
+
+    def test_production_content_changes_and_restore_withdraw_current_approvals_without_erasing_history(self):
+        self.production_setup()
+        self.api("POST", "/api/projects/film/shots", {
+            "id": "one-shot", "sceneId": "one", "title": "Кадр"}, 201)
+        version = self.api("POST", "/api/projects/film/versions", {"label": "Исходник"}, 201)["data"]
+        cells = {stage: self.cell(stage) for stage in ("heroes", "storyboard", "shots", "video", "sound")}
+        cells["shot-sound"] = self.cell("sound", "one-shot", "shot")
+        cells["episode-edit"] = self.cell("edit", "cut", "episode")
+        mutations = (
+            ("script", "PUT", "/api/projects/film/script", {"text": "Новый сценарий"}, 200),
+            ("scene", "PATCH", "/api/projects/film/scenes/one", {"text": "Новый текст сцены"}, 200),
+            ("shot", "PATCH", "/api/projects/film/shots/one-shot", {"description": "Другой ракурс"}, 200),
+            ("new-shot", "POST", "/api/projects/film/shots", {
+                "id": "new-shot", "sceneId": "one", "title": "Добавленный кадр"}, 201),
+            ("delete-shot", "DELETE", "/api/projects/film/shots/new-shot", None, 200),
+            ("restore", "POST", f"/api/projects/film/versions/{version['id']}/restore", {}, 201),
+        )
+        for kind, method, path, payload, status in mutations:
+            with self.subTest(kind=kind):
+                # Снова утверждаем текущий результат, чтобы каждый способ изменения
+                # проверял снятие реального актуального апрува, а не уже пустую клетку.
+                for stage in ("heroes", "storyboard", "shots", "video"):
+                    self.api("PATCH", f"/api/projects/film/cells/{cells[stage]['id']}", {"status": "awaiting"})
+                    self.approval(cells[stage])
+                for stage in ("sound", "shot-sound", "episode-edit"):
+                    self.api("PATCH", f"/api/projects/film/cells/{cells[stage]['id']}", {"status": "awaiting"})
+                history = self.api("GET", "/api/projects/film/approvals")["data"]
+                self.api(method, path, payload, status)
+                self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], history)
+                for stage, cell in cells.items():
+                    expected = "done"
+                    if kind in ("shot", "new-shot", "delete-shot") and stage in ("heroes", "storyboard"):
+                        expected = "approved"
+                    elif kind in ("shot", "new-shot", "delete-shot") and stage == "sound":
+                        expected = "awaiting"
+                    elif kind in ("new-shot", "delete-shot") and stage == "shot-sound":
+                        expected = "awaiting"
+                    current = self.api("GET", f"/api/projects/film/cells/{cell['id']}")["data"]
+                    self.assertEqual(current["status"], expected, kind + " / " + stage)
+                video_path = f"/api/projects/film/cells/{cells['video']['id']}"
+                changed = self.api("PATCH", video_path, {
+                    "comment": "Подготовить новую версию", "dueAt": "2026-10-21"})["data"]
+                self.assertEqual(changed["status"], "done")
+                self.assertEqual(changed["comment"], "Подготовить новую версию")
+                self.assertEqual(changed["dueAt"], "2026-10-21")
+                before = self.project_bytes()
+                self.api("PATCH", video_path, {"status": "working"}, 409)
+                self.assertEqual(self.project_bytes(), before)
+
+    def test_production_changed_cell_version_or_approver_withdraws_gate_and_preserves_verdicts(self):
+        self.production_setup()
+        heroes = self.approved_cell("heroes")
+        storyboard = self.approved_cell("storyboard")
+        shots = self.approved_cell("shots")
+        video = self.approved_cell("video")
+        edit = self.cell("edit", "cut", "episode", status="awaiting")
+        history = self.api("GET", "/api/projects/film/approvals")["data"]
+        path = f"/api/projects/film/cells/{storyboard['id']}"
+        revised = self.api("PATCH", path, {"version": "v2"})["data"]
+        self.assertEqual(revised["status"], "done")
+        for cell in (shots, video, edit):
+            self.assertEqual(self.api("GET", f"/api/projects/film/cells/{cell['id']}")["data"]["status"], "done")
+        self.assertEqual(self.api("GET", f"/api/projects/film/cells/{heroes['id']}")["data"]["status"], "approved")
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], history)
+        self.api("PATCH", path, {"status": "awaiting"})
+        self.approval(revised)
+        history = self.api("GET", "/api/projects/film/approvals")["data"]
+        changed = self.api("PATCH", path, {"approverRole": "cinematographer"})["data"]
+        self.assertEqual(changed["status"], "done")
+        self.assertEqual(self.api("GET", "/api/projects/film/approvals")["data"], history)
+        before = self.project_bytes()
+        self.approval(changed, key="temporary-director", status=403)
+        self.assertEqual(self.project_bytes(), before)
+        self.api("PATCH", path, {"status": "awaiting"})
+        self.approval(changed, key="temporary-camera")
 
 
 class AtomicWriteTests(unittest.TestCase):
