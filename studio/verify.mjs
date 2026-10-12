@@ -1664,3 +1664,31 @@ console.log('Actual app passport conflict, retained form, malformed file and imp
 }
 console.log('Actual app committed import lost-response recovery and late file-read navigation protection: passed.');
 await verifyBreakdownModules();
+
+// №45: грамматика голосовых и текстовых команд (studio/golos.js) — разбор без исполнения.
+{
+  const { parseCommand, parseNumber, parseSection, describeCommand } = await import('./golos.js');
+  assert.equal(parseNumber('принять 12.3'), '12.3');
+  assert.equal(parseNumber('вернуть 12-3, свет не совпадает'), '12.3');
+  assert.equal(parseNumber('принять двенадцать три'), '12.3');
+  assert.equal(parseNumber('открой сцену четыре'), '4');
+  assert.equal(parseNumber('двадцать один два'), '21.2');
+  assert.equal(parseNumber('он екі үш'), '12.3');
+  assert.equal(parseSection('открой карту производства'), 'map');
+  assert.equal(parseSection('покажи героев'), 'heroes');
+  assert.equal(parseCommand('принять 12.3').kind, 'accept');
+  assert.equal(parseCommand('принять 12.3').confirm, 'show');
+  const back = parseCommand('вернуть 12.2, свет не совпадает');
+  assert.equal(back.kind, 'return'); assert.equal(back.target, '12.2'); assert.equal(back.tail, 'свет не совпадает');
+  assert.equal(parseCommand('открой карту').section, 'map');
+  assert.equal(parseCommand('открой сцену 4').target, '4');
+  assert.equal(parseCommand('ещё четыре 12.3').confirm, 'price');
+  assert.equal(parseCommand('видео 12.3').confirm, 'price');
+  assert.equal(parseCommand('кто тормозит').kind, 'waiting');
+  assert.equal(parseCommand('қабылдау 12.3').kind, 'accept');
+  assert.equal(parseCommand('почему сцена три скучная').kind, 'ask');
+  assert.equal(parseCommand(''), null);
+  assert.ok(describeCommand(parseCommand('вернуть 12.2, свет не совпадает')).includes('свет не совпадает'));
+  assert.ok(describeCommand(parseCommand('видео 12.3')).includes('«да»'));
+  console.log('Voice/text command grammar: numbers, sections, verbs, confirmations and questions: passed.');
+}

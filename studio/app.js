@@ -5,6 +5,7 @@ import { ProductionMapApi, canApproveCell } from './production-map-api.js';
 import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js';
 import { renderBreakdownSection, renderPassportEditor } from './breakdown.js';
 import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js';
+import { parseCommand, describeCommand } from './golos.js';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -637,7 +638,9 @@ const navGroups = () => ({ script: t('Девелопмент', 'Девелопм
 function navGroupLabel(id) { const title = navGroups()[id]; return title ? `<span class='glabel'>${title}</span>` : ''; }
 function helperStub(p) {
   if (!p) return '';
-  return `<div class='helper-stub' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'><div class='q'><i></i>${t('Помощник проекта: одно окно на все этапы, подключится после ключа модели.', 'Жоба көмекшісі: барлық кезеңге бір терезе, модель кілтінен кейін қосылады.')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span>studio.neyra.vision</span></div></div></div>`;
+  const mic = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+  const micTitle = t('Голос недоступен в этом браузере', 'Бұл браузерде дауыс қолжетімсіз');
+  return `<div class='helper-stub' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'><form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Команда или вопрос: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${t('помощник подключится после ключа модели', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
 }
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Введите ключ участника, чтобы открыть проект команды.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ участника', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
@@ -726,8 +729,39 @@ function persistPreferences() {
   try { localStorage.setItem(storeKey, JSON.stringify(localWorkspace)); }
   catch { toast(t('Не удалось сохранить настройки в браузере.', 'Браузерде параметрлерді сақтау мүмкін болмады.')); }
 }
+function runCommand(text) {
+  const cmd = parseCommand(text);
+  const status = document.querySelector('[data-voice-status]');
+  if (!cmd) return;
+  const say = message => { if (status) status.textContent = message; toast(message); };
+  if (cmd.kind === 'open' && cmd.section) { go(cmd.section); say(describeCommand(cmd, state.locale)); return; }
+  if (cmd.kind === 'open' && cmd.target) { go('breakdown'); say(describeCommand(cmd, state.locale)); return; }
+  if (cmd.kind === 'waiting') { mapFilter = 'awaiting'; go('map'); say(describeCommand(cmd, state.locale)); return; }
+  if (cmd.kind === 'help') { location.href = '../pomoshch/'; return; }
+  if (cmd.kind === 'ask') { say(t('Вопрос записан. Помощник ответит, когда подключится ключ модели.', 'Сұрақ жазылды. Көмекші модель кілті қосылғанда жауап береді.')); return; }
+  if (['accept', 'return', 'review', 'take', 'done', 'note'].includes(cmd.kind)) { go('map'); say(describeCommand(cmd, state.locale) + ' · ' + t('выберите клетку на карте', 'картадан ұяшықты таңдаңыз')); return; }
+  say(describeCommand(cmd, state.locale));
+}
+function listenVoice() {
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Rec) { toast(t('Голос недоступен в этом браузере — напишите команду.', 'Бұл браузерде дауыс қолжетімсіз — команданы жазыңыз.')); return; }
+  const rec = new Rec(); rec.lang = state.locale === 'kk' ? 'kk-KZ' : 'ru-RU'; rec.interimResults = false; rec.maxAlternatives = 1;
+  const status = document.querySelector('[data-voice-status]'); const listening = t('слушаю…', 'тыңдап тұрмын…'); if (status) status.textContent = listening;
+  rec.onresult = event => { const text = event.results[0][0].transcript; const input = document.querySelector('#voice-input'); if (input) input.value = text; runCommand(text); };
+  rec.onerror = () => { if (status) status.textContent = t('не расслышал — повторите или напишите', 'естімедім — қайталаңыз немесе жазыңыз'); };
+  rec.onend = () => { if (status && status.textContent === listening) status.textContent = t('тишина', 'тыныштық'); };
+  try { rec.start(); } catch { toast(t('Микрофон занят или запрещён.', 'Микрофон бос емес немесе тыйым салынған.')); }
+}
+app.addEventListener('submit', event => {
+  if (event.target?.id !== 'voice-form') return;
+  event.preventDefault();
+  const input = event.target.querySelector('#voice-input'); const text = input?.value || '';
+  if (!text.trim()) return;
+  runCommand(text); if (input) input.value = '';
+});
 app.addEventListener('click', async event => {
   if (busy || connecting) return;
+  if (event.target.closest("[data-action='voice']")) { listenVoice(); return; }
   const lang = event.target.closest('[data-lang]');
   if (lang) { state.locale = lang.dataset.lang; persistPreferences(); render(); return; }
   const filter = event.target.closest('[data-map-filter]');
