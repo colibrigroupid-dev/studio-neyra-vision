@@ -229,7 +229,10 @@ def build(slug, proekty, outdir):
                     body = parts[2]
             body = re.sub(r"^#\s+.*$", "", body, count=1, flags=re.M)
             # промпт в <details>
-            body = re.sub(r"\*\*Промпт[^*]*\*\*\s*\n`([^`]+)`", lambda m: f"<details><summary>Показать, что уйдёт в генерацию</summary><code class='promt'>{html.escape(m.group(1))}</code></details>", body)
+            prompts = []
+            def _tok(m):
+                prompts.append(m.group(1)); return f"\n\n@@PROMPT{len(prompts)-1}@@\n\n"
+            body = re.sub(r"\*\*Промпт[^\n]*\*\*\s*\n`([^`]+)`", _tok, body)
             img = None
             for ext in (".jpg", ".jpeg", ".png", ".webp"):
                 c = f.parent / ("portret" + ext) if kind == "geroi" else f.parent / ("plastina" + ext)
@@ -237,7 +240,7 @@ def build(slug, proekty, outdir):
             src = None
             if img:
                 dst = copy_img(img, imgdir, f"{kind[0]}-{f.parent.name}", 1280); src = "img/" + dst.name
-            out.append({"slug": f.parent.name, "meta": meta, "body": body.strip(), "src": src})
+            out.append({"slug": f.parent.name, "meta": meta, "body": body.strip(), "src": src, "prompts": prompts})
         return out
 
     def passports_html():
@@ -253,7 +256,11 @@ def build(slug, proekty, outdir):
             stcls = "g" if st != "chernovik" else "d"
             head = '<div class="pass__frame">' + inner + '<span class="board__st ' + stcls + '">' + st_ru + '</span></div>'
             sub = " · ".join(x for x in (m.get("rol", ""), (m.get("vozrast") and (m.get("vozrast") + " лет")) or "", m.get("tip", ""), m.get("vremya", "")) if x)
-            return f'<article class="pass">{head}<h3>{E(m.get("imya", p["slug"]))}</h3><p class="caps">{E(sub)}</p><div class="doc pass__doc">{md(p["body"])}</div></article>'
+            body_html = md(p["body"])
+            for i, pr in enumerate(p["prompts"]):
+                det = "<details><summary>Показать, что уйдёт в генерацию</summary><code class='promt'>" + html.escape(pr) + "</code></details>"
+                body_html = body_html.replace(f"<p>@@PROMPT{i}@@</p>", det).replace(f"@@PROMPT{i}@@", det)
+            return f'<article class="pass">{head}<h3>{E(m.get("imya", p["slug"]))}</h3><p class="caps">{E(sub)}</p><div class="doc pass__doc">{body_html}</div></article>'
         g = "".join(card(p, "geroi") for p in geroi); l = "".join(card(p, "lokacii") for p in lok)
         return f'<section id="pasporta"><div class="wrap"><p class="caps">Паспорта · герои {len(geroi)} · локации {len(lok)}</p><h2>Кто и где — что никогда не меняется.</h2><p class="muted">Текст «что никогда не меняется» и промпты — черновики редактора; принимает автор. Портреты и пластины появятся после выбора варианта ⭐ — это и будет замок.</p>{("<h3 class=caps style=margin-top:2rem>Герои</h3><div class=passes>" + g + "</div>") if g else ""}{("<h3 class=caps style=margin-top:2rem>Локации</h3><div class=passes>" + l + "</div>") if l else ""}</div></section>'
 
