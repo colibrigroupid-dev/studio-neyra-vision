@@ -100,6 +100,10 @@ body{font-size:16px;line-height:1.5}
 .editor-frame-wrap{margin:0 0 24px;border:1px solid var(--line-soft);border-radius:16px;overflow:hidden;background:var(--surface)}
 .editor-frame{display:block;width:100%;height:min(72vh,820px);border:0;background:var(--surface)}
 @media(max-width:768px){.editor-frame{height:70vh}}
+/* пустой экран проекта (проба по разбору веб-мастера): studio/?prostoy=1 */
+.simple-head{padding:12vh 0 28px}
+.simple-head h1{font:500 clamp(1.75rem,1.4rem + 1.6vw,2.4rem)/1.15 var(--disp);letter-spacing:-.015em;margin:0 0 10px}
+.simple-head .lead{color:var(--muted);max-width:52ch;margin:0}
 /* рабочее поле */
 .work-main{max-width:940px;padding:36px 24px 160px}
 .prototype-note{font:400 .8125rem/1.4 var(--mono);letter-spacing:.04em;color:var(--dim);margin-bottom:24px}
