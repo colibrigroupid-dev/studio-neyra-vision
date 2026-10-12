@@ -4,12 +4,14 @@
     python3 tools/sync-project.py <slug> push      папка → сервер (проект, сценарий + версия, карта производства)
     python3 tools/sync-project.py <slug> pull      сервер → папка (новый драфт файлом, карта в PROEKT.md)
     python3 tools/sync-project.py <slug> status    что различается
+    python3 tools/sync-project.py <slug> razbivka [--draft <файл.fountain>]   разбивка + паспорта → сервер (№21.a: /breakdown, /characters, /locations)
 
 Доступ: ~/.config/neyra-studio/sync.json  →  {"url": "http://127.0.0.1:8770", "key": "…"}  (или переменные NV_URL, NV_KEY).
 Источник правды — папка; сервер — рабочая копия команды. Ничего не затирается: сценарий с сервера ложится новым файлом
 drafty/draft-NN.fountain, карта в PROEKT.md переписывается только внутри таблицы раздела «Карта производства».
 """
 import argparse, json, os, pathlib, re, sys, urllib.request, urllib.error, datetime
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 HOME = pathlib.Path.home()
 PROEKTY = HOME / "Documents/CODE/KINO-STANCIYA/PROEKTY"
@@ -161,6 +163,43 @@ def pull(slug):
         (proj / "PROEKT.md").write_text(write_karta(proekt, rows), encoding="utf-8")
     print(f"карта: клеток на сервере {len(cells)}, обновлено в PROEKT.md {changed}")
 
+
+def razbivka_push(slug, draft=None):
+    """Сценарий → razbivka.json → POST /breakdown; паспорта из KANON.md и карточек → /characters, /locations (по имени, без дублей)."""
+    import razbivka, kanon
+    proj = PROEKTY / slug
+    ensure_project(slug, proj)
+    f = pathlib.Path(draft) if draft else latest_draft(proj)[0]
+    if not f or not f.exists(): sys.exit("нет драфта: укажите --draft <файл.fountain>")
+    d = razbivka.parse(f.read_text(encoding="utf-8"))
+    st, r = api("POST", f"/api/projects/{slug}/breakdown", d)
+    if st == 404: sys.exit("сервер ещё не умеет /breakdown (№21.a у Codex)")
+    if st not in (200, 201): sys.exit(f"разбивка: {st} {r}")
+    rd = r.get("data", {})
+    print(f"разбивка: {st} · сцен {len(d['scenes'])}, героев {len(d['characters'])}, локаций {len(d['locations'])}" + (f" · сервер: {json.dumps(rd, ensure_ascii=False)[:160]}" if rd else ""))
+    K = kanon.read_kanon(proj)
+    if not K: print("канона нет — паспорта на сервер не ушли (python3 tools/kanon.py init)"); return
+    for coll, items, tagp in (("characters", K["heroes"], "@char_"), ("locations", K["locs"], "@loc_")):
+        st, r = api("GET", f"/api/projects/{slug}/{coll}")
+        have = r.get("data", []) if st == 200 else []
+        have = have if isinstance(have, list) else have.get("items", [])
+        by_name = {x.get("name", "").upper(): x for x in have}
+        made = upd = 0
+        for tag, h in items.items():
+            body = {"name": h["imya"], "identity": h["identity"], "taboo": h["taboo"], "refs": [{"path": x.split(" ")[0], "role": "identity" if coll == "characters" else "environment"} for x in h["refs"]],
+                    "status": "locked" if h["refs"] and h["identity"] else "draft"}
+            if coll == "characters" and h.get("height"): body["height"] = h["height"]
+            ex = by_name.get(h["imya"].upper())
+            if ex:
+                diff = {k: v for k, v in body.items() if ex.get(k) != v}
+                if diff:
+                    st, r = api("PATCH", f"/api/projects/{slug}/{coll}/{ex['id']}", diff); upd += (st == 200)
+                    if st != 200: print(f"  {coll} {h['imya']}: {st} {r.get('error', {}).get('message', '')}")
+            else:
+                st, r = api("POST", f"/api/projects/{slug}/{coll}", body); made += (st == 201)
+                if st != 201: print(f"  {coll} {h['imya']}: {st} {r.get('error', {}).get('message', '')}")
+        print(f"{coll}: создано {made}, обновлено {upd}, было {len(have)}")
+
 def status(slug):
     proj = PROEKTY / slug
     st, r = api("GET", f"/api/projects/{slug}")
@@ -170,5 +209,7 @@ def status(slug):
     st, m = api("GET", f"/api/projects/{slug}/map"); print("клеток карты:", len((m.get("data") or {}).get("cells") or []) if st == 200 else st)
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("slug"); ap.add_argument("action", choices=["push", "pull", "status"])
-    a = ap.parse_args(); {"push": push, "pull": pull, "status": status}[a.action](a.slug)
+    ap = argparse.ArgumentParser(); ap.add_argument("slug"); ap.add_argument("action", choices=["push", "pull", "status", "razbivka"]); ap.add_argument("--draft")
+    a = ap.parse_args()
+    if a.action == "razbivka": razbivka_push(a.slug, a.draft)
+    else: {"push": push, "pull": pull, "status": status}[a.action](a.slug)
