@@ -1,3 +1,5 @@
+export const DEFAULT_SERVER_URL = 'https://api.studio.neyra.vision';
+
 export function makeDemo() {
   return {
     title: {

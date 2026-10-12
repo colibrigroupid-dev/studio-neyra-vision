@@ -1,7 +1,9 @@
-import { makeDemo } from './data.js';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js';
 import { frameAt, totalDuration } from './timeline.js';
 import { StudioServer } from './storage.js';
 import { ProductionMapApi, canApproveCell } from './production-map-api.js';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js';
 import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js';
 
 const storeKey = 'neyra-vision-prototype-v1';
@@ -25,6 +27,8 @@ function applyPaperMode() {
   document.documentElement.dataset.scriptPaper = paperMode();
   document.querySelectorAll('[data-paper-mode]').forEach(control => { control.value = paperMode(); });
   document.querySelectorAll('.production-map, .map-dialog').forEach(surface => { surface.dataset.mapMode = paperMode(); });
+  document.querySelectorAll('.cinema-section, .passport-dialog').forEach(surface => { surface.dataset.cinemaMode = paperMode(); });
+  document.querySelectorAll('[data-cinema-mode]').forEach(control => { control.value = paperMode(); });
   const mapControl = document.querySelector('#production-map-mode');
   if (mapControl) mapControl.value = paperMode();
 }
@@ -41,7 +45,7 @@ const local = value => value?.[state.locale] || value?.ru || '';
 const e = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll(String.fromCharCode(39), '&#39;').replaceAll(String.fromCharCode(34), '&quot;');
 const project = () => state.projects[state.activeId];
 const settingsKey = 'neyra-vision-server-settings-v1';
-let settings = { url: 'http://127.0.0.1:8770', key: '' };
+let settings = { url: DEFAULT_SERVER_URL, key: '' };
 try { settings = { ...settings, ...JSON.parse(localStorage.getItem(settingsKey)) }; } catch { /* Device settings are optional. */ }
 let localWorkspace = state;
 let serverClient = null;
@@ -57,6 +61,10 @@ let busy = false;
 let mapState = { client: null, slug: '', snapshot: null, loading: false, ready: false, error: '', token: 0 };
 let mapFilter = 'all';
 let mapCard = null;
+const cinemaPages = ['breakdown', 'heroes', 'locations'];
+let cinemaState = { client: null, slug: '', snapshot: null, loading: false, ready: false, error: '', token: 0 };
+let passportCard = null;
+let importCard = null;
 const storageLabel = () => connecting ? t('подключение к серверу…', 'серверге қосылу…') : serverClient ? storageError ? t('ошибка сохранения', 'сақтау қатесі') : pendingWrites || draftTimer || busy ? t('сохраняется на сервере…', 'серверде сақталуда…') : t('сохранено на сервере', 'серверде сақталды') : t('только в этом браузере', 'тек осы браузерде');
 function updateStorageLabel() {
   document.querySelectorAll('[data-storage-label]').forEach(el => { el.textContent = storageLabel(); });
@@ -230,7 +238,7 @@ const stages = () => [
   { id: 'team', title: t('Команда', 'Команда'), short: t('Один проект для всех', 'Бәріне ортақ бір жоба'), description: t('Режиссёр, сценарист, художник и продюсер работают в разделах одного проекта. У каждого понятная роль и зона ответственности.', 'Режиссер, сценарист, суретші мен продюсер бір жобаның бөлімдерінде жұмыс істейді. Әркімнің рөлі мен міндеті айқын.'), result: t('Участники · роли · доступ к разделам', 'Қатысушылар · рөлдер · бөлімдерге қолжетімділік') },
   { id: 'post', title: t('Постпродакшен', 'Постпродакшн'), short: t('Фильм становится целым', 'Фильм біртұтас туындыға айналады'), description: t('Планируйте монтаж, цвет, звук и VFX. Соберите работу отделов в один процесс завершения фильма.', 'Монтажды, түсті, дыбысты және VFX жұмыстарын жоспарлаңыз. Бөлімдердің жұмысын фильмді аяқтаудың ортақ үдерісіне біріктіріңіз.'), result: t('Монтаж · звук · цвет · VFX', 'Монтаж · дыбыс · түс · VFX') }
 ];
-const navItems = () => [{ id: 'overview', title: t('Обзор проекта', 'Жобаға шолу') }, { id: 'map', title: t('Карта производства', 'Өндіріс картасы') }, ...stages()];
+const navItems = () => [{ id: 'overview', title: t('Обзор проекта', 'Жобаға шолу') }, { id: 'map', title: t('Карта производства', 'Өндіріс картасы') }, ...stages().flatMap(stage => stage.id === 'script' ? [stage, ...cinemaPages.map(id => ({ id, title: ({ breakdown: t('Разбивка', 'Сценарийді талдау'), heroes: t('Герои', 'Кейіпкерлер'), locations: t('Локации', 'Локациялар') })[id] }))] : [stage])];
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 4000); }
 function download(name, value, type = 'text/plain;charset=utf-8') { const url = URL.createObjectURL(new Blob(['\uFEFF', value], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function demoOpen() { if (!serverClient && state.projects.demo) state.activeId = 'demo'; go('overview'); }
@@ -241,7 +249,7 @@ function stopPlayback() { if (playback) clearInterval(playback); playback = null
 function landing() {
   const steps = stages();
   return `<header class='section-shell'><div class='site-nav'>${brand()}<nav aria-label='${t('Главное меню', 'Негізгі мәзір')}'><a href='#process'>${t('Процесс', 'Үдеріс')}</a><a href='#project'>${t('Пространство проекта', 'Жоба кеңістігі')}</a><a href='#about'>${t('О платформе', 'Платформа туралы')}</a></nav><div class='nav-actions'>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}${btn(t('В студию', 'Студияға'), 'demo', false, 'arrow')}</div></div></header>
-  <main><section class='hero'><img class='hero-image' src='assets/hero.jpg' alt='${t('Горы Заилийского Алатау на рассвете', 'Таңғы Іле Алатауы')}' fetchpriority='high'><div class='hero-content'><div class='eyebrow'>${t('КИНОПЛАТФОРМА · КАЗАХСТАН', 'КИНО ПЛАТФОРМАСЫ · ҚАЗАҚСТАН')}</div><h1>${t('От первой строки<br>до <em>финального кадра.</em>', 'Алғашқы жолдан<br><em>соңғы кадрға дейін.</em>')}</h1><p>${t('Ваша история. Ваша команда. Одно пространство.<br>Сценарий, изображения и ИИматик — начало пути к фильму, который вы создаёте вместе.', 'Сіздің оқиғаңыз. Сіздің командаңыз. Ортақ кеңістік.<br>Сценарий, суреттер және ЖИ-аниматик — бірге түсіретін фильмге бастайтын жол.')}</p><div class='hero-buttons'>${btn(t('Создать проект', 'Жоба құру'), 'create', true, 'plus')}${btn(t('Открыть демопроект', 'Демо жобаны ашу'), 'demo', false, 'arrow')}</div><div class='hero-foot'><span class='line'></span><span>${t('СЦЕНАРИЙ → КАДР → ФИЛЬМ', 'СЦЕНАРИЙ → КАДР → ФИЛЬМ')}</span></div></div><div class='shot-label'>NEYRA.VISION / 001<br>${t('ВИЗУАЛЬНЫЙ РЕФЕРЕНС · АЛМАТЫ', 'ВИЗУАЛДЫ РЕФЕРЕНС · АЛМАТЫ')}</div></section>
+  <main>${participantHint()}<section class='hero'><img class='hero-image' src='assets/hero.jpg' alt='${t('Горы Заилийского Алатау на рассвете', 'Таңғы Іле Алатауы')}' fetchpriority='high'><div class='hero-content'><div class='eyebrow'>${t('КИНОПЛАТФОРМА · КАЗАХСТАН', 'КИНО ПЛАТФОРМАСЫ · ҚАЗАҚСТАН')}</div><h1>${t('От первой строки<br>до <em>финального кадра.</em>', 'Алғашқы жолдан<br><em>соңғы кадрға дейін.</em>')}</h1><p>${t('Ваша история. Ваша команда. Одно пространство.<br>Сценарий, изображения и ИИматик — начало пути к фильму, который вы создаёте вместе.', 'Сіздің оқиғаңыз. Сіздің командаңыз. Ортақ кеңістік.<br>Сценарий, суреттер және ЖИ-аниматик — бірге түсіретін фильмге бастайтын жол.')}</p><div class='hero-buttons'>${btn(t('Создать проект', 'Жоба құру'), 'create', true, 'plus')}${btn(t('Открыть демопроект', 'Демо жобаны ашу'), 'demo', false, 'arrow')}</div><div class='hero-foot'><span class='line'></span><span>${t('СЦЕНАРИЙ → КАДР → ФИЛЬМ', 'СЦЕНАРИЙ → КАДР → ФИЛЬМ')}</span></div></div><div class='shot-label'>NEYRA.VISION / 001<br>${t('ВИЗУАЛЬНЫЙ РЕФЕРЕНС · АЛМАТЫ', 'ВИЗУАЛДЫ РЕФЕРЕНС · АЛМАТЫ')}</div></section>
   <section class='intro-strip section-shell'><h2>${t('Один проект.<br>Вся команда. Каждый кадр.', 'Бір жоба.<br>Бүкіл команда. Әр кадр.')}</h2><p>${t('Фильм не складывается из разрозненных файлов. Ему нужны общий сценарий, понятные этапы и место, где видно работу над каждой сценой. neyra.vision связывает этот процесс — от первого замысла до постпродакшена.', 'Фильм шашыраңқы файлдардан құралмайды. Оған ортақ сценарий, айқын кезеңдер және әр көріністің жұмысын бақылауға болатын кеңістік қажет. neyra.vision алғашқы ойдан постпродакшнға дейінгі үдерісті байланыстырады.')}</p></section>
   <section class='section section-shell' id='process'><div class='eyebrow'>01 / ${t('ОТ ИСТОРИИ К ФИЛЬМУ', 'ОҚИҒАДАН ФИЛЬМГЕ')}</div><div class='section-heading'><h2>${t('Двигаемся по этапам.<br>Сохраняем целое.', 'Кезең-кезеңімен алға.<br>Ортақ ойды сақтаймыз.')}</h2><p>${t('Начинаем со сценария. Каждый следующий этап опирается на принятые решения.', 'Сценарийден бастаймыз. Әр келесі кезең қабылданған шешімдерге сүйенеді.')}</p></div><div class='process-grid'>${steps.map((s, i) => `<button class='process-item ${i === processStep ? 'active' : ''}' data-step='${i}' aria-pressed='${i === processStep}'><span class='num'>0${i + 1}</span><h3>${s.title}</h3><p>${s.short}</p></button>`).join('')}</div><div class='process-detail'><div><span class='eyebrow'>${t('ЭТАП', 'КЕЗЕҢ')} 0${processStep + 1}</span><h3>${steps[processStep].title}</h3><p>${steps[processStep].description}</p></div><div class='process-result'><small>${t('ЧТО ПЕРЕХОДИТ ДАЛЬШЕ', 'КЕЛЕСІ КЕЗЕҢГЕ НЕ ӨТЕДІ')}</small><div>${steps[processStep].result}</div><a class='btn small' href='#/studio/${steps[processStep].id}'>${t('Посмотреть в прототипе', 'Прототиптен көру')}${icon('arrow')}</a></div></div></section>
   <section class='section section-shell' id='project'><div class='project-showcase'><div class='project-preview'><div class='preview-top'><span>neyra.vision / studio</span><span class='muted'>${t('ДЕМОПРОЕКТ', 'ДЕМО ЖОБА')}</span></div><div class='preview-photo'><img src='assets/hero.jpg' alt='' loading='lazy'><h3>${t('Там, где начинается свет', 'Жарық бастау алған жер')}</h3></div><div class='preview-tabs'><span>${t('Обзор', 'Шолу')}</span><span>${t('Сценарий', 'Сценарий')}</span><span>${t('Раскадровка', 'Кадрлық жоспар')}</span><span>${t('Команда', 'Команда')}</span></div></div><div class='showcase-copy'><div class='eyebrow'>02 / ${t('ПРОЕКТ В ЦЕНТРЕ', 'ОРТАҚ ЖОБА')}</div><h2>${t('У вашей истории<br>есть своё пространство.', 'Оқиғаңыздың<br>өз кеңістігі бар.')}</h2><p>${t('Страница проекта — рабочий центр фильма. Здесь встречаются творческий замысел, материалы и люди, которые превращают их в кино.', 'Жоба беті — фильмнің жұмыс орталығы. Мұнда шығармашылық ой, материалдар және оларды киноға айналдыратын адамдар тоғысады.')}</p><ul class='text-list'><li>${icon('check')}${t('Сцены и версии сценария', 'Көріністер мен сценарий нұсқалары')}</li><li>${icon('check')}${t('Отдельная карточка каждого кадра', 'Әр кадрдың жеке карточкасы')}</li><li>${icon('check')}${t('Роли, комментарии и согласования', 'Рөлдер, пікірлер және келісу')}</li></ul>${btn(t('Исследовать демопроект', 'Демо жобамен танысу'), 'demo', true, 'arrow')}</div></div></section>
@@ -424,22 +432,183 @@ async function submitMapApproval(form, data, verdict) {
     showMapCardError(`${reason} ${t('Обновите карточку перед новым решением.', 'Жаңа шешім алдында карточканы жаңартыңыз.')}`, true);
   }
 }
+function cinemaPage(section) {
+  if (cinemaState.client !== serverClient || cinemaState.slug !== state.activeId) {
+    cinemaState = { client: serverClient, slug: state.activeId, snapshot: null, loading: false, ready: false, error: '', token: cinemaState.token + 1 };
+    passportCard = null; importCard = null;
+  }
+  const ready = Boolean(serverClient && cinemaState.ready && !cinemaState.loading && !cinemaState.error);
+  return renderBreakdownSection({ section, snapshot: cinemaState.snapshot, locale: state.locale, mode: paperMode(),
+    connected: Boolean(serverClient), loading: cinemaState.loading || Boolean(serverClient && !cinemaState.ready && !cinemaState.error), error: cinemaState.error,
+    canImport: ready && canWriteBreakdownSection(project(), 'breakdown'),
+    canEdit: ready && canWriteBreakdownSection(project(), section) });
+}
+function cinemaError(error) {
+  if ([401, 403].includes(error.status)) return t('Нет доступа. Проверьте ключ и права у руководителя проекта.', 'Қолжетімділік жоқ. Кілт пен құқықтарды жоба жетекшісінен тексеріңіз.');
+  if (error.status === 409) return t('Проект изменился. Обновите раздел перед новой правкой.', 'Жоба өзгерді. Жаңа түзету алдында бөлімді жаңартыңыз.');
+  if (error.status === 0) return t('Сервер не подтвердил результат. Обновите раздел перед повторным действием.', 'Сервер нәтижені растаған жоқ. Әрекетті қайталамас бұрын бөлімді жаңартыңыз.');
+  return error.message || t('Не удалось загрузить раздел.', 'Бөлімді жүктеу мүмкін болмады.');
+}
+async function refreshCinema() {
+  const client = serverClient, slug = state.activeId;
+  if (!client || !project() || !cinemaPages.includes(route())) return false;
+  cinemaState.client = client; cinemaState.slug = slug;
+  const token = ++cinemaState.token;
+  const current = () => client === serverClient && slug === state.activeId && token === cinemaState.token && cinemaPages.includes(route());
+  cinemaState.loading = true; cinemaState.ready = false; cinemaState.error = ''; passportCard = null; importCard = null;
+  render();
+  try {
+    if (!await flushDraft()) throw new Error(t('Сначала сохраните текущий сценарий.', 'Алдымен ағымдағы сценарийді сақтаңыз.'));
+    if (!current()) return false;
+    let snapshot, record, isolated;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      snapshot = await new BreakdownApi(client).load(slug);
+      if (!current()) return false;
+      record = state.projects[slug];
+      if (record?._revision !== snapshot.revision || !client.known.has(slug)
+          || snapshot.principal && JSON.stringify(record?._principal) !== JSON.stringify(snapshot.principal)) {
+        isolated = new StudioServer({ url: client.url, key: client.key, fetchImpl: client.fetchImpl });
+        record = await isolated.loadProject(slug);
+        if (!current()) return false;
+      }
+      if (record?._revision === snapshot.revision) break;
+      if (attempt === 2) throw Object.assign(new Error('REVISION_CONFLICT'), { status: 409 });
+    }
+    if (!current()) return false;
+    if (isolated) client.known.set(slug, structuredClone(record));
+    state.projects[slug] = record;
+    cinemaState.snapshot = snapshot; cinemaState.ready = true;
+    return true;
+  } catch (error) {
+    if (current()) { cinemaState.snapshot = null; cinemaState.error = cinemaError(error); }
+    return false;
+  } finally {
+    if (current()) { cinemaState.loading = false; render(); }
+  }
+}
+function showPassportError(message, disable = false) {
+  const node = dialog.querySelector('[data-passport-error]');
+  if (node) { node.textContent = message; node.hidden = false; }
+  if (disable) dialog.querySelectorAll('button[type="submit"]').forEach(button => { button.disabled = true; });
+  toast(message);
+}
+async function passportDialog(collection, id) {
+  const section = collection === 'characters' ? 'heroes' : collection === 'locations' ? 'locations' : '';
+  if (!serverClient || !section || route() !== section || !canWriteBreakdownSection(project(), section)) return;
+  if (!await refreshCinema() || !canWriteBreakdownSection(project(), section) || route() !== section) return;
+  const record = cinemaState.snapshot?.[collection]?.find(item => item.id === id);
+  if (!record) return;
+  openDialog(`${dialogHead(t('Паспорт', 'Паспорт'))}${renderPassportEditor({ record, collection, locale: state.locale })}`);
+  dialog.classList.add('passport-dialog'); dialog.dataset.cinemaMode = paperMode();
+  passportCard = { client: serverClient, slug: state.activeId, section, collection, record: structuredClone(record), revision: cinemaState.snapshot.revision, token: cinemaState.token };
+}
+function passportPatch(record, data) {
+  const sceneValues = String(data.get('scenes') || '').trim().split(/[,;\s]+/).filter(Boolean);
+  if (sceneValues.some(value => !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1 || Number(value) > 1000000)) {
+    throw new Error(t('Укажите номера сцен целыми числами через запятую.', 'Көрініс нөмірлерін үтір арқылы бүтін сандармен жазыңыз.'));
+  }
+  const taboo = String(data.get('taboo') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+  if (taboo.length > 10 || taboo.some(value => value.length > 500)) throw new Error(t('Допустимо до 10 табу-деталей, каждая до 500 символов.', 'Әрқайсысы 500 таңбадан аспайтын 10 тыйым салынған бөлшекке дейін рұқсат етіледі.'));
+  const next = { name: String(data.get('name') || '').trim(), role: String(data.get('role') || ''), identity: String(data.get('identity') || ''),
+    taboo, height: String(data.get('height') || ''), status: data.get('status'), scenes: [...new Set(sceneValues.map(Number))] };
+  if (!next.name || !['draft', 'locked'].includes(next.status)) throw new Error(t('Укажите имя и статус паспорта.', 'Паспорт атауы мен мәртебесін көрсетіңіз.'));
+  // PATCH only edited base fields; references and both translation objects stay
+  // on the server, including fields that this editor does not expose.
+  return Object.fromEntries(Object.entries(next).filter(([field, value]) => JSON.stringify(value) !== JSON.stringify(record[field] ?? (['taboo', 'scenes'].includes(field) ? [] : ''))));
+}
+function invalidateMap(client, slug) {
+  if (mapState.client !== client || mapState.slug !== slug) return;
+  mapState.token += 1; mapState.ready = false; mapState.loading = false; mapState.error = ''; mapCard = null;
+}
+async function submitPassport(form, data) {
+  const card = passportCard;
+  const current = () => card && passportCard === card && card.client === serverClient && card.slug === state.activeId && card.token === cinemaState.token && route() === card.section;
+  if (!card || card.client !== serverClient || card.slug !== state.activeId || card.token !== cinemaState.token || route() !== card.section
+      || form.dataset.passportId !== card.record.id || form.dataset.passportCollection !== card.collection
+      || !canWriteBreakdownSection(project(), card.section)) {
+    showPassportError(t('Обновите карточку и проверьте права.', 'Карточканы жаңартып, құқықтарды тексеріңіз.'), true); return;
+  }
+  try {
+    const patch = passportPatch(card.record, data);
+    if (!Object.keys(patch).length) { dialog.close(); return; }
+    if (!await flushDraft() || project()?._revision !== card.revision) throw Object.assign(new Error('REVISION_CONFLICT'), { status: 409 });
+    const result = await new BreakdownApi(card.client).patchPassport(card.slug, card.collection, card.record.id, patch, card.revision);
+    const known = card.client.known.get(card.slug), record = state.projects[card.slug];
+    if (known?._revision === card.revision) known._revision = result.revision;
+    if (record?._revision === card.revision) record._revision = result.revision;
+    invalidateMap(card.client, card.slug);
+    if (!current()) return;
+    passportCard = null; dialog.close();
+    const refreshed = await refreshCinema();
+    toast(refreshed ? t('Паспорт сохранён на сервере.', 'Паспорт серверде сақталды.') : t('Паспорт сохранён. Обновите раздел, чтобы увидеть результат.', 'Паспорт сақталды. Нәтижені көру үшін бөлімді жаңартыңыз.'));
+  } catch (error) {
+    if (!current()) return;
+    // Keep the typed form on validation or write failure. Unknown write results
+    // require explicit reload, never an automatic PATCH replay.
+    const reload = [0, 401, 403, 409, 200].includes(error.status);
+    if (reload) { passportCard = null; cinemaState.ready = false; cinemaState.error = cinemaError(error); }
+    showPassportError(cinemaError(error), reload);
+  }
+}
+async function breakdownImportDialog() {
+  if (!serverClient || !canWriteBreakdownSection(project(), 'breakdown') || !cinemaPages.includes(route())) return;
+  if (!await refreshCinema() || !canWriteBreakdownSection(project(), 'breakdown')) return;
+  openDialog(`${dialogHead(t('Импортировать разбивку', 'Сценарий талдауын импорттау'))}<form id='breakdown-import-form'><label for='breakdown-file'>razbivka.json</label><input id='breakdown-file' name='file' type='file' accept='.json,application/json' required><p>${t('Выберите razbivka.json. Сцены и паспорта будут обновлены; заполненные замки и авторский текст сохранятся.', 'razbivka.json файлын таңдаңыз. Көріністер мен паспорттар жаңартылады; толтырылған бекітілген сипаттамалар мен автор мәтіні сақталады.')}</p><p data-passport-error role='alert' hidden></p>${dialogActions(t('Импортировать', 'Импорттау'))}</form>`);
+  dialog.classList.add('passport-dialog'); dialog.dataset.cinemaMode = paperMode();
+  importCard = { client: serverClient, slug: state.activeId, revision: cinemaState.snapshot.revision, token: cinemaState.token };
+}
+async function submitBreakdownImport(data) {
+  const card = importCard;
+  const current = () => card && card === importCard && card.client === serverClient && card.slug === state.activeId && card.token === cinemaState.token && cinemaPages.includes(route());
+  if (!current() || !canWriteBreakdownSection(project(), 'breakdown')) { showPassportError(t('Обновите раздел и проверьте право импорта.', 'Бөлімді жаңартып, импорттау құқығын тексеріңіз.'), true); return; }
+  let submitted = false;
+  try {
+    const file = data.get('file');
+    if (!file || typeof file.text !== 'function' || !file.size) throw new Error(t('Выберите файл razbivka.json.', 'razbivka.json файлын таңдаңыз.'));
+    if (file.size > 2 * 1024 * 1024) throw new Error(t('Файл больше 2 МиБ.', 'Файл 2 МиБ-тан үлкен.'));
+    const source = await file.text();
+    if (!current()) return;
+    let payload;
+    try { payload = JSON.parse(source.replace(/^\uFEFF/, '')); }
+    catch { throw new Error(t('В файле некорректный JSON.', 'Файлдағы JSON дұрыс емес.')); }
+    if (!await flushDraft() || !current()) return;
+    if (!canWriteBreakdownSection(project(), 'breakdown') || project()?._revision !== card.revision) throw Object.assign(new Error('REVISION_CONFLICT'), { status: 409 });
+    submitted = true;
+    await new BreakdownApi(card.client).import(card.slug, payload, card.revision);
+    // An import changes scene/shot data. Discard the old save baseline so that
+    // a later save cannot derive an author draft from stale scene collections.
+    card.client.known.delete(card.slug); invalidateMap(card.client, card.slug);
+    if (!current()) return;
+    importCard = null; dialog.close();
+    const refreshed = await refreshCinema();
+    toast(refreshed ? t('Разбивка импортирована на сервер.', 'Сценарий талдауы серверге импортталды.') : t('Разбивка импортирована. Обновите раздел, чтобы увидеть результат.', 'Сценарий талдауы импортталды. Нәтижені көру үшін бөлімді жаңартыңыз.'));
+  } catch (error) {
+    if (!current()) return;
+    const reload = submitted && error.status !== 422 && error.status !== 413;
+    if (reload) { importCard = null; cinemaState.ready = false; cinemaState.error = cinemaError(error); }
+    showPassportError(cinemaError(error), reload);
+  }
+}
 function workspace(page) {
   const p = project();
-  const pages = { overview, map: productionMapPage, script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
+  const pages = { overview, map: productionMapPage, breakdown: () => cinemaPage('breakdown'), heroes: () => cinemaPage('heroes'), locations: () => cinemaPage('locations'), script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
   if (!pages[page]) page = 'overview';
-  const section = page === 'map' ? 'overview' : ['storyboard', 'shots', 'animatic'].includes(page) ? 'shots' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
-  const denied = p?._denied?.includes(section);
+  const section = ['map', 'heroes', 'locations'].includes(page) ? 'overview' : page === 'breakdown' ? 'script' : ['storyboard', 'shots', 'animatic'].includes(page) ? 'shots' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
+  const denied = !cinemaPages.includes(page) && p?._denied?.includes(section);
   const content = !p ? `<div class='empty'><h1>${t('Нет доступных проектов', 'Қолжетімді жобалар жоқ')}</h1><p>${t('Создайте проект ключом администратора, режиссёра или продюсера. Для входа в существующий проект попросите руководителя выдать ключ участника.', 'Әкімші, режиссер немесе продюсер кілтімен жоба құрыңыз. Бар жобаға кіру үшін жетекшіден қатысушы кілтін сұраңыз.')}</p>${btn(t('Создать проект', 'Жоба құру'), 'create', true, 'plus')}</div>` : denied ? `<div class='empty'><h1>${t('Нет доступа к разделу', 'Бөлімге қолжетімділік жоқ')}</h1><p>${t('Сервер проверяет роль и разделы участника. Попросите руководителя изменить ваши права в разделе «Команда».', 'Сервер қатысушының рөлі мен бөлімдерін тексереді. Жетекшіден «Команда» бөлімінде құқықтарыңызды өзгертуді сұраңыз.')}</p></div>` : pages[page]();
-  return `<div class='workspace ${page === 'map' ? 'map-workspace' : ''}'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('РАБОЧЕЕ ПРОСТРАНСТВО', 'ЖҰМЫС КЕҢІСТІГІ')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}</a>`).join('')}</nav><div class='side-foot'>studio.neyra.vision<br>${t('СЦЕНАРИЙ → КАДР → ФИЛЬМ', 'СЦЕНАРИЙ → КАДР → ФИЛЬМ')}</div></aside><main class='work-main'><div class='prototype-note'>${t('ПРОТОТИП · Генерация изображений и видео пока не подключена.', 'ПРОТОТИП · Сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${content}</main></div></div>`;
+  return `<div class='workspace ${page === 'map' ? 'map-workspace' : cinemaPages.includes(page) ? 'cinema-workspace' : ''}'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('РАБОЧЕЕ ПРОСТРАНСТВО', 'ЖҰМЫС КЕҢІСТІГІ')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}</a>`).join('')}</nav><div class='side-foot'>studio.neyra.vision<br>${t('СЦЕНАРИЙ → КАДР → ФИЛЬМ', 'СЦЕНАРИЙ → КАДР → ФИЛЬМ')}</div></aside><main class='work-main'><div class='prototype-note'>${t('ПРОТОТИП · Генерация изображений и видео пока не подключена.', 'ПРОТОТИП · Сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}</main></div></div>`;
 }
 
-function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog', 'map-dialog'); dialog.innerHTML = html; dialog.showModal(); }
+function participantHint() {
+  return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Введите ключ участника, чтобы открыть проект команды.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ участника', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
+}
+function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog', 'map-dialog', 'passport-dialog', 'server-dialog'); dialog.innerHTML = html; dialog.showModal(); }
 const dialogHead = (title, subtitle = '') => `<div class='dialog-header'><div><div class='eyebrow'>NEYRA.VISION / STUDIO</div><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div><button class='icon-btn' data-close aria-label='${t('Закрыть', 'Жабу')}'>${icon('close')}</button></div>`;
 const dialogActions = label => `<div class='dialog-actions'><button type='button' class='btn' data-close>${t('Отмена', 'Бас тарту')}</button><button type='submit' class='btn primary'>${label}${icon('arrow')}</button></div>`;
 function createDialog() { openDialog(`${dialogHead(t('Начнём новую историю.', 'Жаңа оқиғаны бастайық.'), t('Ваш текущий проект останется в списке проектов.', 'Қазіргі жобаңыз жобалар тізімінде сақталады.'))}<form id='create-form'>${serverClient ? `<label for='project-slug'>${t('Код проекта (латиница)', 'Жоба коды (латынша)')}</label><input id='project-slug' name='slug' maxlength='64'><small>${t('Необязательно. Этот код задаёт проект в правах ключа; пустое поле создаст новый код автоматически.', 'Міндетті емес. Бұл код кілт құқықтарындағы жобаны белгілейді; бос өріс жаңа кодты автоматты түрде жасайды.')}</small>` : ''}<label for='project-title'>${t('Название проекта', 'Жоба атауы')}</label><input id='project-title' name='title' required maxlength='120' placeholder='${t('Название вашего фильма', 'Фильміңіздің атауы')}'><label for='project-synopsis'>${t('О чём ваша история?', 'Оқиғаңыз не туралы?')}</label><textarea id='project-synopsis' name='synopsis' rows='3' maxlength='4000'></textarea>${dialogActions(t('Создать проект', 'Жоба құру'))}</form>`); }
 function serverDialog() {
-  openDialog(`${dialogHead(t('Сервер', 'Сервер'), t('Адрес и ключ роли сохраняются только на этом устройстве.', 'Мекенжай мен рөл кілті тек осы құрылғыда сақталады.'))}<form id='server-form'><label for='server-url'>${t('Сервер', 'Сервер')}</label><input id='server-url' name='url' type='url' required value='${e(settings.url)}'><label for='server-key'>${t('Ключ роли', 'Рөл кілті')} (X-Key)</label><input id='server-key' name='key' type='password' autocomplete='off' maxlength='512' value='${e(settings.key)}'><p class='access-note'>${t('Введите ключ, полученный от руководителя проекта. В разделе «Команда» руководитель добавляет участников и выдаёт ключи. Пустой ключ включает локальный режим; локальные проекты сохраняются отдельно.', 'Жоба жетекшісінен алған кілтті енгізіңіз. Жетекші «Команда» бөлімінде қатысушыларды қосып, кілттер береді. Бос кілт жергілікті режимді қосады; жергілікті жобалар бөлек сақталады.')}</p>${dialogActions(t('Сохранить и подключиться', 'Сақтау және қосылу'))}</form>`);
+  openDialog(`${dialogHead(t('Сервер', 'Сервер'), t('Адрес и ключ роли сохраняются только на этом устройстве.', 'Мекенжай мен рөл кілті тек осы құрылғыда сақталады.'))}<form id='server-form'><label for='server-url'>${t('Сервер', 'Сервер')}</label><input id='server-url' name='url' type='url' required value='${e(settings.url)}'><label for='server-key'>${t('Ключ участника', 'Қатысушы кілті')}</label><input id='server-key' name='key' type='password' autocomplete='off' maxlength='512' placeholder='${t('Введите ключ участника', 'Қатысушы кілтін енгізіңіз')}' value='${e(settings.key)}'><p class='access-note'>${t('Введите ключ, полученный от руководителя проекта. В разделе «Команда» руководитель добавляет участников и выдаёт ключи. Пустой ключ включает локальный режим; локальные проекты сохраняются отдельно.', 'Жоба жетекшісінен алған кілтті енгізіңіз. Жетекші «Команда» бөлімінде қатысушыларды қосып, кілттер береді. Бос кілт жергілікті режимді қосады; жергілікті жобалар бөлек сақталады.')}</p>${dialogActions(t('Сохранить и подключиться', 'Сақтау және қосылу'))}</form>`);
+  dialog.classList.add('server-dialog');
 }
 function memberDialog(id = '') {
   if (!canManageTeam()) return;
@@ -544,6 +713,12 @@ app.addEventListener('click', async event => {
   const p = project();
   if (action === 'server') serverDialog();
   else if (action === 'refresh-map') await refreshProductionMap();
+  else if (action === 'refresh-breakdown') await runOperation(() => refreshCinema());
+  else if (action === 'import-breakdown') await runOperation(() => breakdownImportDialog());
+  else if (action === 'edit-passport') {
+    const control = event.target.closest('[data-action]');
+    await runOperation(() => passportDialog(control.dataset.passportCollection, control.dataset.passportId));
+  }
   else if (action === 'demo') demoOpen();
   else if (action === 'create') createDialog();
   else if (['script', 'storyboard', 'team'].includes(action)) go(action);
@@ -591,7 +766,7 @@ app.addEventListener('input', event => {
   if (event.target.id === 'play-seek') { playTime = Number(event.target.value); updatePlayer(); }
 });
 app.addEventListener('change', async event => {
-  if (event.target.id === 'script-paper-mode' || event.target.id === 'production-map-mode') {
+  if (event.target.id === 'script-paper-mode' || event.target.id === 'production-map-mode' || event.target.hasAttribute?.('data-cinema-mode')) {
     if (!['light', 'graphite'].includes(event.target.value)) return;
     paperPreference = event.target.value;
     applyPaperMode();
@@ -677,6 +852,12 @@ dialog.addEventListener('click', async event => {
 dialog.addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.target; const data = new FormData(form);
+  if (form.id === 'passport-form') {
+    await runOperation(() => submitPassport(form, data)); return;
+  }
+  if (form.id === 'breakdown-import-form') {
+    await runOperation(() => submitBreakdownImport(data)); return;
+  }
   if (form.id === 'map-approval-form') {
     await runOperation(() => submitMapApproval(form, data, event.submitter?.value || data.get('verdict'))); return;
   }
@@ -748,7 +929,7 @@ dialog.addEventListener('submit', async event => {
 dialog.addEventListener('close', () => {
   // A close event can arrive after this native dialog has already reopened.
   if (dialog.open) return;
-  mapCard = null;
+  mapCard = null; passportCard = null; importCard = null;
   const issued = Boolean(dialog.dataset.memberKey);
   if (issued) { dialog.innerHTML = ''; delete dialog.dataset.memberKey; }
   if (lastFocus?.isConnected) lastFocus.focus();
@@ -758,9 +939,11 @@ function render() {
   stopPlayback(); document.documentElement.lang = state.locale; document.title = t('neyra.vision — от истории к кадру', 'neyra.vision — оқиғадан кадрға');
   app.innerHTML = route() === 'home' ? landing() : workspace(route()); app.inert = busy || connecting;
   if (route() === 'animatic') updatePlayer();
+  if (cinemaPages.includes(route()) && serverClient && project() && !connecting && !cinemaState.loading && !cinemaState.ready && !cinemaState.error) void refreshCinema();
   if (route() === 'map' && serverClient && project() && !connecting && !mapState.loading && !mapState.ready && !mapState.error) void refreshProductionMap();
 }
 window.addEventListener('hashchange', () => {
+  cinemaState.token += 1; cinemaState.loading = false; cinemaState.ready = false; cinemaState.error = ''; passportCard = null; importCard = null;
   if (route() === 'map') { mapState.ready = false; mapState.error = ''; }
   else { mapState.token += 1; mapState.loading = false; mapCard = null; }
   render(); const hash = location.hash; if (['#process', '#project', '#about'].includes(hash)) document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' }); else window.scrollTo(0, 0);

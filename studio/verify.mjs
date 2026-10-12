@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { frameAt, totalDuration } from './timeline.js';
-import { makeDemo } from './data.js';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js';
+import { verifyBreakdownModules } from './breakdown-tests.js';
 import { ProductionMapApi, canApproveCell } from './production-map-api.js';
 import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js';
 
@@ -35,13 +38,14 @@ const secrets = {
   'writer-secret': { id: 'writer-local', role: 'writer', sections: ['overview', 'script'] },
   'producer-secret': { id: 'producer-local', role: 'producer', sections },
   'director-secret': { id: 'director-local', role: 'director', sections },
-  'viewer-secret': { id: 'viewer-local', role: 'viewer', sections }
+  'viewer-secret': { id: 'viewer-local', role: 'viewer', sections },
+  'artist-secret': { id: 'artist-local', role: 'artist', sections: ['overview', 'heroes', 'locations', 'shots', 'team'] }
 };
 const baseProject = slug => ({
   slug, title: `Проект ${slug}`, synopsis: '', language: 'ru', createdAt: date, updatedAt: date, revision: 1,
   translations: { ru: { title: `Проект ${slug}`, synopsis: '' }, kk: { title: `Жоба ${slug}`, synopsis: '' } },
   script: { text: '', language: 'ru', status: 'draft', updatedAt: date, translations: { ru: '', kk: '' } },
-  scenes: [], shots: [], versions: [], members: [], post: [], cells: [], approvals: [], activity: []
+  scenes: [], characters: [], locations: [], shots: [], versions: [], members: [], post: [], cells: [], approvals: [], activity: []
 });
 const metadata = p => Object.fromEntries(['slug', 'title', 'synopsis', 'language', 'createdAt', 'updatedAt', 'revision', 'translations'].filter(k => k in p).map(k => [k, clone(p[k])]));
 const reply = (status, data, revision) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...(revision ? { ETag: `"${revision}"` } : {}) } });
@@ -119,9 +123,12 @@ function nativeApi(slugs = ['film']) {
     const p = projects.get(parts[2]);
     if (!p) return errorReply(404, 'NOT_FOUND');
     const collection = parts[3];
-    const section = ({ scenes: 'script', versions: 'script', members: 'team', map: 'overview', cells: 'overview', approvals: 'overview', activity: 'overview' })[collection] || collection || 'overview';
+    const section = ['characters', 'locations'].includes(collection) ? method === 'GET' ? 'overview' : collection === 'characters' ? 'heroes' : 'locations'
+      : ({ scenes: 'script', versions: 'script', members: 'team', map: 'overview', cells: 'overview', approvals: 'overview', activity: 'overview' })[collection] || collection || 'overview';
     if (!allowed(principal, p, section) && !(collection === 'members' && manageTeam(principal, p))) return errorReply(403, 'FORBIDDEN');
     if (collection === 'members' && method !== 'GET' && !manageTeam(principal, p)) return errorReply(403, 'FORBIDDEN');
+    if (method !== 'GET' && ['characters', 'locations', 'breakdown'].includes(collection)
+      && !(collection === 'breakdown' ? ['admin', 'producer', 'director', 'assistant_director'] : ['admin', 'producer', 'director', 'artist']).includes(principal.role)) return errorReply(403, 'FORBIDDEN');
     if (method !== 'GET') {
       call.beforeRevision = p.revision;
       if (call.ifMatch !== `"${p.revision}"`) return errorReply(409, 'REVISION_CONFLICT');
@@ -133,6 +140,38 @@ function nativeApi(slugs = ['film']) {
       checkFields(body, ['title', 'synopsis', 'language', 'translations']);
       Object.assign(p, clone(body));
       data = metadata(p);
+    } else if (['characters', 'locations'].includes(collection)) {
+      if (method === 'GET') return reply(200, parts[4] ? { data: clone(p[collection].find(item => item.id === parts[4])) } : paginate(p[collection], url), p.revision);
+      assert.equal(method, 'PATCH');
+      checkFields(body, ['name', 'role', 'identity', 'taboo', 'height', 'status', 'scenes', 'refs', 'translations']);
+      const item = p[collection].find(item => item.id === parts[4]);
+      if (!item) return errorReply(404, 'NOT_FOUND');
+      Object.assign(item, clone(body));
+      data = item;
+    } else if (collection === 'breakdown') {
+      assert.equal(method, 'POST');
+      checkFields(body, ['scenes', 'characters', 'locations']);
+      const normalize = name => name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
+      data = { summary: {}, scenes: [], characters: [], locations: [] };
+      for (const group of ['scenes', 'characters', 'locations']) {
+        data.summary[group] = { created: 0, updated: 0, unchanged: 0 };
+        for (const incoming of body[group]) {
+          let item = p[group].find(item => group === 'scenes' ? item.n === incoming.n : normalize(item.name) === normalize(incoming.name));
+          const created = !item;
+          if (created) {
+            item = group === 'scenes' ? { id: `scene-${++sequence}`, text: '', translations: {} }
+              : { id: `${group}-${++sequence}`, name: incoming.name, role: '', identity: '', taboo: [], height: '', refs: [], status: 'draft', scenes: [], translations: {} };
+            p[group].push(item);
+          }
+          if (group === 'scenes') {
+            const { heading, ...fields } = incoming;
+            Object.assign(item, clone(fields), { title: heading });
+            p.shots.filter(shot => shot.sceneId === item.id).forEach(shot => { shot.needsReview = true; });
+          } else Object.assign(item, clone(Object.fromEntries(Object.entries(incoming).filter(([field]) => field !== 'name'))));
+          data.summary[group][created ? 'created' : 'updated'] += 1;
+          data[group].push(group === 'scenes' ? { id: item.id, n: item.n } : { id: item.id, name: item.name });
+        }
+      }
     } else if (collection === 'map') {
       assert.equal(method, 'GET');
       assert.equal(url.search, '', '/map does not accept pagination parameters');
@@ -468,12 +507,12 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     showModal() { this.open = true; }, close() { this.open = false; this.listeners.get('close')?.({}); },
     focus() {}, select() {}, click() {}, setAttribute() {}, querySelector() { return null; }, querySelectorAll() { return []; }
   });
-  const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element(), mapControl = element(), mapSurface = element(), mapErrorNode = element();
+  const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element(), mapControl = element(), mapSurface = element(), mapErrorNode = element(), cinemaControl = element(), cinemaSurface = element(), passportErrorNode = element();
   if (queuedDialogClose) dialog.close = function () { this.open = false; queueMicrotask(() => this.listeners.get('close')?.({})); };
   const memberRoleHint = element(), issuedMemberKey = element();
   let memberSections = [];
   let mapSubmitButtons = [];
-  dialog.querySelector = selector => selector === '[data-map-error]' ? mapErrorNode : null;
+  dialog.querySelector = selector => selector === '[data-map-error]' ? mapErrorNode : selector === '[data-passport-error]' ? passportErrorNode : null;
   dialog.querySelectorAll = selector => selector === "input[name='sections']" ? memberSections : selector === '#map-approval-form button[type="submit"]' ? mapSubmitButtons : [];
   let dialogMarkup = '';
   Object.defineProperty(dialog, 'innerHTML', { get: () => dialogMarkup, set: value => {
@@ -482,7 +521,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     memberRoleHint.textContent = /id=['"]member-role-hint['"][^>]*>([^<]*)/.exec(value)?.[1] || '';
     memberSections = [...value.matchAll(/<input\b[^>]*name=['"]sections['"][^>]*>/g)].map(([tag]) => ({ value: /value=['"]([^'"]*)['"]/.exec(tag)?.[1] || '', checked: /\bchecked\b/.test(tag), disabled: /\bdisabled\b/.test(tag) }));
     mapSubmitButtons = [...value.matchAll(/<button\b[^>]*type=['"]submit['"][^>]*name=['"]verdict['"][^>]*>/g)].map(([tag]) => ({ value: /value=['"]([^'"]*)['"]/.exec(tag)?.[1] || '', disabled: /\bdisabled\b/.test(tag) }));
-    mapErrorNode.textContent = ''; mapErrorNode.hidden = true;
+    mapErrorNode.textContent = ''; mapErrorNode.hidden = true; passportErrorNode.textContent = ''; passportErrorNode.hidden = true;
   } });
   paperControl.id = 'script-paper-mode'; paperControl.dataset.paperMode = '';
   let markup = '', markupWrites = 0;
@@ -494,20 +533,23 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     const mapOptions = /<select\b[^>]*id=['"]production-map-mode['"][^>]*>([\s\S]*?)<\/select>/.exec(value)?.[1];
     mapControl.value = mapOptions ? /<option\b[^>]*value=['"]([^'"]+)['"][^>]*\bselected\b/.exec(mapOptions)?.[1] || 'graphite' : '';
     mapSurface.dataset.mapMode = /<section\b[^>]*class=['"]production-map['"][^>]*data-map-mode=['"]([^'"]*)['"]/.exec(value)?.[1] || '';
+    const cinemaOptions = /<select\b[^>]*id=['"]cinema-mode['"][^>]*>([\s\S]*?)<\/select>/.exec(value)?.[1];
+    cinemaControl.value = cinemaOptions ? /<option\b[^>]*value=['"]([^'"]+)['"][^>]*\bselected\b/.exec(cinemaOptions)?.[1] || 'graphite' : '';
+    cinemaSurface.dataset.cinemaMode = /<section\b[^>]*class=['"]cinema-section['"][^>]*[^>]*data-cinema-mode=['"]([^'"]*)['"]/.exec(value)?.[1] || '';
   } });
   const localStorage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => { if (failStorage) throw new Error('Quota exceeded'); stored.set(key, value); } };
   class TestServer extends StudioServer { constructor(settings) { super({ ...settings, fetchImpl: fetchImpl || api?.fetchImpl || (async () => { throw new TypeError('Offline'); }) }); } }
   const document = {
     documentElement: { dataset: {} }, activeElement: null, title: '',
     querySelector(selector) { return ({ '#app': app, '#dialog': dialog, '#toast': toast, '#draft-text': draft, '#script-paper-mode': paperControl.value ? paperControl : null, '#production-map-mode': mapControl.value ? mapControl : null, '#member-role-hint': memberRoleHint, '#issued-member-key': issuedMemberKey })[selector] || (selector.startsWith('.') ? element() : null); },
-    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : selector === '[data-paper-mode]' && paperControl.value ? [paperControl] : selector === '.production-map, .map-dialog' ? [...(mapControl.value ? [mapSurface] : []), ...(dialog.classList.contains('map-dialog') ? [dialog] : [])] : []; },
+    querySelectorAll(selector) { return selector === '[data-storage-label]' ? [label] : selector === '[data-storage-error]' ? [storageErrorNode] : selector === '[data-cinema-mode]' ? cinemaControl.value ? [cinemaControl] : [] : selector === '.cinema-section, .passport-dialog' ? [...(cinemaControl.value ? [cinemaSurface] : []), ...(dialog.classList.contains('passport-dialog') ? [dialog] : [])] : selector === '[data-paper-mode]' && paperControl.value ? [paperControl] : selector === '.production-map, .map-dialog' ? [...(mapControl.value ? [mapSurface] : []), ...(dialog.classList.contains('map-dialog') ? [dialog] : [])] : []; },
     createElement() { return element(); }
   };
   const schemeListeners = new Set();
   const scheme = { media: '(prefers-color-scheme: dark)', matches: systemDark, addEventListener(type, handler) { if (type === 'change') schemeListeners.add(handler); } };
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler), matchMedia: () => scheme };
   const context = vm.createContext({
-    makeDemo, frameAt, totalDuration, ProductionMapApi, canApproveCell, renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName,
+    makeDemo, DEFAULT_SERVER_URL, BreakdownApi, canWriteBreakdownSection, renderBreakdownSection, renderPassportEditor, frameAt, totalDuration, ProductionMapApi, canApproveCell, renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName,
     StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
     location: { hash }, crypto: globalThis.crypto, console, navigator: { clipboard: { writeText: async text => { clipboard.push(text); } } }, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
@@ -516,7 +558,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   });
   vm.runInContext(appSource, context, { filename: 'studio/app.js' });
   const settle = async () => {
-    const pending = 'connecting || pendingWrites || busy || (typeof mapState !== "undefined" && mapState.loading)';
+    const pending = 'connecting || pendingWrites || busy || mapState.loading || cinemaState.loading';
     for (let i = 0; i < 300 && vm.runInContext(pending, context); i += 1) await Promise.resolve();
     assert.equal(Boolean(vm.runInContext(pending, context)), false, 'App asynchronous operation must finish');
   };
@@ -527,11 +569,12 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   const dialogClickData = (attribute, value = '') => dispatch(dialog, 'click', { closest: selector => selector === `[data-${attribute}]` ? { dataset: { [dataAttribute(attribute)]: value } } : null });
   const dialogChange = (id, value) => dispatch(dialog, 'change', { id, value });
   const input = (id, value) => dispatch(app, 'input', { id, value });
-  const change = (id, value) => dispatch(app, 'change', { id, value, dataset: id === paperControl.id ? paperControl.dataset : {} });
+  const change = (id, value) => dispatch(app, 'change', { id, value, dataset: id === paperControl.id ? paperControl.dataset : {}, hasAttribute: name => id === 'cinema-mode' && name === 'data-cinema-mode' });
   const submit = (id, fields, dataset = {}, submitterValue) => dispatch(dialog, 'submit', { id, fields, dataset }, submitterValue ? { submitter: { value: submitterValue } } : {});
   const flushInput = async () => { for (const [id, timer] of [...timers]) if (timer.delay === 350) { timers.delete(id); timer.callback(); } await settle(); };
   await settle();
-  return { app, dialog, toast, label, storageErrorNode, stored, context, document, paperControl, mapControl, mapSurface, mapErrorNode, memberRoleHint, issuedMemberKey, clipboard, click, clickData, dialogClickData, dialogChange, input, change, submit, flushInput, settle, timers, downloads,
+  return { app, dialog, toast, label, storageErrorNode, stored, context, document, paperControl, mapControl, mapSurface, mapErrorNode, cinemaControl, cinemaSurface, passportErrorNode, memberRoleHint, issuedMemberKey, clipboard, click, clickData, dialogClickData, dialogChange, input, change, submit, flushInput, settle, timers, downloads,
+    clickPassport: (collection, id) => dispatch(app, 'click', { closest: selector => selector === '[data-action]' ? { dataset: { action: 'edit-passport', passportCollection: collection, passportId: id } } : null }),
     get mapSubmitButtons() { return mapSubmitButtons; },
     get markupWrites() { return markupWrites; },
     navigate: async page => { context.location.hash = `#/studio/${page}`; await handlers.get('hashchange')?.(); },
@@ -689,7 +732,7 @@ console.log('Native-like default fetch receiver, first connection and automatic 
   assert.ok(ui.app.innerHTML.includes('&lt;script&gt;Название&lt;/script&gt;'));
   assert.ok(!ui.app.innerHTML.includes('<script>Название'));
   await ui.click('server');
-  assert.ok(ui.dialog.innerHTML.includes("value='http://127.0.0.1:8770'"));
+  assert.ok(ui.dialog.innerHTML.includes("value='https://api.studio.neyra.vision'"));
   assert.ok(ui.dialog.innerHTML.includes("type='password'"));
   const raw = '<script>Авторский текст</script> & "реплика"';
   await ui.input('scene-text', raw);
@@ -1434,3 +1477,190 @@ console.log('Actual app production late card response cannot cross navigation sn
   assert.ok(ui.mapSubmitButtons.every(button => button.disabled));
 }
 console.log('Actual app production blocked dependency gives a truthful reason without mutation: passed.');
+
+// №21.b / №55: exercise real app event handlers and shared save baselines.
+const cinemaSettings = (key = 'admin-secret') => new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key })]]);
+const passportFields = record => ({ name: record.name, role: record.role, identity: record.identity, taboo: record.taboo.join('\n'), height: record.height, status: record.status, scenes: record.scenes.join(', ') });
+const fileFor = source => ({ size: new TextEncoder().encode(source).length, text: async () => source });
+function seedBreakdown(api, slug = 'film') {
+  const p = api.projects.get(slug);
+  p.script.text = '.ИНТ. КОМНАТА — ДЕНЬ\n\nАвторский Fountain дословно.\n\nГЕРОЙ\nРеплика.';
+  p.script.translations = { ru: p.script.text, kk: 'Қазақша автор мәтіні.' };
+  p.scenes = [{ id: 'scene-1', title: 'ИНТ. КОМНАТА — ДЕНЬ', text: 'Автор сцены', translations: {}, n: 1, type: 'ИНТ', location: 'КОМНАТА', time: 'ДЕНЬ', page_from: 1, page_to: 3, chars: ['ГЕРОЙ'] }];
+  p.characters = [{ id: 'hero-1', name: 'ГЕРОЙ', role: 'Главный герой', identity: 'Шрам на левой щеке', taboo: ['Без бороды'], height: '180 см', status: 'locked', scenes: [1], refs: [{ path: 'https://example.test/hero.jpg', role: 'identity' }], translations: { kk: { name: 'КЕЙІПКЕР', identity: 'Сол жақ бетінде тыртық' } } }];
+  p.locations = [{ id: 'location-1', name: 'КОМНАТА', role: 'Дом героя', identity: 'Деревянные стены', taboo: ['Без неона'], height: 'Потолок 3 м', status: 'draft', scenes: [1], refs: [], translations: {} }];
+  return p;
+}
+const importFixture = () => ({
+  scenes: [{ n: 1, heading: 'ИНТ. КОМНАТА — НОЧЬ', type: 'ИНТ', location: 'КОМНАТА', time: 'НОЧЬ', act: 1, chars: ['ГЕРОЙ'], page_from: 2, page_to: 4 }, { n: 7, heading: 'НАТ. УЛИЦА — ДЕНЬ', type: 'НАТ', location: 'УЛИЦА', time: 'ДЕНЬ', act: 1, chars: ['ГЕРОЙ'], page_from: 5, page_to: 5 }],
+  characters: [{ name: ' герой ', age: null, lines: 2, scenes: [1, 7], first_scene: 1 }],
+  locations: [{ name: 'КОМНАТА', parent: 'КОМНАТА', types: ['ИНТ'], times: ['НОЧЬ'], scenes: [1] }, { name: 'УЛИЦА', parent: 'УЛИЦА', types: ['НАТ'], times: ['ДЕНЬ'], scenes: [7] }]
+});
+{
+  const ui = await appHarness({ hash: '#/studio/breakdown' });
+  assert.match(ui.app.innerHTML, /Введите ключ участника/);
+  assert.doesNotMatch(ui.app.innerHTML, /data-scene-id=/, 'Local demo is not presented as server breakdown');
+  await ui.click('server');
+  assert.match(ui.dialog.innerHTML, /value='https:\/\/api\.studio\.neyra\.vision'/);
+  const local = await appHarness({ stored: new Map([[settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: '' })]]) });
+  await local.click('server');
+  assert.match(local.dialog.innerHTML, /value='http:\/\/127\.0\.0\.1:8770'/, 'Saved explicit local server stays selectable');
+  const api = nativeApi(); seedBreakdown(api);
+  const server = await appHarness({ api, stored: cinemaSettings(), hash: '#/studio/breakdown' });
+  assert.doesNotMatch(server.app.innerHTML, /class='participant-hint'/);
+  assert.match(server.app.innerHTML, /data-scene-id='scene-1'/);
+  assert.match(server.app.innerHTML, /1–3/);
+  assert.match(server.app.innerHTML, /#\/studio\/heroes/);
+  assert.match(server.app.innerHTML, /#\/studio\/locations/);
+  await server.navigate('heroes'); await server.settle();
+  assert.match(server.app.innerHTML, /Шрам на левой щеке/);
+  assert.match(server.app.innerHTML, /locked/);
+  assert.match(server.app.innerHTML, /data-action='edit-passport'/);
+  await server.change('cinema-mode', 'graphite');
+  assert.equal(server.cinemaSurface.dataset.cinemaMode, 'graphite');
+  await server.clickData('lang', 'kk');
+  assert.match(server.app.innerHTML, /КЕЙІПКЕР/);
+  assert.match(server.app.innerHTML, /Кейіпкерлер/);
+  await server.navigate('locations'); await server.settle();
+  assert.match(server.app.innerHTML, /Деревянные стены/);
+  assert.equal(server.cinemaSurface.dataset.cinemaMode, 'graphite');
+  await server.change('cinema-mode', 'light');
+  assert.equal(server.cinemaSurface.dataset.cinemaMode, 'light');
+  assert.equal(server.stored.get(paperStorageKey), 'light');
+  assert.ok(!server.stored.get(workspaceKey)?.includes('hero-1'), 'Server passports are transient, not browser workspace data');
+}
+console.log('Actual app cinema routes, server default/entry hint, RU/KK and shared graphite/paper: passed.');
+{
+  const api = nativeApi(); const p = seedBreakdown(api);
+  const ui = await appHarness({ api, stored: cinemaSettings(), hash: '#/studio/heroes' });
+  const author = p.script.text;
+  const preserved = clone({ refs: p.characters[0].refs, translations: p.characters[0].translations });
+  await ui.clickPassport('characters', 'hero-1');
+  assert.match(ui.dialog.innerHTML, /id='passport-form'/);
+  assert.match(ui.dialog.innerHTML, /Шрам на левой щеке/);
+  await ui.submit('passport-form', { ...passportFields(p.characters[0]), identity: 'Авторский замок & <текст>', taboo: 'Без бороды\nБез очков', scenes: '1, 7', height: '181 см' }, { passportId: 'hero-1', passportCollection: 'characters' });
+  const calls = api.calls.filter(c => c.method === 'PATCH' && c.path.endsWith('/characters/hero-1'));
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body, { identity: 'Авторский замок & <текст>', taboo: ['Без бороды', 'Без очков'], height: '181 см', scenes: [1, 7] });
+  assert.deepEqual({ refs: p.characters[0].refs, translations: p.characters[0].translations }, preserved);
+  assert.match(ui.app.innerHTML, /Авторский замок &amp; &lt;текст&gt;/);
+  assert.equal(vm.runInContext('serverClient.known.get("film")._revision', ui.context), p.revision);
+  assert.equal(p.script.text, author);
+  await ui.navigate('script'); await ui.input('draft-text', author + '\nПродолжение'); await ui.flushInput();
+  assert.equal(p.script.text, author + '\nПродолжение', 'Next screenplay save uses the passport revision');
+
+  const artistApi = nativeApi(); const film = seedBreakdown(artistApi);
+  film.members.push({ id: 'artist-member', keyId: 'artist-local', role: 'artist', sections: ['overview', 'heroes', 'team'], accessStatus: 'active' });
+  const artist = await appHarness({ api: artistApi, stored: cinemaSettings('artist-secret'), hash: '#/studio/heroes' });
+  assert.match(artist.app.innerHTML, /data-action='edit-passport'/);
+  await artist.clickPassport('characters', 'hero-1');
+  await artist.submit('passport-form', { ...passportFields(film.characters[0]), role: 'Обновлено художником' }, { passportId: 'hero-1', passportCollection: 'characters' });
+  assert.equal(film.characters[0].role, 'Обновлено художником');
+  await artist.navigate('locations'); await artist.settle();
+  assert.doesNotMatch(artist.app.innerHTML, /data-action='edit-passport'/, 'Member sections limit the principal sections');
+  assert.match(artist.app.innerHTML, /только просмотр/);
+  await artist.navigate('breakdown'); await artist.settle();
+  assert.match(artist.app.innerHTML, /раздел недоступен/);
+  assert.doesNotMatch(artist.app.innerHTML, /data-scene-id=/);
+}
+console.log('Actual app passport PATCH, untouched translations/refs, shared revision and artist section permissions: passed.');
+{
+  for (const key of ['writer-secret', 'viewer-secret']) {
+    const api = nativeApi(); const p = seedBreakdown(api); const principal = secrets[key];
+    p.members.push({ id: 'member', keyId: principal.id, role: principal.role, sections: principal.sections, accessStatus: 'active' });
+    const ui = await appHarness({ api, stored: cinemaSettings(key), hash: '#/studio/heroes' });
+    assert.match(ui.app.innerHTML, /Шрам на левой щеке/);
+    assert.doesNotMatch(ui.app.innerHTML, /data-action='edit-passport'/);
+    assert.doesNotMatch(ui.app.innerHTML, /data-action='import-breakdown'/);
+    const before = api.calls.filter(c => c.method !== 'GET').length;
+    await ui.clickPassport('characters', 'hero-1');
+    await ui.submit('passport-form', { ...passportFields(p.characters[0]), name: 'Подмена' }, { passportId: 'hero-1', passportCollection: 'characters' });
+    await ui.click('import-breakdown');
+    await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
+    assert.equal(api.calls.filter(c => c.method !== 'GET').length, before, 'Forged forms cannot send a write for read-only roles');
+    assert.equal(p.characters[0].name, 'ГЕРОЙ');
+  }
+}
+console.log('Actual app writer/viewer read-only passports, import denial and forged-form guards: passed.');
+{
+  const api = nativeApi(); const p = seedBreakdown(api);
+  const ui = await appHarness({ api, stored: cinemaSettings(), hash: '#/studio/script' });
+  const author = p.script.text + '\n\nОжидающая правка автора.';
+  await ui.input('draft-text', author);
+  await ui.navigate('breakdown'); await ui.settle();
+  assert.equal(p.script.text, author, 'Entering breakdown flushes the pending author draft');
+  const preserved = clone(p.characters[0]);
+  await ui.click('import-breakdown');
+  assert.match(ui.dialog.innerHTML, /type='file'/);
+  const previous = p.revision;
+  await ui.submit('breakdown-import-form', { file: fileFor('\uFEFF' + JSON.stringify(importFixture())) });
+  const imports = api.calls.filter(c => c.path.endsWith('/breakdown') && c.method === 'POST');
+  assert.equal(imports.length, 1);
+  assert.equal(imports[0].ifMatch, `"${previous}"`);
+  assert.equal(p.script.text, author);
+  assert.equal(p.scenes[0].text, 'Автор сцены');
+  assert.equal(p.characters.length, 1, 'Normalized repeat name does not duplicate the passport');
+  for (const field of ['name', 'role', 'identity', 'taboo', 'height', 'status', 'refs', 'translations']) assert.deepEqual(p.characters[0][field], preserved[field]);
+  assert.deepEqual(p.characters[0].scenes, [1, 7]);
+  assert.match(ui.app.innerHTML, /НОЧЬ/);
+  assert.match(ui.app.innerHTML, /2–4/);
+  assert.equal(vm.runInContext('project().scenes.length', ui.context), 2);
+  assert.equal(vm.runInContext('serverClient.known.get("film").scenes.length', ui.context), 2);
+  await ui.navigate('script'); await ui.input('draft-text', author + '\nПосле импорта'); await ui.flushInput();
+  assert.equal(p.script.text, author + '\nПосле импорта', 'Reloaded baseline never rebuilds author draft from imported empty scene text');
+  await ui.navigate('breakdown'); await ui.settle(); await ui.click('import-breakdown');
+  await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
+  assert.equal(p.characters.length, 1);
+  assert.equal(p.scenes.length, 2);
+}
+console.log('Actual app file breakdown import, normalized passports, pending author preservation and following save baseline: passed.');
+{
+  const api = nativeApi(); const p = seedBreakdown(api);
+  const ui = await appHarness({ api, stored: cinemaSettings(), hash: '#/studio/heroes' });
+  await ui.clickPassport('characters', 'hero-1');
+  p.revision += 1;
+  await ui.submit('passport-form', { ...passportFields(p.characters[0]), identity: 'Не сохранять' }, { passportId: 'hero-1', passportCollection: 'characters' });
+  assert.equal(ui.dialog.open, true);
+  assert.match(ui.passportErrorNode.textContent, /Проект изменился/);
+  assert.equal(p.characters[0].identity, 'Шрам на левой щеке');
+  await ui.submit('passport-form', { ...passportFields(p.characters[0]), identity: 'Повтор' }, { passportId: 'hero-1', passportCollection: 'characters' });
+  assert.equal(api.calls.filter(c => c.method === 'PATCH' && c.path.endsWith('/hero-1')).length, 1, 'Conflict requires opening a fresh card');
+  ui.dialog.close(); await ui.click('refresh-breakdown'); await ui.click('import-breakdown');
+  await ui.submit('breakdown-import-form', { file: fileFor('{bad json') });
+  assert.equal(api.calls.filter(c => c.method === 'POST' && c.path.endsWith('/breakdown')).length, 0);
+  assert.match(ui.passportErrorNode.textContent, /некорректный JSON/);
+  api.failOnce(c => c.method === 'POST' && c.path.endsWith('/breakdown'), 403, 'FORBIDDEN');
+  await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
+  assert.match(ui.passportErrorNode.textContent, /Нет доступа/);
+  await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
+  assert.equal(api.calls.filter(c => c.method === 'POST' && c.path.endsWith('/breakdown')).length, 1, 'Rejected import is not replayed');
+}
+console.log('Actual app passport conflict, retained form, malformed file and import denial without replay: passed.');
+{
+  const api = nativeApi(); const p = seedBreakdown(api);
+  let loseResponse = true;
+  const fetchImpl = async (...args) => {
+    const response = await api.fetchImpl(...args);
+    if (loseResponse && args[1]?.method === 'POST' && new URL(args[0]).pathname.endsWith('/breakdown')) { loseResponse = false; throw new TypeError('Lost committed import response'); }
+    return response;
+  };
+  const ui = await appHarness({ api, fetchImpl, stored: cinemaSettings(), hash: '#/studio/breakdown' });
+  await ui.click('import-breakdown');
+  await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
+  assert.equal(p.scenes.length, 2, 'Server committed before losing the response');
+  assert.match(ui.passportErrorNode.textContent, /Сервер не подтвердил/);
+  await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
+  assert.equal(api.calls.filter(c => c.method === 'POST' && c.path.endsWith('/breakdown')).length, 1);
+  ui.dialog.close(); await ui.click('refresh-breakdown');
+  assert.match(ui.app.innerHTML, /data-scene-id='scene-/);
+  assert.equal(vm.runInContext('serverClient.known.get("film")._revision', ui.context), p.revision);
+
+  await ui.click('import-breakdown');
+  let release;
+  const reading = new Promise(resolve => { release = resolve; });
+  const work = ui.submit('breakdown-import-form', { file: { size: 50, text: () => reading } });
+  await Promise.resolve(); await ui.navigate('overview'); release(JSON.stringify(importFixture())); await work; await ui.settle();
+  assert.equal(api.calls.filter(c => c.method === 'POST' && c.path.endsWith('/breakdown')).length, 1, 'Late file read cannot import into another visit');
+}
+console.log('Actual app committed import lost-response recovery and late file-read navigation protection: passed.');
+await verifyBreakdownModules();

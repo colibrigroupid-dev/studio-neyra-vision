@@ -217,3 +217,119 @@ dialog{background:var(--bg);color:var(--text);border:1px solid var(--line);borde
   .map-dialog .dialog-actions{flex-direction:column;align-items:stretch}
   .map-dialog .dialog-actions .btn,.map-dialog .map-reopen{width:100%}
 }
+
+/* №21.b: cinema sections use server records and keep wide tables inside their region. */
+.cinema-workspace .work-header .btn,.cinema-workspace .work-header .langs button,.cinema-workspace .work-controls #project-switch,.cinema-workspace .storage-label,.cinema-workspace .side-nav a,.cinema-workspace .project-name,.cinema-workspace .project-name small,.cinema-workspace .side-foot,.cinema-workspace .prototype-note{font-size:16px}
+.cinema-workspace .side-nav a{min-height:44px}
+.cinema-workspace .sidebar,.cinema-workspace .work-grid,.cinema-workspace .work-main,.cinema-workspace .work-controls{min-width:0;max-width:100%}
+.cinema-workspace .prototype-note,.cinema-workspace .side-foot{overflow-wrap:anywhere}
+.cinema-section,.passport-dialog{
+  --cinema-bg:#1e1f22;
+  --cinema-surface:#27292c;
+  --cinema-text:#e8e4dd;
+  --cinema-muted:#b7b4ae;
+  --cinema-line:#494b4f;
+  --cinema-accent:#dfc192;
+  --cinema-ink:#171711;
+  --cinema-error:#f0b6a9;
+  color-scheme:dark;
+  color:var(--cinema-text);
+  font-size:16px;
+  line-height:1.6;
+  min-width:0;
+  max-width:100%;
+}
+.cinema-section[data-cinema-mode='light'],.passport-dialog[data-cinema-mode='light']{
+  --cinema-bg:#eeede4;
+  --cinema-surface:#e4e3d9;
+  --cinema-text:#2c302b;
+  --cinema-muted:#4a4f46;
+  --cinema-line:#b8b8ac;
+  --cinema-accent:#735229;
+  --cinema-ink:#fffdf6;
+  --cinema-error:#923d30;
+  color-scheme:light;
+}
+.cinema-section{padding:24px;border:1px solid var(--cinema-line);border-radius:8px;background:var(--cinema-bg)}
+.cinema-section .page-heading{align-items:flex-start;margin-bottom:24px;min-width:0}
+.cinema-section .page-heading>div{min-width:0;max-width:100%}
+.cinema-section h1{font-size:28px;line-height:1.3;overflow-wrap:anywhere}
+.cinema-section h2{font-size:20px;line-height:1.5;letter-spacing:0;margin:0;overflow-wrap:anywhere}
+.cinema-section p,.cinema-section .page-heading p,.passport-dialog p{font-size:16px;color:var(--cinema-muted);overflow-wrap:anywhere}
+.cinema-section .btn,.passport-dialog .btn{min-height:44px;font-size:16px;line-height:1.5;padding:10px 16px;white-space:normal;color:var(--cinema-text);border-color:var(--cinema-line);max-width:100%;overflow-wrap:anywhere}
+.cinema-section .btn:hover,.passport-dialog .btn:hover{background:var(--cinema-surface)}
+.cinema-section .btn.primary,.passport-dialog .btn.primary{background:var(--cinema-accent);border-color:var(--cinema-accent);color:var(--cinema-ink)}
+.cinema-section button:focus-visible,.cinema-section select:focus-visible,.breakdown-scroll:focus-visible,.passport-dialog button:focus-visible,.passport-dialog input:focus-visible,.passport-dialog select:focus-visible,.passport-dialog textarea:focus-visible{outline:2px solid var(--cinema-accent);outline-offset:4px}
+.cinema-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.cinema-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;min-width:0}
+.cinema-section .cinema-mode-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0;font-size:16px;color:var(--cinema-muted);max-width:100%}
+.cinema-section .cinema-mode-control select{min-height:44px;max-width:100%;font-size:16px;color:var(--cinema-text);background:var(--cinema-bg);border-color:var(--cinema-line)}
+.cinema-section .cinema-access-note{margin:0}
+.cinema-state{padding:24px;border:1px solid var(--cinema-line);border-radius:6px;margin-bottom:20px;min-width:0;overflow-wrap:anywhere}
+.cinema-state:last-child{margin-bottom:0}
+.cinema-state p:last-child{margin-bottom:0}
+.cinema-error{border-color:var(--cinema-error)}
+.cinema-section .cinema-error p{color:var(--cinema-error)}
+.cinema-section .cinema-scroll-hint{margin-bottom:12px}
+.breakdown-scroll{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;border:1px solid var(--cinema-line);border-radius:6px;scrollbar-color:var(--cinema-muted) var(--cinema-bg)}
+.breakdown-table{width:100%;min-width:760px;table-layout:fixed;border-collapse:separate;border-spacing:0;background:var(--cinema-bg);font-size:16px;color:var(--cinema-text)}
+.breakdown-table caption{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.breakdown-table th,.breakdown-table td{padding:12px;text-align:left;vertical-align:top;font-weight:400;overflow-wrap:anywhere;border-right:1px solid var(--cinema-line);border-bottom:1px solid var(--cinema-line)}
+.breakdown-table thead th{background:var(--cinema-surface);font-weight:600}
+.breakdown-table tr>:first-child{width:64px;position:sticky;left:0;background:var(--cinema-bg);z-index:1;font-weight:600}
+.breakdown-table thead tr>:first-child{background:var(--cinema-surface);z-index:2}
+.breakdown-table tr>:nth-child(2){width:104px}
+.breakdown-table tr>:nth-child(5){width:104px}
+.breakdown-table tr>:last-child{border-right:0}
+.breakdown-table tbody tr:last-child>*{border-bottom:0}
+.passport-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;min-width:0}
+.passport-card{padding:24px;border:1px solid var(--cinema-line);border-radius:6px;background:var(--cinema-surface);min-width:0}
+.passport-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;min-width:0}
+.passport-status{font-size:16px;color:var(--cinema-muted);overflow-wrap:anywhere;max-width:100%}
+.passport-status[data-status='locked']{color:var(--cinema-accent)}
+.passport-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0;font-size:16px}
+.passport-fields>div{min-width:0}
+.passport-fields dt{color:var(--cinema-muted);margin:0 0 4px}
+.passport-fields dd{margin:0;color:var(--cinema-text);white-space:pre-wrap;overflow-wrap:anywhere}
+.passport-identity,.passport-taboo,.passport-scenes{grid-column:1/-1}
+.passport-taboo ul{padding-left:20px;margin:0}
+.passport-taboo li+li{margin-top:8px}
+.passport-dialog{background:var(--cinema-bg);border-color:var(--cinema-line);width:min(640px,calc(100% - 32px));padding:28px}
+.passport-dialog .dialog-header h2{font-size:24px;color:var(--cinema-text);overflow-wrap:anywhere}
+.passport-dialog .dialog-header p,.passport-dialog label{font-size:16px;color:var(--cinema-muted)}
+.passport-dialog .eyebrow{font-size:16px;color:var(--cinema-accent)}
+.passport-dialog .icon-btn{width:44px;min-width:44px;min-height:44px;color:var(--cinema-text);border-color:var(--cinema-line)}
+.passport-dialog input,.passport-dialog select,.passport-dialog textarea{font-size:16px;color:var(--cinema-text);background:var(--cinema-bg);border-color:var(--cinema-line);min-width:0;max-width:100%}
+.passport-dialog input,.passport-dialog select{min-height:44px}
+.passport-dialog select{width:100%}
+.passport-dialog textarea{line-height:1.7}
+.passport-dialog .passport-language-note{margin:24px 0 0;padding-left:16px;border-left:2px solid var(--cinema-accent)}
+.passport-dialog #passport-taboo-note,.passport-dialog #passport-scenes-note{margin:8px 0 0}
+.passport-dialog .form-error{font-size:16px;color:var(--cinema-error)}
+.passport-dialog .form-error[hidden]{display:none}
+@media(max-width:1100px){
+  .passport-list{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:480px){
+  .cinema-section{padding:16px}
+  .cinema-section h1{font-size:24px}
+  .cinema-section .page-heading,.cinema-toolbar{flex-direction:column;align-items:stretch}
+  .cinema-actions{flex-direction:column;align-items:stretch}
+  .cinema-section .cinema-mode-control{justify-content:space-between}
+  .cinema-section .cinema-mode-control select{min-width:0;flex:1}
+  .cinema-state,.passport-card{padding:16px}
+  .passport-fields{grid-template-columns:minmax(0,1fr)}
+  .passport-card>.btn{width:100%}
+  .passport-dialog{padding:20px}
+  .passport-dialog .dialog-actions{flex-direction:column;align-items:stretch}
+  .passport-dialog .dialog-actions .btn{width:100%}
+}
+
+/* №55: entry guidance stays readable before a participant connects. */
+.participant-hint{display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:20px;border:1px solid var(--line);border-radius:8px;margin:0 0 24px;min-width:0;max-width:100%;overflow-wrap:anywhere}
+.participant-hint p{font-size:16px;margin:0;flex:1 1 220px}
+.participant-hint .btn,.server-dialog .btn{font-size:16px;min-height:44px;white-space:normal}
+.server-dialog label,.server-dialog input,.server-dialog p,.server-dialog .eyebrow{font-size:16px}
+.server-dialog input{min-height:44px}
+.server-dialog .icon-btn{width:44px;min-width:44px;min-height:44px}
+@media(max-width:480px){.participant-hint .btn,.server-dialog .dialog-actions .btn{width:100%}}
