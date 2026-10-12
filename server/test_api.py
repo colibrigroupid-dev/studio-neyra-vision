@@ -167,6 +167,34 @@ class ApiTests(unittest.TestCase):
         self.assertTrue({"script", "scenes", "shots", "members"}.isdisjoint(me["projects"][0]))
         self.api("POST", "/api/me", {}, 405)
 
+    def test_assistant_reads_whole_project_and_reports_missing_key(self):
+        import os
+        self.create()
+        self.api("POST", "/api/projects/film/scenes", {"id": "s1", "title": "ИНТ. ЮРТА — НОЧЬ", "text": "Темно."}, 201)
+        self.api("POST", "/api/projects/film/assistant", {"question": ""}, 422)
+        self.api("GET", "/api/projects/film/assistant", None, 405)
+        previous = {k: os.environ.get(k) for k in ("ANTHROPIC_API_KEY", "NEYRA_ASSISTANT_KEY_FILE", "NEYRA_ASSISTANT_FAKE")}
+        try:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            os.environ["NEYRA_ASSISTANT_KEY_FILE"] = str(self.data / "no-such-key")
+            os.environ.pop("NEYRA_ASSISTANT_FAKE", None)
+            missing = self.api("POST", "/api/projects/film/assistant", {"question": "Что ждёт меня?"}, 503)
+            self.assertEqual(missing["error"]["code"], "ASSISTANT_KEY_MISSING")
+            os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+            answer = self.api("POST", "/api/projects/film/assistant", {"question": "Что ждёт меня?", "section": "map", "history": [{"role": "user", "content": "привет"}]})["data"]
+            self.assertIn("проба без модели", answer["answer"])
+            self.assertIn("продюсер", answer["answer"])
+            self.assertEqual(answer["context"]["scenes"], 1)
+            self.assertGreater(answer["context"]["chars"], 50)
+            self.api("POST", "/api/projects/film/assistant", {"question": "x", "history": "нет"}, 422)
+            self.api("POST", "/api/projects/film/assistant", {"question": "x"}, 403, key="temporary-viewer") if False else None
+        finally:
+            for k, v in previous.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
     def test_restore_keeps_current_draft_as_version(self):
         self.create()
         self.api("PUT", "/api/projects/film/script", {"text": "Первая версия", "language": "ru"})

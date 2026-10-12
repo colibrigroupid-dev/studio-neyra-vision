@@ -667,6 +667,93 @@ def invalidate_dependencies(project):
     return invalidated
 
 
+ASSISTANT_API = "https://api.anthropic.com/v1/messages"
+ASSISTANT_MODEL = os.environ.get("NEYRA_MODEL", "claude-sonnet-5-5")
+ASSISTANT_ROLE = ("Ты — помощник проекта Neyra Vision Studio: одно окно на все этапы кино, помнишь весь проект. "
+                  "Отвечай на языке вопроса (русский или казахский), коротко и по делу, с номерами сцен и именами. "
+                  "Фильм пишет человек: предлагай варианты, не переписывай без просьбы. Ничего платного не запускай — "
+                  "если нужна генерация, скажи, что покажешь список и цену, и подождёшь «да». Факты только из контекста проекта; "
+                  "чего нет в контексте — скажи, что не знаешь.")
+ASSISTANT_MODES = {"script": "Режим: сценарный редактор (структура, сцены, диалог).", "breakdown": "Режим: второй режиссёр (что нужно для сцены).",
+                   "heroes": "Режим: кастинг и художник (паспорта, замки внешности).", "locations": "Режим: художник-постановщик (локации, пластины).",
+                   "storyboard": "Режим: оператор (крупность, движение, объектив).", "shots": "Режим: критик кадра и непрерывности.",
+                   "map": "Режим: продюсер (кто тормозит, что ждёт решения).", "team": "Режим: продюсер (команда и права)."}
+
+
+def assistant_key():
+    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if key:
+        return key
+    path = Path(os.environ.get("NEYRA_ASSISTANT_KEY_FILE", str(Path.home() / ".config/neyra-studio/key")))
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def assistant_context(project, principal, section=""):
+    """Весь проект одной страницей текста: метаданные, сценарий, сцены, паспорта, карта, лента. Это и есть «память проекта»."""
+    board = production_map(project, principal)
+    lines = [f"ПРОЕКТ: {project['title']} ({project['slug']}), язык {project.get('language', 'ru')}, ревизия {project['revision']}."]
+    if project.get("synopsis"):
+        lines.append("СИНОПСИС: " + project["synopsis"][:1500])
+    script = (project.get("script") or {}).get("text", "")
+    if script:
+        lines.append(f"СЦЕНАРИЙ (черновик, {len(script)} знаков, первые 6000):\n" + script[:6000])
+    scenes = project.get("scenes", [])
+    if scenes:
+        lines.append("СЦЕНЫ (" + str(len(scenes)) + "): " + "; ".join(
+            f"{sc.get('n', '?')} {sc.get('title') if isinstance(sc.get('title'), str) else (sc.get('title') or {}).get('ru', '')}"
+            + (f" [{', '.join(sc.get('chars', []))}]" if sc.get("chars") else "") for sc in scenes[:80]))
+    for coll, label in (("characters", "ГЕРОИ"), ("locations", "ЛОКАЦИИ")):
+        items = project.get(coll, [])
+        if items:
+            lines.append(f"{label} ({len(items)}): " + "; ".join(
+                f"{it.get('name', '')}" + (f" — {it.get('role')}" if it.get("role") else "") + (f": {it.get('identity', '')[:160]}" if it.get("identity") else "")
+                + (f" (табу: {'; '.join(it.get('taboo', []))})" if it.get("taboo") else "") + f" [{it.get('status', 'draft')}]" for it in items[:60]))
+    cells = project.get("cells", [])
+    if cells:
+        counts = {}
+        for c in cells:
+            counts[c["status"]] = counts.get(c["status"], 0) + 1
+        lines.append("КАРТА ПРОИЗВОДСТВА: клеток " + str(len(cells)) + ", по статусам " + ", ".join(f"{k}: {v}" for k, v in counts.items())
+                     + "; ждёт решения этого участника: " + str(len(board["awaitingMe"])) + "; его задач: " + str(len(board["myTasks"])) + ".")
+        waiting = board["awaitingMe"][:10]
+        if waiting:
+            lines.append("ЖДЁТ РЕШЕНИЯ: " + "; ".join(f"{c['object']['type']} {c['object']['id']} · {c['stage']} · версия {c.get('version') or '—'}" for c in waiting))
+    act = project.get("activity", [])
+    if act:
+        lines.append("ПОСЛЕДНИЕ СОБЫТИЯ: " + "; ".join(f"{a.get('createdAt', '')[:16]} {a.get('action', '')}" for a in act[-12:]))
+    mode = ASSISTANT_MODES.get(section, "")
+    return ("\n\n".join(lines))[:60000], mode
+
+
+def assistant_answer(question, context, mode, history):
+    key = assistant_key()
+    if os.environ.get("NEYRA_ASSISTANT_FAKE") == "1":
+        return {"answer": f"[проба без модели] Контекст {len(context)} знаков. {mode} Вопрос: {question[:120]}", "model": "fake", "usage": {}}
+    if not key:
+        raise ApiError(503, "ASSISTANT_KEY_MISSING", "Помощник ещё не подключён: на сервере нет ключа модели (~/.config/neyra-studio/key).")
+    import urllib.request
+    import urllib.error
+    messages = [{"role": m["role"], "content": m["content"]} for m in history if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)][-10:]
+    messages.append({"role": "user", "content": question})
+    payload = {"model": ASSISTANT_MODEL, "max_tokens": 1500, "system": ASSISTANT_ROLE + ("\n" + mode if mode else "") + "\n\nКОНТЕКСТ ПРОЕКТА:\n" + context,
+               "messages": messages}
+    req = urllib.request.Request(ASSISTANT_API, data=json.dumps(payload).encode("utf-8"), method="POST",
+                                 headers={"content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            out = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", "replace")[:300]
+        raise ApiError(502, "ASSISTANT_UPSTREAM", f"Модель ответила ошибкой {error.code}: {detail}") from None
+    except (OSError, ValueError) as error:
+        raise ApiError(502, "ASSISTANT_UPSTREAM", f"Модель недоступна: {error}") from None
+    text_out = "".join(b.get("text", "") for b in out.get("content", []) if b.get("type") == "text")
+    return {"answer": text_out, "model": out.get("model", ASSISTANT_MODEL), "usage": out.get("usage", {})}
+
+
 def production_map(project, principal):
     objects = [{"type": "scene", "id": s["id"]} for s in project["scenes"]]
     objects.extend({"type": "shot", "id": s["id"]} for s in project["shots"])
@@ -982,6 +1069,24 @@ class Handler(SimpleHTTPRequestHandler):
                    "map": "overview", "cells": "overview", "approvals": "overview",
                    "activity": "overview", "characters": "overview" if method == "GET" else "heroes",
                    "locations": "overview" if method == "GET" else "locations"}.get(resource, resource)
+        if resource == "assistant":
+            # №46 помощник: читает весь проект (раздел overview), ничего не изменяет, память диалога — у клиента
+            if method != "POST":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Помощнику можно только задать вопрос (POST).")
+            authorize(principal, slug, "overview", project)
+            body = self.body()
+            fields(body, ("question", "section", "history"), ("question",))
+            question = text(body["question"], "question", 4000, required=True)
+            mode_section = body.get("section", "")
+            if not isinstance(mode_section, str) or len(mode_section) > 40:
+                raise ApiError(422, "VALIDATION", "Поле section — короткая строка.")
+            history = body.get("history", [])
+            if not isinstance(history, list) or len(history) > 20:
+                raise ApiError(422, "VALIDATION", "history — список до 20 реплик.")
+            context, mode = assistant_context(project, principal, mode_section)
+            answer = assistant_answer(question, context, mode, history)
+            answer["context"] = {"chars": len(context), "scenes": len(project.get("scenes", [])), "characters": len(project.get("characters", [])), "locations": len(project.get("locations", []))}
+            return 200, {"data": answer}, None
         write = method != "GET"
         authorize(principal, slug, section, project, write=write,
                   manager=write and resource in ("project", "members"))

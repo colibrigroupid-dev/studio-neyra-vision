@@ -660,7 +660,7 @@ function helperStub(p) {
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Введите ключ участника, чтобы открыть проект команды.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ участника', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
 }
-function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog', 'map-dialog', 'passport-dialog', 'server-dialog'); dialog.innerHTML = html; dialog.showModal(); }
+function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog', 'map-dialog', 'passport-dialog', 'server-dialog', 'assistant-dialog'); dialog.innerHTML = html; dialog.showModal(); }
 const dialogHead = (title, subtitle = '') => `<div class='dialog-header'><div><div class='eyebrow'>NEYRA.VISION / STUDIO</div><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div><button class='icon-btn' data-close aria-label='${t('Закрыть', 'Жабу')}'>${icon('close')}</button></div>`;
 const dialogActions = label => `<div class='dialog-actions'><button type='button' class='btn' data-close>${t('Отмена', 'Бас тарту')}</button><button type='submit' class='btn primary'>${label}${icon('arrow')}</button></div>`;
 function createDialog() { openDialog(`${dialogHead(t('Начнём новую историю.', 'Жаңа оқиғаны бастайық.'), t('Ваш текущий проект останется в списке проектов.', 'Қазіргі жобаңыз жобалар тізімінде сақталады.'))}<form id='create-form'>${serverClient ? `<label for='project-slug'>${t('Код проекта (латиница)', 'Жоба коды (латынша)')}</label><input id='project-slug' name='slug' maxlength='64'><small>${t('Необязательно. Этот код задаёт проект в правах ключа; пустое поле создаст новый код автоматически.', 'Міндетті емес. Бұл код кілт құқықтарындағы жобаны белгілейді; бос өріс жаңа кодты автоматты түрде жасайды.')}</small>` : ''}<label for='project-title'>${t('Название проекта', 'Жоба атауы')}</label><input id='project-title' name='title' required maxlength='120' placeholder='${t('Название вашего фильма', 'Фильміңіздің атауы')}'><label for='project-synopsis'>${t('О чём ваша история?', 'Оқиғаңыз не туралы?')}</label><textarea id='project-synopsis' name='synopsis' rows='3' maxlength='4000'></textarea>${dialogActions(t('Создать проект', 'Жоба құру'))}</form>`); }
@@ -753,9 +753,32 @@ function runCommand(text) {
   if (cmd.kind === 'open' && cmd.target) { go('breakdown'); say(describeCommand(cmd, state.locale)); return; }
   if (cmd.kind === 'waiting') { mapFilter = 'awaiting'; go('map'); say(describeCommand(cmd, state.locale)); return; }
   if (cmd.kind === 'help') { location.href = '../pomoshch/'; return; }
-  if (cmd.kind === 'ask') { say(t('Вопрос записан. Помощник ответит, когда подключится ключ модели.', 'Сұрақ жазылды. Көмекші модель кілті қосылғанда жауап береді.')); return; }
+  if (cmd.kind === 'ask') { void askAssistant(cmd.text); return; }
   if (['accept', 'return', 'review', 'take', 'done', 'note'].includes(cmd.kind)) { go('map'); say(describeCommand(cmd, state.locale) + ' · ' + t('выберите клетку на карте', 'картадан ұяшықты таңдаңыз')); return; }
   say(describeCommand(cmd, state.locale));
+}
+const assistantHistory = [];
+function assistantDialog(answer, pending = '') {
+  const items = assistantHistory.slice(-8).map(m => `<div class='assistant-msg ${m.role}'><span class='label'>${m.role === 'user' ? t('Вы', 'Сіз') : t('Помощник', 'Көмекші')}</span><p>${e(m.content).replace(/\n/g, '<br>')}</p></div>`).join('');
+  openDialog(`${dialogHead(t('Помощник проекта', 'Жоба көмекшісі'), t('Помнит весь проект: сценарий, сцены, паспорта, карту, ленту. Ничего не меняет и не запускает платное.', 'Бүкіл жобаны есте сақтайды. Ештеңені өзгертпейді, ақылыны іске қоспайды.'))}<div class='assistant-log'>${items}${pending ? `<div class='assistant-msg assistant pending'><span class='label'>${t('Помощник', 'Көмекші')}</span><p>${e(pending)}</p></div>` : ''}</div><form id='assistant-form'><label for='assistant-q'>${t('Спросить ещё', 'Тағы сұрау')}</label><input id='assistant-q' name='q' maxlength='4000' autocomplete='off'>${dialogActions(t('Спросить', 'Сұрау'))}</form>`);
+  dialog.classList.add('assistant-dialog');
+}
+async function askAssistant(question) {
+  if (!question.trim()) return;
+  if (!serverClient || !project()) { toast(t('Помощник работает с проектом на сервере: подключите сервер и ключ.', 'Көмекші сервердегі жобамен жұмыс істейді: сервер мен кілтті қосыңыз.')); return; }
+  assistantHistory.push({ role: 'user', content: question });
+  assistantDialog(null, t('думаю…', 'ойланып тұрмын…'));
+  try {
+    const page = route();
+    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/assistant`, { question, section: page === 'overview' ? '' : page, history: assistantHistory.slice(0, -1).slice(-10) });
+    const answer = result?.data?.answer || t('Пустой ответ.', 'Бос жауап.');
+    assistantHistory.push({ role: 'assistant', content: answer });
+    if (dialog.open && dialog.classList.contains('assistant-dialog')) assistantDialog(answer);
+  } catch (error) {
+    assistantHistory.pop();
+    const message = error?.status === 503 ? t('Помощник ещё не подключён: на сервере нет ключа модели. Вопрос не потерян — задайте его, когда ключ появится.', 'Көмекші әлі қосылмаған: серверде модель кілті жоқ.') : (error?.message || t('Помощник не ответил.', 'Көмекші жауап бермеді.'));
+    if (dialog.open && dialog.classList.contains('assistant-dialog')) assistantDialog(null, message); else toast(message);
+  }
 }
 function listenVoice() {
   const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -945,6 +968,7 @@ dialog.addEventListener('click', async event => {
   });
 });
 dialog.addEventListener('submit', async event => {
+  if (event.target?.id === 'assistant-form') { event.preventDefault(); const q = event.target.querySelector('#assistant-q')?.value || ''; if (q.trim()) void askAssistant(q); return; }
   event.preventDefault();
   const form = event.target; const data = new FormData(form);
   if (form.id === 'passport-form') {

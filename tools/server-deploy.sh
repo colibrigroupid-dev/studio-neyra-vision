@@ -15,6 +15,9 @@ ssh -o BatchMode=yes "$HOST" 'mkdir -p /opt/neyra-studio/server /opt/neyra-studi
 TMP="$(mktemp -d)"; git -C "$ROOT" show HEAD:server/app.py > "$TMP/app.py"
 scp -q "$TMP/app.py" "$HOST:/opt/neyra-studio/server/app.py"; rm -rf "$TMP"
 scp -q "$KEYS" "$HOST:/opt/neyra-studio/keys.json"
+# ключ модели для помощника (№46): если лежит на маке в ~/.config/neyra-studio/key — уезжает на сервер
+MODELKEY="$HOME/.config/neyra-studio/key"
+if [ -f "$MODELKEY" ]; then ssh -o BatchMode=yes "$HOST" 'mkdir -p /root/.config/neyra-studio'; scp -q "$MODELKEY" "$HOST:/root/.config/neyra-studio/key"; ssh -o BatchMode=yes "$HOST" 'chmod 600 /root/.config/neyra-studio/key'; echo "ключ модели для помощника скопирован"; else echo "ключа модели нет (~/.config/neyra-studio/key) — помощник ответит 503, пока не появится"; fi
 ssh -o BatchMode=yes "$HOST" 'chmod 600 /opt/neyra-studio/keys.json
 cat > /etc/systemd/system/neyra-studio.service <<UNIT
 [Unit]

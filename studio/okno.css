@@ -90,6 +90,12 @@ body{font-size:16px;line-height:1.5}
 .helper-stub .chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 6px}
 .helper-stub .chip{min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:13px;cursor:pointer}
 .helper-stub .chip:hover{background:var(--surface2);color:var(--text)}
+/* диалог помощника */
+.assistant-log{display:grid;gap:10px;margin:8px 0 16px;max-height:50vh;overflow:auto}
+.assistant-msg{display:grid;gap:4px;padding:10px 14px;border-radius:14px;background:var(--surface2)}
+.assistant-msg.user{background:transparent;border:1px solid var(--line-soft)}
+.assistant-msg .label{font-size:13px;color:var(--dim)}.assistant-msg p{margin:0;font-size:15px;line-height:1.5}
+.assistant-msg.pending p{color:var(--muted)}
 /* рабочее поле */
 .work-main{max-width:940px;padding:36px 24px 160px}
 .prototype-note{font:400 .8125rem/1.4 var(--mono);letter-spacing:.04em;color:var(--dim);margin-bottom:24px}
