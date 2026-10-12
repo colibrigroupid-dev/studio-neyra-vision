@@ -388,7 +388,17 @@ Draft date: 13.10.2026
   // ---------- утилиты ----------
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   let tt; function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 2200); }
-  document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); cur().text = src.value; save(); toast('Сохранено в браузере'); } });
+  async function serverVersion() {
+    if (!serverMode || !serverMode.loaded) return false;
+    clearTimeout(serverMode.timer);
+    const path = '/api/projects/' + encodeURIComponent(serverMode.slug);
+    await serverFetch(path + '/script', 'PUT', { text: cur().text });
+    const stamp = new Date(); const label = 'редактор · ' + stamp.toLocaleDateString('ru-RU') + ' ' + stamp.toTimeString().slice(0, 5);
+    await serverFetch(path + '/versions', 'POST', { label });
+    $('#saveState').textContent = 'версия зафиксирована · ' + label;
+    return true;
+  }
+  document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); cur().text = src.value; save(); if (serverMode && serverMode.loaded) serverVersion().then(() => toast('Версия сценария зафиксирована на сервере')).catch((err) => toast('Сервер не принял версию: ' + err.message)); else toast('Сохранено в браузере'); } });
 
   // ---------- старт ----------
   if (!Object.keys(projects).length) newProject('Последний поезд (пример)', DEMO);
