@@ -99,7 +99,7 @@ def shots_for_scene(lines, sc, hero_names):
         para = []
         while i < len(block) and block[i].strip() and not razbivka.NAME_RE.match(block[i].strip()): para.append(block[i].strip()); i += 1
         text = " ".join(para)
-        chars = [n for n in hero_names if re.search(rf"(?<![{CAPS}])" + re.escape(n) + rf"(?![{CAPS}])", text)]
+        chars = [n for n in hero_names if re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", text, flags=(0 if n == n.upper() else re.I))]
         if first_action: size = "общий (мастер)"; first_action = False
         elif SHADOW_WORDS.search(text): size = "общий, тени"
         elif CLOSE_WORDS.search(text) and not WIDE_WORDS.search(text): size = "крупный"
@@ -146,7 +146,7 @@ def main():
     heroes, locs = read_cards(proj, "geroi"), read_cards(proj, "lokacii")
     K = kanon.read_kanon(proj)
     if not K: print("канона нет (03-vizual/KANON.md) — промпты без стиля и запретов; создайте: python3 tools/kanon.py init", a.slug)
-    hero_names = sorted({c["name"] for c in d["characters"]} | {a for h in heroes.values() for a in h["aliases"] if a}, key=len, reverse=True)
+    hero_names = sorted({c["name"] for c in d["characters"]} | {a for h in heroes.values() for a in h["aliases"] if a} | {a for h in (K["heroes"].values() if K else []) for a in h.get("aliases", ()) if a}, key=len, reverse=True)
     want = [int(x) for x in a.sceny.split(",") if x.strip()]
     rows, cards, jobs, total_sec = [], [], [], 0.0
     for sc in d["scenes"]:
@@ -155,10 +155,13 @@ def main():
         shots = shots_for_scene(lines, sc, hero_names)
         for k, sh in enumerate(shots, 1):
             sid = f"{sc['n']:02d}-{k:02d}"
-            prev = out / "kadry" / f"{sid}.md"; action_en = ""
-            if prev.exists():  # перевод действия, вписанный ассистентом, переживает пересборку
-                m_en = re.search(r"^deystvie_en:\s*(.+)$", prev.read_text(encoding="utf-8"), flags=re.M)
-                action_en = m_en.group(1).strip() if m_en else ""
+            prev = out / "kadry" / f"{sid}.md"; action_en = ""; keep = {"status": "draft", "prinyal": "", "zamechanie": ""}
+            if prev.exists():  # перевод, статус, замечание и «кто принял» переживают пересборку
+                pm = {}
+                for ln in prev.read_text(encoding="utf-8").split("---", 2)[1].splitlines():
+                    if ":" in ln: a_, b_ = ln.split(":", 1); pm[a_.strip()] = b_.strip()
+                action_en = pm.get("deystvie_en", "")
+                keep = {k_: pm.get(k_, v_) for k_, v_ in keep.items()}
             if K:
                 prompt, krefs = kanon.sobrat(K, "karandash", {"id": sid, "size_en": SIZE_EN.get(sh["size"], "medium shot"), "move_en": MOVE_EN.get(sh["move"].split(" (")[0], "static camera"), "chars": list(dict.fromkeys(sh["chars"])), "loc_name": sc["location"], "vo": sh["vo"]}, action_en=action_en, time_en=(sc["time"] or "day").lower())
             else:
@@ -177,7 +180,7 @@ def main():
                     if h and h["zamok_img"]: refs.append({"path": h["zamok_img"], "role": "identity"})
                 if loc and loc["zamok_img"]: refs.append({"path": loc["zamok_img"], "role": "staging"})
             card = ("---\n" + f"kadr: {sid}\nscena: {sc['n']}\nkrupnost: {sh['size']}\ndvizhenie: {sh['move']}\nobektiv: {lens}\ndlitelnost: {sh['sec']} с\n"
-                    f"status: draft\nprinyal: \ndeystvie: {action}\ndeystvie_en: {action_en}\nzamechanie: \ngeroi: {who}\nlokaciya: {sc['location']}\nkanon: {K['version'] if K else ''}\n---\n" + prompt + "\n")
+                    f"status: {keep['status']}\nprinyal: {keep['prinyal']}\ndeystvie: {action}\ndeystvie_en: {action_en}\nzamechanie: {keep['zamechanie']}\ngeroi: {who}\nlokaciya: {sc['location']}\nkanon: {K['version'] if K else ''}\n---\n" + prompt + "\n")
             (out / "kadry" / f"{sid}.md").write_text(card, encoding="utf-8")
             cards.append(sid)
             job = generator.Job(kind="karandash", project=a.slug, target=f"shot:{sc['n']}.{k}", prompt=prompt, negative=NEGATIVE,

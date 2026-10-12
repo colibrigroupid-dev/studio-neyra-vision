@@ -4,6 +4,9 @@
     python3 tools/kanon.py init <slug>        собрать 03-vizual/KANON.md из паспортов и stranica.json (существующий не трогает)
     python3 tools/kanon.py proverka <slug>    проверить канон и кадры: пустые замки, возраст числом, устаревшие кадры
     python3 tools/kanon.py reestr <slug>      реестр кадров 03-vizual/REESTR-KADROV.md/.json из карточек и сайдкаров
+    python3 tools/kanon.py vernut <slug> <кадр> "<замечание по-русски>" [--en "rule in English"] [--kto Имя]
+                                              кадр → returned, замечание в карточку, правило в канон (№26 «ИИ учится»)
+    python3 tools/kanon.py prinyat <slug> <кадр> [--kto Имя]     кадр → approved (⭐), кто принял, в сайдкар
 
 Механика (RAZBOR/09): канон = один файл, который дословно вклеивается в каждый промпт, — стиль и палитра 60:30:10,
 список запретов, замок каждого героя (identity block, табу-детали, референсы с ролями) и локации. У канона есть
@@ -51,7 +54,7 @@ def read_kanon(proj):
         if ln.startswith("### ") and sec in ("heroes", "locs"):
             m = re.match(r"###\s+(@\S+)\s*·\s*(.+)", ln)
             if not m: continue
-            cur = {"tag": m.group(1), "imya": m.group(2).strip(), "identity": "", "taboo": [], "refs": [], "height": "", "state": "v1", "lock": ""}
+            cur = {"tag": m.group(1), "imya": m.group(2).strip(), "identity": "", "taboo": [], "refs": [], "height": "", "state": "v1", "lock": "", "aliases": set()}
             k[sec][m.group(1)] = cur; continue
         s = ln.strip()
         if not s: continue
@@ -67,13 +70,15 @@ def read_kanon(proj):
             elif a == "taboo": cur["taboo"] = [x.strip() for x in _v(b).split(";") if x.strip()]
             elif a == "refs": cur["refs"] = [x.strip() for x in b.split(";") if x.strip() and not x.strip().startswith("[нет")]
             elif a in ("height", "state", "lock"): cur[a] = _v(b)
+            elif a == "alias": cur["aliases"] = {x.strip() for x in _v(b).split(";") if x.strip()}
     return k
 
 def hero_by_name(k, name):
     n = name.upper()
     for h in k["heroes"].values():
         imya = h["imya"].upper()
-        if n == imya or n.startswith(imya) or imya.startswith(n) or n in h.get("aliases", ()): return h
+        als = {a.upper() for a in h.get("aliases", ())}
+        if n == imya or n.startswith(imya) or imya.startswith(n) or n in als or any(n.startswith(a) for a in als): return h
     return None
 
 def loc_by_name(k, loc_name):
@@ -193,6 +198,7 @@ def init(slug):
         o += [f"### @char_{h['slug']} · {h['imya']}",
               f"identity: {h['ident'] or '[заполнить по-английски из паспорта: ' + h['ru'][:80] + '…]'}",
               "taboo: [решение: 2–3 детали, которые никогда не меняются — напр. the red ribbons in the braids never change colour; the bow is always on the back]",
+              "alias: [как героя называют в действии без имени, через «;» — напр. конь; мальчик]",
               "height: [решение: рост в см — нужен, когда в кадре двое]",
               f"refs: {'; '.join(h['imgs']) if h['imgs'] else '[нет — после утверждённого портрета: 03-vizual/geroi/' + h['slug'] + '/zamok.png (identity)]'}",
               "state: v1", ""]
@@ -262,6 +268,72 @@ def proverka(slug):
     if stale: w(f"кадры под старым каноном ({len(stale)}): {', '.join(stale[:12])}{'…' if len(stale) > 12 else ''}")
     print(f"итого замечаний: {bad}")
 
+
+# ---------- №26: замечание → правило, приёмка ----------
+def _find_card(proj, kadr):
+    for d in (proj / "03-vizual" / "kadry", proj / "03-vizual" / "raskadrovka" / "kadry"):
+        f = d / f"{kadr}.md"
+        if f.exists(): return f
+    sys.exit(f"нет карточки кадра {kadr}")
+
+def _set_meta(f, **fields):
+    t = f.read_text(encoding="utf-8")
+    head, body = t.split("---", 2)[1], t.split("---", 2)[2]
+    lines = head.strip("\n").splitlines(); keys = {l.split(":", 1)[0].strip(): i for i, l in enumerate(lines) if ":" in l}
+    for k, v in fields.items():
+        line = f"{k}: {v}"
+        if k in keys: lines[keys[k]] = line
+        else: lines.append(line)
+    f.write_text("---\n" + "\n".join(lines) + "\n---" + body, encoding="utf-8")
+
+def _sidecar_approval(f, status, by, comment):
+    for side in f.parent.glob(f"{f.stem}*.json"):
+        try: d = json.loads(side.read_text(encoding="utf-8"))
+        except Exception: continue
+        if not str(d.get("schema", "")).startswith("neyra-vision/provenance"): continue
+        d["approval"] = {"status": status, "by": by, "at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "comment": comment}
+        side.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+
+def vernut(slug, kadr, text, en="", kto=""):
+    proj = PROEKTY / slug; f = _find_card(proj, kadr)
+    meta = {}
+    for ln in f.read_text(encoding="utf-8").split("---", 2)[1].splitlines():
+        if ":" in ln: a, b = ln.split(":", 1); meta[a.strip()] = b.strip()
+    who = meta.get("geroi", "") or meta.get("lokaciya", "") or "все"
+    _set_meta(f, status="returned", zamechanie=text, prinyal=kto)
+    _sidecar_approval(f, "returned", kto, text)
+    k = proj / "03-vizual" / "KANON.md"
+    if k.exists():
+        t = k.read_text(encoding="utf-8")
+        rule = f"- {datetime.date.today():%d.%m.%Y} · {kadr} · {who} · {en or text}" + (f" (рус.: {text})" if en else "")
+        marker = "## Правила из замечаний"
+        i = t.find(marker)
+        if i >= 0:
+            j = t.find("\n## ", i + 1); j = len(t) if j < 0 else j
+            sec = t[i:j].rstrip("\n")
+            sec = re.sub(r"\n- \(пусто[^\n]*", "", sec)
+            t = t[:i] + sec + "\n" + rule + "\n\n" + t[j:].lstrip("\n")
+        else:
+            t = t.rstrip("\n") + "\n\n" + marker + " (ИИ учится)\n\n" + rule + "\n"
+        k.write_text(t, encoding="utf-8")
+        print(f"кадр {kadr} → returned; правило в канон: «{en or text}» (касается: {who}); канон теперь версии {hashlib.sha256(t.encode()).hexdigest()[:10]}")
+    else:
+        print(f"кадр {kadr} → returned; канона нет, правило не записано")
+
+def prinyat(slug, kadr, kto=""):
+    proj = PROEKTY / slug; f = _find_card(proj, kadr)
+    _set_meta(f, status="approved", prinyal=kto)
+    _sidecar_approval(f, "approved", kto, "")
+    print(f"кадр {kadr} → approved ⭐" + (f" ({kto})" if kto else ""))
+
 if __name__ == "__main__":
     if len(sys.argv) < 3: print(__doc__); sys.exit(0)
-    {"init": init, "proverka": proverka, "reestr": reestr}[sys.argv[1]](sys.argv[2])
+    cmd = sys.argv[1]
+    if cmd in ("init", "proverka", "reestr"): {"init": init, "proverka": proverka, "reestr": reestr}[cmd](sys.argv[2])
+    elif cmd == "vernut":
+        import argparse; ap = argparse.ArgumentParser(); ap.add_argument("cmd"); ap.add_argument("slug"); ap.add_argument("kadr"); ap.add_argument("text"); ap.add_argument("--en", default=""); ap.add_argument("--kto", default="")
+        a = ap.parse_args(); vernut(a.slug, a.kadr, a.text, a.en, a.kto)
+    elif cmd == "prinyat":
+        import argparse; ap = argparse.ArgumentParser(); ap.add_argument("cmd"); ap.add_argument("slug"); ap.add_argument("kadr"); ap.add_argument("--kto", default="")
+        a = ap.parse_args(); prinyat(a.slug, a.kadr, a.kto)
+    else: print(__doc__)

@@ -46,5 +46,32 @@ server {
 NG
 ln -sf /etc/nginx/sites-available/neyra-studio-api /etc/nginx/sites-enabled/neyra-studio-api
 nginx -t 2>&1 | tail -1 && systemctl reload nginx && echo "nginx: сайт api.studio.neyra.vision включён (80)"
-command -v certbot >/dev/null || (apt-get install -y -qq certbot python3-certbot-nginx >/dev/null 2>&1 && echo "certbot установлен")'
+command -v certbot >/dev/null || (apt-get install -y -qq certbot python3-certbot-nginx >/dev/null 2>&1 && echo "certbot установлен")
+# №56: ежедневный бэкап данных (7 дней), 03:17 UTC
+mkdir -p /opt/backups/neyra-studio
+cat > /usr/local/bin/neyra-studio-backup <<BK
+#!/bin/sh
+set -e
+d=/opt/backups/neyra-studio; mkdir -p \$d
+tar -czf \$d/data-\$(date +%Y%m%d-%H%M).tar.gz -C /opt/neyra-studio data keys.json
+ls -1t \$d/data-*.tar.gz | tail -n +8 | xargs -r rm -f
+BK
+chmod +x /usr/local/bin/neyra-studio-backup
+cat > /etc/systemd/system/neyra-studio-backup.service <<UNIT
+[Unit]
+Description=Neyra Studio — бэкап данных
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/neyra-studio-backup
+UNIT
+cat > /etc/systemd/system/neyra-studio-backup.timer <<UNIT
+[Unit]
+Description=Neyra Studio — ежедневный бэкап 03:17 UTC
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload && systemctl enable --now neyra-studio-backup.timer && /usr/local/bin/neyra-studio-backup && echo "бэкап: таймер включён, первый архив: \$(ls -1t /opt/backups/neyra-studio | head -1)"'
 echo "готово: дальше DNS A api.studio.neyra.vision → 212.192.8.91 (Cloudflare, DNS only) и команда certbot из шапки этого файла"
