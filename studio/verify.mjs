@@ -1692,3 +1692,21 @@ await verifyBreakdownModules();
   assert.ok(describeCommand(parseCommand('видео 12.3')).includes('«да»'));
   console.log('Voice/text command grammar: numbers, sections, verbs, confirmations and questions: passed.');
 }
+
+// №52 р.3 / №36: каркас окна в новом дизайне — хлопушка, группы цехов, меню аккаунта, подсказки-команды,
+// лист «Ждёт меня» на Обзоре из клеток awaiting карты; клик по строке ведёт на карту.
+{
+  const api = nativeApi(); const p = seedBreakdown(api);
+  const date = '2026-10-13T00:00:00+05:00';
+  p.cells.push({ id: 'cell-wait', object: { type: 'scene', id: 'scene-1' }, stage: 'script', status: 'awaiting', assignee: { keyId: null, name: 'Лена <b>x</b>' }, approverRole: 'producer', dueAt: null, version: 'draft-01', variant: null, comment: '', createdAt: date, updatedAt: date });
+  const ui = await appHarness({ api, stored: cinemaSettings(), hash: '#/studio/overview' }); await ui.settle();
+  assert.match(ui.app.innerHTML, /class='slate'/, 'Slate header is rendered');
+  assert.match(ui.app.innerHTML, /class='glabel'>Девелопмент</, 'Sidebar groups film departments');
+  assert.match(ui.app.innerHTML, /class='menu'/, 'Account menu lives in the sidebar');
+  assert.match(ui.app.innerHTML, /data-cmd='кто тормозит'/, 'Command chips are offered');
+  assert.match(ui.app.innerHTML, /data-open-cell='cell-wait'/, 'Awaiting cell is listed on the overview');
+  assert.match(ui.app.innerHTML, /Лена &lt;b&gt;x&lt;\/b&gt;/, 'Assignee name is escaped');
+  assert.match(ui.app.innerHTML, /class='tabbar'/, 'Mobile tab bar is rendered');
+  assert.ok(api.calls.some(c => c.path.endsWith('/map')), 'Overview loads the production map for the waiting list');
+}
+console.log('Actual app new shell: slate, department groups, account menu, command chips and overview waiting list: passed.');
