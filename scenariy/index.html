@@ -15,7 +15,7 @@
 <link rel="icon" href="../assets/favicon-64.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;500;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=50">
+<link rel="stylesheet" href="app.css?v=53">
 </head>
 <body>
 <noscript><div class="nojs">Сценарная работает только с включённым JavaScript.</div></noscript>
@@ -59,6 +59,7 @@
         <span class="sep"></span>
         <select id="ptype" class="ptype" aria-label="Тип абзаца">
           <option value="scene_heading" data-t="Заголовок сцены">Заголовок сцены</option>
+          <option value="scene_characters" data-t="Участники сцены">Участники сцены</option>
           <option value="action" data-t="Описание действия">Описание действия</option>
           <option value="character" data-t="Персонаж">Персонаж</option>
           <option value="parenthetical" data-t="Ремарка">Ремарка</option>
@@ -67,6 +68,7 @@
           <option value="shot" data-t="Кадр">Кадр</option>
           <option value="transition" data-t="Переход">Переход</option>
           <option value="inline_note" data-t="Заметка по тексту">Заметка по тексту</option>
+          <option value="unformatted_text" data-t="Простой текст">Простой текст</option>
           <option value="sequence_heading" data-t="Группа (эпизод)">Группа (эпизод)</option>
           <option value="act_heading" data-t="Акт">Акт</option>
           <option value="page_break" data-t="Разрыв страницы">Разрыв страницы</option>
@@ -110,32 +112,36 @@
         <div class="seg tier" role="group"><button type="button" data-tier="standard" aria-pressed="true" data-t="Стандарт">Стандарт</button><button type="button" data-tier="pro" aria-pressed="false">PRO</button></div>
         <button type="button" class="ic" id="btnNeyraClose" aria-label="Закрыть">×</button>
       </div>
-      <div class="scope"><span class="caps" data-t="Работать с">Работать с</span>
-        <select id="scope"><option value="auto" data-t="выделение → сцена → всё">выделение → сцена → всё</option><option value="selection" data-t="выделенным">выделенным</option><option value="scene" data-t="текущей сценой">текущей сценой</option><option value="all" data-t="всем сценарием">всем сценарием</option></select>
-        <span class="what" id="scopeWhat"></span></div>
-      <div class="actions" id="actions">
-        <button type="button" data-act="coverage" class="wide"><span data-t="Читательское заключение">Читательское заключение</span><small data-t="весь сценарий: что работает, что ломается">весь сценарий: что работает, что ломается</small></button>
-        <button type="button" data-act="beats"><span data-t="Бит-шит">Бит-шит</span><small data-t="15 битов, где дыра">15 битов, где дыра</small></button>
-        <button type="button" data-act="continuity"><span data-t="Непрерывность">Непрерывность</span><small data-t="имена, время, ружья">имена, время, ружья</small></button>
-        <button type="button" data-act="improve"><span data-t="Улучшить сцену">Улучшить сцену</span><small data-t="цель · препятствие · перемена">цель · препятствие · перемена</small></button>
-        <button type="button" data-act="dialogue"><span data-t="Диалог живее">Диалог живее</span><small data-t="подтекст, голоса героев">подтекст, голоса героев</small></button>
-        <button type="button" data-act="modernize"><span data-t="Модернизировать">Модернизировать</span><small data-t="в наше время и язык">в наше время и язык</small></button>
-        <button type="button" data-act="turns"><span data-t="3 поворота">3 поворота</span><small data-t="варианты для сцены">варианты для сцены</small></button>
-        <button type="button" data-act="logline"><span data-t="Логлайн и синопсис">Логлайн и синопсис</span><small data-t="в документ «Синопсис»">в документ «Синопсис»</small></button>
-        <button type="button" data-act="kazakh"><span data-t="На казахский">На казахский</span><small data-t="перевод с форматом">перевод с форматом</small></button>
-        <button type="button" data-act="russian"><span data-t="На русский">На русский</span><small data-t="перевод с форматом">перевод с форматом</small></button>
-        <button type="button" data-act="expand"><span data-t="Расписать">Расписать</span><small data-t="из синопсиса — сцены">из синопсиса — сцены</small></button>
-        <button type="button" data-act="cut"><span data-t="Сжать">Сжать</span><small data-t="входи поздно, выходи рано">входи поздно, выходи рано</small></button>
+      <div class="ai-list" id="actions">
+        <button type="button" data-act="paraphrase"><i>↻</i><span data-t="Перефразировать">Перефразировать</span></button>
+        <button type="button" data-act="expand"><i>⤢</i><span data-t="Расширить">Расширить</span></button>
+        <button type="button" data-act="cut"><i>⤡</i><span data-t="Сократить">Сократить</span></button>
+        <button type="button" data-act="continue"><i>⎘</i><span data-t="Вставить">Вставить</span></button>
+        <button type="button" data-act="summarize"><i>≡</i><span data-t="Подытожить">Подытожить</span></button>
+        <button type="button" data-act="translate"><i>Ә</i><span data-t="Перевести">Перевести</span></button>
+        <button type="button" data-act="logline"><i>▤</i><span data-t="Сгенерировать синопсис">Сгенерировать синопсис</span></button>
+        <button type="button" data-act="coverage"><i>✎</i><span data-t="Разбор сценария">Разбор сценария</span></button>
+        <button type="button" data-act="generate"><i>Тт</i><span data-t="Сгенерировать">Сгенерировать</span></button>
+        <button type="button" class="more" id="aiMore"><i>…</i><span data-t="Ещё">Ещё</span></button>
+        <div class="ai-extra hidden" id="aiExtra">
+          <button type="button" data-act="dialogue"><i>“</i><span data-t="Диалог живее">Диалог живее</span></button>
+          <button type="button" data-act="modernize"><i>⌁</i><span data-t="Модернизировать">Модернизировать</span></button>
+          <button type="button" data-act="turns"><i>⑂</i><span data-t="3 поворота">3 поворота</span></button>
+          <button type="button" data-act="beats"><i>▦</i><span data-t="Бит-шит">Бит-шит</span></button>
+          <button type="button" data-act="continuity"><i>⟲</i><span data-t="Непрерывность">Непрерывность</span></button>
+        </div>
+        <div class="ai-scope"><span class="caps" data-t="Работать с">Работать с</span> <select id="scope"><option value="auto" data-t="выделение → сцена → всё">выделение → сцена → всё</option><option value="selection" data-t="выделенным">выделенным</option><option value="scene" data-t="текущей сценой">текущей сценой</option><option value="all" data-t="всем сценарием">всем сценарием</option></select><span class="what" id="scopeWhat"></span></div>
       </div>
       <div class="chat" id="chat"></div>
+      <div class="ai-foot"><span id="tokenInfo"></span><a href="../studio/#/studio/overview" id="topup" data-t="пополнить">пополнить</a></div>
       <form class="ask" id="askForm"><textarea id="askIn" rows="1" placeholder="Спросить NEYRA о сценарии…" data-tp="NEYRA-дан сценарий туралы сұрау…" aria-label="Вопрос"></textarea><button class="btn btn--main btn--sm" type="submit" aria-label="Отправить">→</button></form>
     </aside>
   </div>
 </div>
 <input type="file" id="fileIn" accept=".fountain,.txt,.md,.fdx,.json" class="hidden">
 <div class="toast" id="toast" role="status"></div>
-<script src="fountain.js?v=50"></script>
-<script src="editor.js?v=50"></script>
-<script src="app.js?v=50"></script>
+<script src="fountain.js?v=53"></script>
+<script src="editor.js?v=53"></script>
+<script src="app.js?v=53"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@
   // ---------- язык ----------
   const KZ = {
     'Сценарная': 'Сценарий беті', 'Режиссёрская': 'Режиссёр беті', 'Титульная страница': 'Титул беті', 'Синопсис': 'Синопсис', 'Сценарий': 'Сценарий', 'Статистика': 'Статистика', 'Персонажи': 'Кейіпкерлер', 'Локации': 'Локациялар',
-    'Длительность': 'Ұзақтығы', 'стр.': 'бет', 'Заголовок сцены': 'Көрініс тақырыбы', 'Описание действия': 'Әрекет сипаттамасы', 'Персонаж': 'Кейіпкер', 'Ремарка': 'Ремарка', 'Реплика': 'Реплика', 'Лирика': 'Лирика', 'Кадр': 'Кадр', 'Переход': 'Ауысу', 'Заметка по тексту': 'Мәтін жазбасы', 'Группа (эпизод)': 'Топ (эпизод)', 'Акт': 'Акт', 'Разрыв страницы': 'Бет үзілісі',
+    'Длительность': 'Ұзақтығы', 'стр.': 'бет', 'Заголовок сцены': 'Көрініс тақырыбы', 'Участники сцены': 'Көрініс қатысушылары', 'Простой текст': 'Қарапайым мәтін', 'Описание действия': 'Әрекет сипаттамасы', 'Персонаж': 'Кейіпкер', 'Ремарка': 'Ремарка', 'Реплика': 'Реплика', 'Лирика': 'Лирика', 'Кадр': 'Кадр', 'Переход': 'Ауысу', 'Заметка по тексту': 'Мәтін жазбасы', 'Группа (эпизод)': 'Топ (эпизод)', 'Акт': 'Акт', 'Разрыв страницы': 'Бет үзілісі',
     'сохранено': 'сақталды', 'проверяю связь': 'байланысты тексеру', 'Название': 'Атауы', 'Подзаголовок / жанр': 'Тақырыпша / жанр', 'Автор': 'Автор', 'Дата черновика': 'Черновик күні', 'Контакты': 'Байланыс', 'Логлайн': 'Логлайн', 'Заметки': 'Жазбалар',
     'Стандарт': 'Стандарт', 'Работать с': 'Жұмыс', 'выделение → сцена → всё': 'белгіленген → көрініс → бәрі', 'выделенным': 'белгіленгенмен', 'текущей сценой': 'ағымдағы көрініспен', 'всем сценарием': 'бүкіл сценариймен',
     'Читательское заключение': 'Оқырман қорытындысы', 'весь сценарий: что работает, что ломается': 'бүкіл сценарий: не жұмыс істейді, не бұзылады', 'Бит-шит': 'Бит-парақ', '15 битов, где дыра': '15 бит, қайда олқылық', 'Непрерывность': 'Үздіксіздік', 'имена, время, ружья': 'есімдер, уақыт, мылтықтар',
@@ -117,11 +117,12 @@
     modal(`<h2>${T('Проекты команды', 'Команда жобалары')}</h2><ul class="keys" style="margin-bottom:.8rem">${arr.map((p) => `<li><button class="btn btn--sm" type="button" data-m="p:${esc(p.slug)}">${esc(typeof p.title === 'string' ? p.title : (p.title && p.title.ru) || p.slug)}</button><span class="caps">${esc(p.slug)}</span></li>`).join('')}</ul><div class="row"><button class="btn" data-m="close" type="button">${T('Закрыть', 'Жабу')}</button></div>`,
       async (act) => { if (!act.startsWith('p:')) return false; try { flush(); await serverOpen(act.slice(2)); } catch (err) { toast(T('Не удалось открыть: ', 'Ашу мүмкін болмады: ') + err.message); return false; } return true; });
   }
+  function showTokens(tk) { const el = $('#tokenInfo'); if (!tk) { el.textContent = ''; return; } if (tk.unlimited) el.textContent = T('токены без лимита', 'токендер шексіз'); else if (!tk.balance) el.textContent = T('Нет доступных токенов', 'Қолжетімді токендер жоқ'); else el.textContent = T('Токенов: ', 'Токендер: ') + tk.balance + (tk.cena_voprosa ? ' · ' + T('вопрос от ', 'сұрақ ') + tk.cena_voprosa : ''); }
   async function checkApi() {
     const dot = $('#aiDot'), st = $('#aiStateText'), p = cur();
     $('#lnkDirector').href = STUDIO + (p && p.server ? '?proekt=' + encodeURIComponent(p.server) + '#/studio/heroes' : '');
     if (server) {
-      try { await serverFetch('/api/me'); dot.className = 'dot on'; st.textContent = (p && p.server) ? T('сервер команды · ', 'команда сервері · ') + p.server : T('сервер команды · этот сценарий в браузере', 'команда сервері · бұл сценарий браузерде'); }
+      try { const me = await serverFetch('/api/me'); showTokens(me.data && (me.data.tokeny || me.data.wallet)); dot.className = 'dot on'; st.textContent = (p && p.server) ? T('сервер команды · ', 'команда сервері · ') + p.server : T('сервер команды · этот сценарий в браузере', 'команда сервері · бұл сценарий браузерде'); }
       catch (e) { dot.className = 'dot off'; st.textContent = T('сервер: ', 'сервер: ') + e.message; }
       return;
     }
@@ -202,15 +203,33 @@
     const p = ed.curPara(); if (!p) return; const ps = ed.paras(); let idx = 0, cur = 0;
     for (const q of ps) { if (ed.typeOf(q) === 'scene_heading') idx++; if (q === p) { cur = idx; break; } }
     $$('#scenes li').forEach((li) => li.classList.toggle('cur', +li.dataset.i === cur));
-    renderRuler(cur);
+    renderRuler();
   }
-  function renderRuler(curIdx) {
-    const r = $('#ruler'); const sc = ed.scenes(); const total = Math.max(60, ed.stats().seconds); const w = r.clientWidth || 800;
-    const step = total <= 180 ? 10 : total <= 900 ? 30 : 60; let h = '';
-    for (let s = 0; s <= total; s += step) h += `<div class="tick" style="left:${(s / total * w).toFixed(1)}px">${fmt(s)}</div>`;
-    let acc = 0; for (const s of sc) { if (curIdx && s.index === curIdx) { h += `<div class="pos" style="left:${(acc / total * w).toFixed(1)}px"></div>`; } acc += s.seconds; }
-    r.innerHTML = h;
+  // лента времени как в STARC: деления по секундам, рамка — отрезок сценария, видимый сейчас на экране; рамку можно тащить
+  const ruler = $('#ruler'), view = $('#view-script');
+  function renderRuler() {
+    if (!ruler.clientWidth || curDoc !== 'script') return;
+    const ps = ed.paras(); const total = Math.max(12, ed.stats().seconds); const w = ruler.clientWidth;
+    const step = total <= 30 ? 1 : total <= 120 ? 5 : total <= 600 ? 30 : total <= 1800 ? 60 : 300;
+    let h = '';
+    for (let s = 0; s <= total; s += step) h += `<span class="tick" style="left:${(s / total * w).toFixed(1)}px"><i></i>${fmt(s)}</span>`;
+    // видимый отрезок: по положению абзацев относительно окна прокрутки
+    const vt = view.scrollTop, vb = vt + view.clientHeight; const sheet = ed.root; const base = sheet.offsetTop;
+    let acc = 0, tStart = null, tEnd = 0;
+    const perPara = ps.map((p) => { const sec = paraDur(p); const top = base + p.offsetTop, bottom = top + p.offsetHeight; const r = { top, bottom, t0: acc, t1: acc + sec }; acc += sec; return r; });
+    for (const r of perPara) { if (r.bottom < vt || r.top > vb) continue; const frac0 = Math.max(0, Math.min(1, (vt - r.top) / Math.max(1, r.bottom - r.top))); const frac1 = Math.max(0, Math.min(1, (vb - r.top) / Math.max(1, r.bottom - r.top))); if (tStart === null) tStart = r.t0 + (r.t1 - r.t0) * frac0; tEnd = r.t0 + (r.t1 - r.t0) * frac1; }
+    if (tStart === null) { tStart = 0; tEnd = Math.min(total, acc || 0); }
+    const x0 = tStart / total * w, x1 = Math.max(x0 + 24, tEnd / total * w);
+    h += `<div class="win" style="left:${x0.toFixed(1)}px;width:${(x1 - x0).toFixed(1)}px"><b class="l">${fmt(tStart)}</b><b class="r">${fmt(tEnd)}</b></div>`;
+    ruler.innerHTML = h; ruler.dataset.total = total;
   }
+  function paraDur(p) { const type = ed.typeOf(p); if (type === 'page_break') return 0; const txt = (p.textContent || '').trim(); const cols = { scene_heading: 58, action: 58, character: 31, parenthetical: 18, dialogue: 28, lyrics: 43, transition: 58, shot: 58, inline_note: 31, sequence_heading: 58, act_heading: 58, centered: 58, synopsis: 58 }[type] || 58; const before = /^(scene_heading|action|character|transition|shot|inline_note|sequence_heading|act_heading|centered|synopsis)$/.test(type) ? 1 : 0; const lines = before + Math.max(1, Math.ceil(txt.length / cols)); return lines / 61 * 60 * 1.01; }
+  view.addEventListener('scroll', () => { if (!rulerTick) rulerTick = requestAnimationFrame(() => { rulerTick = null; renderRuler(); }); });
+  let rulerTick = null, dragging = null;
+  function scrollToTime(t) { const ps = ed.paras(); let acc = 0; const base = ed.root.offsetTop; for (const p of ps) { const d = paraDur(p); if (acc + d >= t) { const frac = d ? (t - acc) / d : 0; view.scrollTop = base + p.offsetTop + p.offsetHeight * frac - 8; return; } acc += d; } view.scrollTop = view.scrollHeight; }
+  ruler.addEventListener('mousedown', (e) => { const total = +ruler.dataset.total || 60; const win = e.target.closest('.win'); const rect = ruler.getBoundingClientRect(); if (win) { const wr = win.getBoundingClientRect(); dragging = { offset: e.clientX - wr.left, width: wr.width, total, rect }; } else { scrollToTime((e.clientX - rect.left) / rect.width * total - (view.clientHeight / Math.max(1, ed.root.offsetHeight) * total) / 2); } e.preventDefault(); });
+  window.addEventListener('mousemove', (e) => { if (!dragging) return; const x = e.clientX - dragging.rect.left - dragging.offset; scrollToTime(Math.max(0, x / dragging.rect.width * dragging.total)); });
+  window.addEventListener('mouseup', () => { dragging = null; });
   function markPages() { ed.paras().forEach((p) => { p.classList.remove('pgmark'); delete p.dataset.page; }); for (const m of ed.pageMarks()) { m.el.classList.add('pgmark'); m.el.dataset.page = m.page; } }
   function renderCounts() { const st = ed.stats(); $('#charsCount').textContent = st.characters || ''; $('#locsCount').textContent = locations().length || ''; }
   function characters() {
@@ -342,7 +361,7 @@
     <li><kbd>Enter</kbd>${T('следующий абзац: заголовок → действие, персонаж → реплика, реплика → действие', 'келесі абзац')}</li>
     <li><kbd>Tab</kbd>${T('действие → персонаж, персонаж → ремарка, реплика → ремарка; в пустом абзаце меняет тип', 'әрекет → кейіпкер, кейіпкер → ремарка')}</li>
     <li><kbd>Enter</kbd> ${T('в пустом абзаце', 'бос абзацта')}: ${T('действие → заголовок сцены, персонаж → действие', 'әрекет → көрініс тақырыбы')}</li>
-    <li><kbd>Ctrl+1…9</kbd>${T('тип абзаца: 1 заголовок, 3 действие, 4 персонаж, 5 ремарка, 6 реплика, 7 лирика, 8 кадр, 9 переход', 'абзац түрі')}</li>
+    <li><kbd>Ctrl+0…9</kbd>${T('тип абзаца: 1 заголовок, 2 участники сцены, 3 действие, 4 персонаж, 5 ремарка, 6 реплика, 7 лирика, 8 кадр, 9 переход, 0 простой текст', 'абзац түрі')}</li>
     <li><kbd>↑ ↓ Enter</kbd>${T('подсказка: ИНТ./НАТ., локации, время, имена, переходы', 'ұсыныс: ІШКІ./СЫРТҚЫ., локациялар, уақыт, есімдер')}</li>
     <li><kbd>⌘Z / ⌘⇧Z</kbd>${T('отменить / повторить', 'болдырмау / қайталау')}</li>
     <li><kbd>⌘S</kbd>${T('зафиксировать версию', 'нұсқаны бекіту')}</li>
@@ -365,7 +384,7 @@
   let tier = 'standard'; try { tier = localStorage.getItem(LS.tier) === 'pro' ? 'pro' : 'standard'; } catch (e) { /* */ }
   function setTier(v) { tier = v === 'pro' ? 'pro' : 'standard'; try { localStorage.setItem(LS.tier, tier); } catch (e) { /* */ } $$('.seg.tier [data-tier]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.tier === tier)); }
   $$('.seg.tier [data-tier]').forEach((b) => b.addEventListener('click', () => { setTier(b.dataset.tier); toast(tier === 'pro' ? T('PRO: глубокий разбор всего сценария; на действиях со сценой — Стандарт.', 'PRO: бүкіл сценарийді терең талдау.') : T('Стандарт', 'Стандарт')); })); setTier(tier);
-  const HEAVY = { coverage: 1, beats: 1, continuity: 1, logline: 1 };
+  const HEAVY = { coverage: 1, beats: 1, continuity: 1, logline: 1, summarize: 0 };
   function effectiveTier(info) { if (tier !== 'pro') return 'standard'; if (info.free) return info.scope && info.scope.kind === 'all' ? 'pro' : 'standard'; return HEAVY[info.key] ? 'pro' : 'standard'; }
 
   function currentScene() { const p = ed.curPara(); if (!p) return null; const sc = ed.scenes(); let s = null; for (const x of sc) { if (x.el.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING || x.el === p) s = x; } if (!s) return null; const idx = sc.indexOf(s); let last = s.el; let n = s.el.nextElementSibling; const stop = idx + 1 < sc.length ? sc[idx + 1].el : null; while (n && n !== stop) { last = n; n = n.nextElementSibling; } return { scene: s, from: s.el, to: last, text: ed.textRange(s.el, last) }; }
@@ -382,6 +401,12 @@
   const FMT = 'Ответ — только текст в формате Fountain (заголовки сцен капсом, имя героя капсом на своей строке, ремарка в скобках), без вступлений и пояснений.';
   const PLAIN = ' Оформление: обычный текст с короткими заголовками и списками, без markdown-таблиц и без решётки перед заголовками.';
   const ACTS = {
+    paraphrase: { title: 'Перефразировать', rewrite: true, prompt: (t, s) => `Перефразируй ${s.label}: тот же смысл, те же события и имена, но живее и точнее; убери канцелярит и повторы. ${FMT}\n\nТЕКСТ:\n${t}` },
+    expand: { title: 'Расширить', rewrite: true, prompt: (t, s) => `Расширь ${s.label} примерно в полтора раза: добавь конкретные детали действия, паузы, реакции и реплики, которые раскрывают героев; ничего не меняй в событиях. ${FMT}\n\nТЕКСТ:\n${t}` },
+    continue: { title: 'Вставить продолжение', insert: true, prompt: (t, s) => `Продолжи сценарий сразу после ${s.label}: напиши следующий бит или сцену (до одной страницы), логично вытекающие из текста, в тоне и ритме автора. ${FMT}\n\nТЕКСТ:\n${t}` },
+    summarize: { title: 'Подытожить', prompt: (t, s) => `Подытожь ${s.label} в 5–8 строках: что происходит, чего хотят герои, что меняется к концу, какие вопросы остаются открытыми.${PLAIN}\n\nТЕКСТ:\n${t}` },
+    translate: { title: 'Перевести', rewrite: true, prompt: (t, s) => (/[ӘҒҚҢӨҰҮҺІәғқңөұүһі]/.test(t) && (t.match(/[ӘҒҚҢӨҰҮҺІәғқңөұүһі]/g) || []).length > t.length / 200 ? `Переведи ${s.label} на русский язык, сохранив формат Fountain (ИНТ. / НАТ., имена капсом, ремарки в скобках). ${FMT}` : `Переведи ${s.label} на казахский язык, сохранив формат Fountain (ІШКІ. / СЫРТҚЫ. вместо ИНТ. / НАТ., имена капсом, ремарки в скобках). Речь живая, по характеру героев. ${FMT}`) + `\n\nТЕКСТ:\n${t}` },
+    generate: { title: 'Сгенерировать', insert: true, brief: true, prompt: (t, s, brief) => `Напиши по заданию автора черновик в формате Fountain (заголовок сцены, действие, диалог), 0,5–1,5 страницы, в тоне сценария. ${FMT}\n\nЗАДАНИЕ: ${brief}\n\nКОНТЕКСТ (${s.label}):\n${t.slice(0, 6000)}` },
     coverage: { scope: 'all', title: 'Читательское заключение', prompt: (t) => `Прочитай сценарий целиком и напиши читательское заключение: логлайн, как ты его понял · синопсис в 10 строк · разбор по элементам (премиса, структура, герой, антагонист, сцены, диалог, темп, тон, мир) · что работает · что не работает, с номерами сцен · 5–10 вопросов автору.${PLAIN}\n\nСЦЕНАРИЙ:\n${t}` },
     beats: { scope: 'all', title: 'Бит-шит', prompt: (t) => `Разметь сценарий по 15 битам Снайдера: для каждого бита — есть ли он, в какой сцене, на какой примерно странице (всего ≈${ed.stats().pages} стр.), и что с ним не так. В конце — какие биты пропущены или стоят не на месте, и один главный вывод о структуре.${PLAIN}\n\nСЦЕНАРИЙ:\n${t}` },
     continuity: { scope: 'all', title: 'Проверка непрерывности', prompt: (t) => `Проверь непрерывность: имена и возраста сходятся · день/ночь и время года не прыгают · герой не знает того, чего ещё не узнал · ружья из первого акта стреляют · ничего не исчезло без объяснения · факты реального мира, которые стоит [уточнить]. Выдай список расхождений с номерами сцен. Если всё чисто — скажи, что именно проверил.${PLAIN}\n\nСЦЕНАРИЙ:\n${t}` },
@@ -397,11 +422,14 @@
   };
   function ctx(p) { const m = p.meta || {}; const bits = []; if (m.logline) bits.push('Логлайн: ' + m.logline.trim()); if (m.synopsis) bits.push('Синопсис автора: ' + m.synopsis.trim().slice(0, 1500)); if (m.notes) bits.push('Заметки автора: ' + m.notes.trim().slice(-800)); return bits.length ? 'ПАМЯТЬ ПРОЕКТА (контекст, не для пересказа):\n' + bits.join('\n') + '\n\n' : ''; }
   $('#actions').addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) runAct(b.dataset.act); });
+  $('#aiMore').addEventListener('click', () => $('#aiExtra').classList.toggle('hidden'));
   async function runAct(key) {
     const act = ACTS[key]; const s = getScope(act.scope);
     if (!s.text.trim()) return toast(T('Нечего отправлять: сценарий пуст', 'Сценарий бос'));
     if (s.kind === 'all' && !ed.stats().scenes) return toast(T('Сначала напишите хотя бы одну сцену', 'Алдымен бір көрініс жазыңыз'));
-    await ask(ctx(cur()) + act.prompt(s.text, s) + (lang === 'kz' && !/На (казахский|русский)/.test(act.title) ? '\n\nОтвечай на казахском языке.' : ''), act.title + ' · ' + s.label, { act, scope: s, key });
+    let brief = '';
+    if (act.brief) { brief = prompt(T('Что написать? (сцена, герои, что должно произойти)', 'Не жазу керек?'), ''); if (!brief || !brief.trim()) return; }
+    await ask(ctx(cur()) + act.prompt(s.text, s, brief) + (lang === 'kz' && !/На (казахский|русский)/.test(act.title) ? '\n\nОтвечай на казахском языке.' : ''), act.title + ' · ' + s.label, { act, scope: s, key });
   }
   $('#askForm').addEventListener('submit', (e) => { e.preventDefault(); const q = $('#askIn').value.trim(); if (!q) return; $('#askIn').value = ''; const s = getScope(); ask(ctx(cur()) + `${q}\n\n(${s.label.toUpperCase()}):\n${s.text}`, q, { scope: s, free: true }); });
   $('#askIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#askForm').requestSubmit(); } });
@@ -417,7 +445,7 @@
       if (server) {
         const slug = p.server; const path = slug ? '/api/projects/' + encodeURIComponent(slug) + '/assistant' : '/api/assistant';
         const r = await serverFetch(path, 'POST', { question: prompt, section: 'script', history: info.free ? history : [], tier: useTier });
-        j = { text: (r.data && r.data.answer) || '', tokeny: r.data && r.data.tokeny };
+        j = { text: (r.data && r.data.answer) || '', tokeny: r.data && r.data.tokeny }; if (j.tokeny) showTokens(j.tokeny);
       } else {
         const messages = []; if (history.length && info.free) { messages.push({ role: 'user', content: 'Напоминание о предыдущих ответах по этому сценарию.' }); messages.push({ role: 'assistant', content: history.map((h) => h.content).join('\n---\n') }); }
         messages.push({ role: 'user', content: prompt });
@@ -425,7 +453,7 @@
         j = await r.json().catch(() => ({ error: 'сервер ответил не JSON' })); if (!r.ok || j.error) throw new Error(j.error || ('ошибка ' + r.status));
       }
       wait.remove(); const text = (j.text || '').trim(); const target = projects[pid]; if (!target) return;
-      target.chat.push({ role: 'assistant', label, text, key: info.key, rewrite: !!(info.act && info.act.rewrite), scope: info.scope ? { kind: info.scope.kind, label: info.scope.label, original: info.scope.kind === 'all' ? '' : info.scope.text, sceneNum: info.scope.kind === 'scene' ? getScope('scene').kind === 'scene' && info.scope.label : '' } : null, ts: Date.now(), spent: j.tokeny && j.tokeny.spisano });
+      target.chat.push({ role: 'assistant', label, text, key: info.key, rewrite: !!(info.act && info.act.rewrite), insert: !!(info.act && info.act.insert), scope: info.scope ? { kind: info.scope.kind, label: info.scope.label, original: info.scope.kind === 'all' ? '' : info.scope.text, sceneNum: info.scope.kind === 'scene' ? getScope('scene').kind === 'scene' && info.scope.label : '' } : null, ts: Date.now(), spent: j.tokeny && j.tokeny.spisano });
       if (target.chat.length > 40) target.chat = target.chat.slice(-40);
       save(); if (pid === currentId) renderChat();
       if (info.act && info.act.toMeta) applyMeta(pid, text);

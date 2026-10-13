@@ -6,16 +6,16 @@
   const T = { heading: 'scene_heading', action: 'action', character: 'character', paren: 'parenthetical', dialogue: 'dialogue', lyrics: 'lyrics', shot: 'shot', transition: 'transition', note: 'inline_note', sequence: 'sequence_heading', act: 'act_heading', centered: 'centered', pagebreak: 'page_break', synopsis: 'synopsis' };
   // переходы по умолчанию STARC (settings_storage.cpp): jumping — курсор в конце непустого абзаца; changing — абзац пустой
   const JUMP = {
-    tab: { scene_heading: 'action', action: 'character', character: 'parenthetical', parenthetical: 'dialogue', dialogue: 'parenthetical', lyrics: 'parenthetical', transition: 'scene_heading', shot: 'action', inline_note: 'action', sequence_heading: 'scene_heading', act_heading: 'sequence_heading', centered: 'action', synopsis: 'action' },
-    enter: { scene_heading: 'action', action: 'action', character: 'dialogue', parenthetical: 'dialogue', dialogue: 'action', lyrics: 'action', transition: 'scene_heading', shot: 'action', inline_note: 'action', sequence_heading: 'scene_heading', act_heading: 'scene_heading', centered: 'action', synopsis: 'action' },
+    tab: { scene_heading: 'scene_characters', scene_characters: 'action', unformatted_text: 'unformatted_text', action: 'character', character: 'parenthetical', parenthetical: 'dialogue', dialogue: 'parenthetical', lyrics: 'parenthetical', transition: 'scene_heading', shot: 'action', inline_note: 'action', sequence_heading: 'scene_heading', act_heading: 'sequence_heading', centered: 'action', synopsis: 'action' },
+    enter: { scene_heading: 'action', scene_characters: 'action', unformatted_text: 'unformatted_text', action: 'action', character: 'dialogue', parenthetical: 'dialogue', dialogue: 'action', lyrics: 'action', transition: 'scene_heading', shot: 'action', inline_note: 'action', sequence_heading: 'scene_heading', act_heading: 'scene_heading', centered: 'action', synopsis: 'action' },
   };
   const CHANGE = {
-    tab: { scene_heading: 'action', action: 'character', character: 'action', parenthetical: 'dialogue', dialogue: 'parenthetical', lyrics: 'parenthetical', transition: 'action', shot: 'action', inline_note: 'inline_note', sequence_heading: 'scene_heading', act_heading: 'sequence_heading', centered: 'action', synopsis: 'action' },
-    enter: { scene_heading: 'scene_heading', action: 'scene_heading', character: 'action', parenthetical: 'parenthetical', dialogue: 'action', lyrics: 'action', transition: 'transition', shot: 'shot', inline_note: 'inline_note', sequence_heading: 'act_heading', act_heading: 'act_heading', centered: 'action', synopsis: 'action' },
+    tab: { scene_heading: 'scene_characters', scene_characters: 'action', unformatted_text: 'unformatted_text', action: 'character', character: 'action', parenthetical: 'dialogue', dialogue: 'parenthetical', lyrics: 'parenthetical', transition: 'action', shot: 'action', inline_note: 'inline_note', sequence_heading: 'scene_heading', act_heading: 'sequence_heading', centered: 'action', synopsis: 'action' },
+    enter: { scene_heading: 'scene_heading', scene_characters: 'action', unformatted_text: 'unformatted_text', action: 'scene_heading', character: 'action', parenthetical: 'parenthetical', dialogue: 'action', lyrics: 'action', transition: 'transition', shot: 'shot', inline_note: 'inline_note', sequence_heading: 'act_heading', act_heading: 'act_heading', centered: 'action', synopsis: 'action' },
   };
-  const UPPER = { scene_heading: 1, character: 1, transition: 1, shot: 1, sequence_heading: 1, act_heading: 1 };
+  const UPPER = { scene_heading: 1, scene_characters: 1, character: 1, transition: 1, shot: 1, sequence_heading: 1, act_heading: 1 };
   // ширина строки в знаках (Courier 12 = 10 зн./дюйм) для шаблона A4 «Отечественный»: текст 147,5 мм ≈ 58 зн.
-  const COLS = { scene_heading: 58, action: 58, character: 31, parenthetical: 18, dialogue: 28, lyrics: 43, transition: 58, shot: 58, inline_note: 31, sequence_heading: 58, act_heading: 58, centered: 58, synopsis: 58 };
+  const COLS = { scene_heading: 58, scene_characters: 58, unformatted_text: 58, action: 58, character: 31, parenthetical: 18, dialogue: 28, lyrics: 43, transition: 58, shot: 58, inline_note: 31, sequence_heading: 58, act_heading: 58, centered: 58, synopsis: 58 };
   const BEFORE = { scene_heading: 1, action: 1, character: 1, transition: 1, shot: 1, inline_note: 1, sequence_heading: 1, act_heading: 1, centered: 1, synopsis: 1 };
   const LINES_PER_PAGE = 61; // A4: 297 − 25 − 12,5 мм при 12 pt
   const SEC_PER_PAGE = 60;
@@ -119,7 +119,7 @@
         let type = null, txt = t.text || '';
         switch (t.type) {
           case 'scene_heading': type = 'scene_heading'; break;
-          case 'action': if (txt === txt.toUpperCase() && /^[A-ZА-ЯЁӘҒҚҢӨҰҮҺІ]/.test(txt) && txt.length < 60 && t.forced) { type = 'shot'; } else type = 'action'; break;
+          case 'action': if (t.forced && txt === txt.toUpperCase() && /^[A-ZА-ЯЁӘҒҚҢӨҰҮҺІ]/.test(txt)) { type = (frag.lastChild && frag.lastChild.dataset && frag.lastChild.dataset.t === 'scene_heading') ? 'scene_characters' : 'shot'; } else if (t.forced) type = 'unformatted_text'; else type = 'action'; break;
           case 'character': type = 'character'; break;
           case 'parenthetical': type = 'parenthetical'; txt = txt.replace(/^\(|\)$/g, ''); break;
           case 'dialogue': type = 'dialogue'; break;
@@ -154,7 +154,8 @@
           case 'parenthetical': line = '(' + txt.replace(/^\(|\)$/g, '') + ')'; break;
           case 'lyrics': line = '~' + txt; break;
           case 'transition': line = '> ' + txt; break;
-          case 'shot': line = '!' + txt; break;
+          case 'shot': case 'scene_characters': line = '!' + txt; break;
+          case 'unformatted_text': line = '!' + (txt === txt.toUpperCase() ? txt.charAt(0) + txt.slice(1).toLowerCase() : txt); break;
           case 'inline_note': line = '[[' + txt + ']]'; break;
           case 'sequence_heading': line = '## ' + txt; break;
           case 'act_heading': line = '# ' + txt; break;
@@ -201,7 +202,7 @@
     }
     function onTab(p, shift) {
       const type = typeOf(p), txt = textOf(p).trim();
-      if (shift) { const order = ['scene_heading', 'action', 'character', 'parenthetical', 'dialogue', 'transition', 'shot']; const i = order.indexOf(type); setTypeOf(p, order[(i - 1 + order.length) % order.length]); return; }
+      if (shift) { const order = ['scene_heading', 'scene_characters', 'action', 'character', 'parenthetical', 'dialogue', 'lyrics', 'shot', 'transition']; const i = order.indexOf(type); setTypeOf(p, order[(i - 1 + order.length) % order.length]); return; }
       if (hintItems.length && !hint.classList.contains('hidden')) { acceptHint(hintPick, false); return; }
       if (!txt) { setTypeOf(p, CHANGE.tab[type] || 'action'); return; }
       if (type === 'scene_heading') { // Tab в заголовке: поставить разделитель « - » перед временем
@@ -278,7 +279,7 @@
       const p = curPara();
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'я')) { e.preventDefault(); undo(); return; }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я')))) { e.preventDefault(); redo(); return; }
-      if (e.ctrlKey && !e.metaKey && /^[0-9]$/.test(e.key)) { const map = { 1: 'scene_heading', 3: 'action', 4: 'character', 5: 'parenthetical', 6: 'dialogue', 7: 'lyrics', 8: 'shot', 9: 'transition', 0: e.shiftKey ? 'inline_note' : 'action', 2: 'action' }; e.preventDefault(); setType(map[e.key]); return; }
+      if (e.ctrlKey && !e.metaKey && /^[0-9]$/.test(e.key)) { const map = { 1: 'scene_heading', 2: 'scene_characters', 3: 'action', 4: 'character', 5: 'parenthetical', 6: 'dialogue', 7: 'lyrics', 8: 'shot', 9: 'transition', 0: e.shiftKey ? 'inline_note' : 'unformatted_text' }; e.preventDefault(); setType(map[e.key]); return; }
       if (e.ctrlKey && !e.metaKey && e.key === ' ') { e.preventDefault(); setType(e.shiftKey ? 'act_heading' : 'sequence_heading'); return; }
       if (!p) return;
       if (hintItems.length && !hint.classList.contains('hidden')) {
