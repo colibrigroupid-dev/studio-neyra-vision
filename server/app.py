@@ -19,11 +19,12 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 import uuid
 
 if __package__:
-    from .blocks import breakdown, tokeny
+    from .blocks import breakdown, tokeny, kartinki
     from .blocks.breakdown import parser as razbivka
 else:
-    from blocks import breakdown, tokeny
+    from blocks import breakdown, tokeny, kartinki
     from blocks.breakdown import parser as razbivka
+import time
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -950,6 +951,45 @@ class Store:
             raise ApiError(500, "STORAGE_WRITE_FAILED", "Не удалось записать данные. Изменения не сохранены.") from None
         atomic_write(self.path(project["slug"]), project)
 
+    # Блок «Картинки»: файлы проекта лежат в <data>/<slug>/files/, ссылки подписываются секретом студии.
+    def file_path(self, slug, file_id):
+        identifier(slug, slug=True)
+        if not re.fullmatch(r"[0-9A-Z]{26}", file_id or ""):
+            raise ApiError(404, "NOT_FOUND", "Файл не найден.")
+        return self.root / slug / "files" / (file_id + ".png")
+
+    def save_file(self, slug, file_id, data):
+        path = self.file_path(slug, file_id)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_bytes(data)
+            os.replace(tmp, path)
+        except OSError:
+            raise ApiError(500, "STORAGE_WRITE_FAILED", "Не удалось сохранить картинку.") from None
+        return path
+
+    def secret(self):
+        path = self.root / "secret.txt"
+        try:
+            value = path.read_text(encoding="ascii").strip()
+            if len(value) >= 32:
+                return value.encode("ascii")
+        except OSError:
+            pass
+        value = secrets.token_hex(32)
+        try:
+            self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+            path.write_text(value, encoding="ascii")
+            os.chmod(path, 0o600)
+        except OSError:
+            raise ApiError(500, "STORAGE_WRITE_FAILED", "Не удалось создать секрет для ссылок на файлы.") from None
+        return value.encode("ascii")
+
+    def file_url(self, slug, file_id, ttl=7 * 24 * 3600):
+        expires = int(time.time()) + ttl
+        return f"/api/projects/{slug}/files/{file_id}?e={expires}&t={kartinki.sign(self.secret(), slug, file_id, expires)}"
+
     # Блок «Токены»: один файл на студию, рядом с проектами (имя без дефиса — не slug, в списки не попадает).
     def tokeny_path(self):
         return self.root / "tokeny.json"
@@ -1096,6 +1136,38 @@ class Handler(SimpleHTTPRequestHandler):
             raise ApiError(400, "BAD_REQUEST", 'If-Match должен иметь вид "<revision>".')
         if match != '"%s"' % project["revision"]:
             raise ApiError(409, "REVISION_CONFLICT", "Проект изменился. Загрузите актуальные данные.")
+
+    def serve_file(self, slug, file_id, query, head=False):
+        """Картинка проекта по подписанной ссылке (без X-Key): <img src> в окне и на странице проекта."""
+        if self.command not in ("GET", "HEAD"):
+            raise ApiError(405, "METHOD_NOT_ALLOWED", "Файл можно только читать.")
+        params = parse_qs(query, keep_blank_values=True)
+        store = self.server.store
+        if not kartinki.check(store.secret(), slug, file_id, (params.get("e") or [""])[0], (params.get("t") or [""])[0], int(time.time())):
+            raise ApiError(403, "FORBIDDEN", "Ссылка на файл устарела или неверна.")
+        path = store.file_path(slug, file_id)
+        try:
+            data = path.read_bytes()
+        except OSError:
+            raise ApiError(404, "NOT_FOUND", "Файл не найден.") from None
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "private, max-age=3600")
+        self.send_header("Content-Security-Policy", "default-src 'none'")
+        self.api_response = True
+        self.end_headers()
+        if not head:
+            self.wfile.write(data)
+
+    def with_urls(self, slug, passport):
+        """Копия паспорта, где у каждого образа есть url (подписанная ссылка на файл)."""
+        store = self.server.store
+        result = copy.deepcopy(passport)
+        for obraz in result.get("obrazy", []):
+            if obraz.get("fileId"):
+                obraz["url"] = store.file_url(slug, obraz["fileId"])
+        return result
 
     def route_tokeny(self, rest, principal):
         """Блок «Токены»: мой счёт, заявка на пополнение; для admin — заявки и начисление."""
@@ -1445,11 +1517,82 @@ class Handler(SimpleHTTPRequestHandler):
                     if shot["id"] in affected_shots:
                         shot["needsReview"] = True
             status = 200
+        elif resource in ("characters", "locations") and len(parts) in (6, 7, 8) and parts[5] in ("narisovat", "obrazy"):
+            # Блок «Картинки» (Александр 13.10 12:53): нарисовать образ по паспорту, варианты, утверждение, правка словами.
+            items = project[resource]
+            passport = get_item(items, parts[4])
+            passport.setdefault("obrazy", [])
+            if parts[5] == "narisovat" and len(parts) == 6 and method == "POST":
+                body = self.body()
+                fields(body, ("rakurs", "pravka", "baseId", "size"), ("rakurs",))
+                rakurs = text(body["rakurs"], "rakurs", 40, required=True)
+                pravka = text(body.get("pravka", ""), "pravka", 1000)
+                size = text(body.get("size", "2K"), "size", 4) or "2K"
+                base_id = text(body.get("baseId", ""), "baseId", 64)
+                try:
+                    kartinki.rakurs_info(resource, rakurs)
+                    cost = tokeny.cena_kartinki(size.lower())
+                    wallets = store.read_tokeny()
+                    wallet = tokeny.ensure_wallet(wallets, principal)
+                    if not tokeny.can_spend(wallet, cost):
+                        store.save_tokeny(wallets)
+                        raise ApiError(402, "TOKENY_EMPTY", f"Нужно {cost} токенов, на счёте {wallet['balance']}. Пополните — и рисуем.")
+                    refs = []
+                    chosen = [o for o in passport["obrazy"] if o.get("status") == "approved"]
+                    if base_id:
+                        base = next((o for o in passport["obrazy"] if o["id"] == base_id), None)
+                        if base is None:
+                            raise ApiError(404, "NOT_FOUND", "Образ для правки не найден.")
+                        chosen = [base] + [o for o in chosen if o["id"] != base_id]
+                    for obraz in chosen[:4]:
+                        try:
+                            refs.append(("image/png", store.file_path(slug, obraz["fileId"]).read_bytes()))
+                        except (OSError, ApiError):
+                            continue
+                    text_prompt = kartinki.prompt(passport, resource, rakurs, pravka, project.get("stil", ""), bool(refs))
+                    png, usage, model = kartinki.generate(text_prompt, refs, size.upper())
+                    file_id = breakdown.ulid()
+                    store.save_file(slug, file_id, png)
+                    obraz = {"id": breakdown.ulid(), "rakurs": rakurs, "fileId": file_id, "status": "variant", "prompt": text_prompt,
+                             "pravka": pravka, "baseId": base_id or None, "model": model, "size": size.upper(), "createdAt": timestamp(),
+                             "by": principal["id"], "tokeny": cost}
+                    passport["obrazy"].append(obraz)
+                    passport["updatedAt"] = obraz["createdAt"]
+                    wallet, spent = tokeny.spend(wallets, principal, "kartinka", cost, passport.get("name", "")[:60])
+                    store.save_tokeny(wallets)
+                except kartinki.KartinkiError as error:
+                    raise ApiError(error.status, error.code, error.message) from None
+                except tokeny.TokenyError as error:
+                    raise ApiError(error.status, error.code, error.message) from None
+                data = dict(obraz, url=store.file_url(slug, file_id), tokeny=dict(tokeny.summary(wallet), spisano=spent))
+                status = 201
+            elif parts[5] == "obrazy" and len(parts) == 8 and parts[7] == "utverdit" and method == "POST":
+                obraz = get_item(passport["obrazy"], parts[6])
+                fields(self.body(allow_empty=True), ())
+                for other in passport["obrazy"]:
+                    if other["rakurs"] == obraz["rakurs"] and other["status"] == "approved":
+                        other["status"] = "variant"
+                obraz.update(status="approved", approvedAt=timestamp(), approvedBy=principal["id"])
+                passport["updatedAt"] = obraz["approvedAt"]
+                data, status = self.with_urls(slug, passport), 200
+            elif parts[5] == "obrazy" and len(parts) == 7 and method == "DELETE":
+                obraz = get_item(passport["obrazy"], parts[6])
+                if obraz.get("status") == "approved":
+                    raise ApiError(409, "APPROVED", "Утверждённый образ не удаляется: сначала утвердите другой.")
+                passport["obrazy"].remove(obraz)
+                try:
+                    store.file_path(slug, obraz["fileId"]).unlink()
+                except (OSError, ApiError):
+                    pass
+                passport["updatedAt"] = timestamp()
+                data, status = {"id": obraz["id"], "deleted": True}, 200
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
         elif resource in ("characters", "locations") and len(parts) in (4, 5):
             items = project[resource]
             item = get_item(items, parts[4]) if len(parts) == 5 else None
             if method == "GET":
-                return 200, ({"data": item} if item is not None else self.listing(items, query)), project["revision"]
+                return 200, ({"data": self.with_urls(slug, item)} if item is not None else self.listing([self.with_urls(slug, it) for it in items], query)), project["revision"]
             create = method == "POST" and item is None
             if create or (method == "PATCH" and item is not None):
                 changes = breakdown.passport_input(self.body(), create)
@@ -1753,6 +1896,9 @@ class Handler(SimpleHTTPRequestHandler):
                 action, obj = "breakdown.razbor", {"type": "project", "id": slug}
             if resource == "scenes" and len(parts) == 6:
                 action, obj = ("scene.unapproved" if data["scene"].get("status") == "draft" else "scene.approved"), {"type": "scene", "id": data["scene"]["id"]}
+            if resource in ("characters", "locations") and len(parts) >= 6:
+                action = kind + ".obraz." + ("created" if status == 201 else "deleted" if method == "DELETE" else "approved")
+                obj = {"type": kind, "id": parts[4]}
         for import_action, import_object, import_data in import_events:
             activity(project, principal, import_action, import_object, import_data)
         activity(project, principal, action, obj, data, stage, invalidated)
@@ -1833,6 +1979,9 @@ class Handler(SimpleHTTPRequestHandler):
                 if head or self.command not in ("GET", "POST", "PUT", "PATCH", "DELETE"):
                     raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
                 parts = path.rstrip("/").split("/")[1:]
+                if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "files":
+                    self.serve_file(parts[2], parts[4], url.query, head)
+                    return
                 with self.server.store.lock:
                     if parts == ["api", "proba"]:
                         status, payload, revision = self.proba()

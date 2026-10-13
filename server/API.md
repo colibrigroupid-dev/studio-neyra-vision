@@ -1052,6 +1052,8 @@ UTF-8, `ensure_ascii=False`, `sort_keys=True`, `separators=(',', ':')`.
 
 `POST /versions` (сохранение версии из Сценарной, ⌘S) — контрольная точка: если у ключа есть запись в `breakdown`, сервер сам подтягивает сцены, героев и локации из текста парсером (без модели, без токенов) и возвращает `razbor: {scenes, characters, locations}` рядом с версией; паспорта и замки не трогаются. Без права на разбивку версия сохраняется как раньше.
 
+Заголовок `If-Match` принимается только в кавычках: `If-Match: "12"`; без кавычек — `400`.
+
 ## Утверждение сцены — Writer → Art (ТЗ Ара Аруш, 13.10.2026)
 
 `POST /api/projects/<slug>/scenes/<id>/utverdit` — право записи в `script`, `If-Match`. Тело `{}` или `{kommentariy?: "…", otmena?: true}`.
@@ -1063,3 +1065,10 @@ UTF-8, `ensure_ascii=False`, `sort_keys=True`, `separators=(',', ':')`.
 
 `/api/projects/<slug>/dokumenty[/<id>]` — GET (раздел `overview`), POST/PATCH/DELETE (запись в `script`, `If-Match`). Документ: `{id, tip: titul|sinopsis|poepizodnik|zametka|loglayn|tritment, title (≤240), text (≤1 МБ), deletedAt, createdAt, updatedAt}`.
 Первый DELETE кладёт в корзину (`deletedAt`), повторный — удаляет насовсем; «Вернуть» = `PATCH {deletedAt: null}`. Сцены: `PATCH /scenes/<id> {deletedAt: "<ISO>"|null}` — та же корзина, сцена остаётся в проекте с меткой.
+
+## Картинки героев и локаций (блок `server/blocks/kartinki/`, 13.10.2026)
+
+- `POST /api/projects/<slug>/characters|locations/<id>/narisovat` — `{rakurs, pravka?, baseId?, size?: "1K"|"2K"|"4K"}`; право записи в `heroes`/`locations`, `If-Match`. Ракурсы героя: `anfas, tri-chetverti, profil-levyy, profil-pravyy, rost`; локации: `master, den, noch, detal`. Промпт собирается из паспорта (внешность, табу, рост, роль) + ракурс + правка художника; референсами подкладываются утверждённые образы паспорта (и `baseId` при правке). Цена `kartinka_<size>` из тарифов, `402` при нехватке. Ответ `201` образ `{id, rakurs, fileId, url, status: "variant", prompt, model, size, tokeny}`.
+- `POST …/obrazy/<obrazId>/utverdit` — утвердить (прежний утверждённый того же ракурса становится вариантом); `DELETE …/obrazy/<obrazId>` — удалить вариант (утверждённый — `409`).
+- Паспорта в GET отдают `obrazy[]` с `url` — подписанная ссылка `/api/projects/<slug>/files/<fileId>?e=…&t=…` на 7 дней, открывается без `X-Key` (для `<img>` и страницы проекта). Файлы — `<data>/<slug>/files/<fileId>.png`, секрет подписи — `<data>/secret.txt`.
+- Ключ модели: `GOOGLE_API_KEY` или `~/.config/neyra-studio/google-key` (деплой копирует `~/.config/nano-banana/key`); модель `NEYRA_IMAGE_MODEL` (по умолчанию Nano Banana 2). Без ключа — `503 IMAGE_KEY_MISSING`. Проба: `NEYRA_ASSISTANT_FAKE=1` отдаёт 1×1 PNG.

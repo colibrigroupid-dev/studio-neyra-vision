@@ -1552,6 +1552,48 @@ class TeamAccessTests(unittest.TestCase):
         self.assertIsNone(self.api("GET", f"/api/projects/film/scenes/{scene['id']}")["data"]["deletedAt"])
         self.api("POST", "/api/projects/film/dokumenty", {"tip": "zametka", "title": "Нельзя"}, 403, key="temporary-viewer")
 
+    def test_hero_images_draw_variants_approve_and_serve_signed_files(self):
+        # Блок «Картинки» (Александр 13.10 12:53): нарисовать по паспорту, варианты, утверждение, правка, ссылки без ключа.
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        self.create()
+        hero = self.api("POST", "/api/projects/film/characters", {"name": "Ер Төстік", "identity": "мальчик в войлочной шапке", "taboo": ["без оружия"]}, 201)["data"]
+        base = f"/api/projects/film/characters/{hero['id']}"
+        self.api("POST", base + "/narisovat", {"rakurs": "космос"}, 422)
+        first = self.api("POST", base + "/narisovat", {"rakurs": "anfas"}, 201)["data"]
+        self.assertEqual((first["status"], first["rakurs"], first["tokeny"]["spisano"]), ("variant", "anfas", 0))  # admin без лимита
+        self.assertIn("Не рисовать: без оружия", first["prompt"])
+        self.assertIn("/api/projects/film/files/", first["url"])
+        # Файл отдаётся по подписанной ссылке без X-Key; подделка — 403.
+        status, parsed, raw = self.request("GET", first["url"], key=None)
+        self.assertEqual((status, raw[:8]), (200, b"\x89PNG\r\n\x1a\n"))
+        status, _, _ = self.request("GET", first["url"].replace("t=", "t=0"), key=None)
+        self.assertEqual(status, 403)
+        # Правка словами от первого образа: референс подкладывается, промпт это отражает.
+        second = self.api("POST", base + "/narisovat", {"rakurs": "anfas", "pravka": "свет холоднее", "baseId": first["id"]}, 201)["data"]
+        self.assertIn("Правка художника: свет холоднее", second["prompt"])
+        self.assertIn("сохрани лицо", second["prompt"])
+        approved = self.api("POST", f"{base}/obrazy/{second['id']}/utverdit", {})["data"]
+        self.assertEqual([o["status"] for o in approved["obrazy"]], ["variant", "approved"])
+        self.assertTrue(all(o["url"] for o in approved["obrazy"]))
+        self.assertEqual(self.api("GET", base)["data"]["obrazy"][1]["status"], "approved")
+        self.api("DELETE", f"{base}/obrazy/{second['id']}", status=409)
+        self.api("DELETE", f"{base}/obrazy/{first['id']}")
+        self.assertEqual(len(self.api("GET", base)["data"]["obrazy"]), 1)
+        # Списание и права: продюсеру с пустым счётом — 402, наблюдателю — 403.
+        Path(os.environ["NEYRA_TARIFY_FILE"]).write_text(json.dumps({"probnyy_paket": 5}), encoding="utf-8")
+        producer = self.issue("producer", ["overview", "heroes", "locations"], email="p@example.test")
+        self.api("POST", base + "/narisovat", {"rakurs": "rost"}, 402, key=producer["key"])
+        Path(os.environ["NEYRA_TARIFY_FILE"]).write_text(json.dumps({"probnyy_paket": 50}), encoding="utf-8")
+        producer2 = self.issue("producer", ["overview", "heroes", "locations"], email="p2@example.test")
+        drawn = self.api("POST", base + "/narisovat", {"rakurs": "rost"}, 201, key=producer2["key"])["data"]
+        self.assertEqual((drawn["tokeny"]["spisano"], drawn["tokeny"]["balance"]), (12, 38))
+        self.api("POST", base + "/narisovat", {"rakurs": "anfas"}, 403, key="temporary-viewer")
+        self.assertIn("character.obraz.created", [a["action"] for a in self.api("GET", "/api/projects/film/activity?limit=200")["data"]])
+        loc = self.api("POST", "/api/projects/film/locations", {"name": "Юрта"}, 201)["data"]
+        plate = self.api("POST", f"/api/projects/film/locations/{loc['id']}/narisovat", {"rakurs": "master", "size": "4K"}, 201)["data"]
+        self.assertEqual((plate["size"], plate["rakurs"]), ("4K", "master"))
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

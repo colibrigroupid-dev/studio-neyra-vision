@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013k';
-import { frameAt, totalDuration } from './timeline.js?v=20261013k';
-import { StudioServer } from './storage.js?v=20261013k';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013k';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013k';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013k';
-import { renderGeroyWorkshop } from './geroy.js?v=20261013k';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013k';
-import { parseCommand, describeCommand } from './golos.js?v=20261013k';
-import { svgPaths as ikonki } from './ikonki.js?v=20261013k';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013l';
+import { frameAt, totalDuration } from './timeline.js?v=20261013l';
+import { StudioServer } from './storage.js?v=20261013l';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013l';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013l';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013l';
+import { renderGeroyWorkshop } from './geroy.js?v=20261013l';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013l';
+import { parseCommand, describeCommand } from './golos.js?v=20261013l';
+import { svgPaths as ikonki } from './ikonki.js?v=20261013l';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -865,6 +865,34 @@ function persistPreferences() {
   try { localStorage.setItem(storeKey, JSON.stringify(localWorkspace)); }
   catch { toast(t('Не удалось сохранить настройки в браузере.', 'Браузерде параметрлерді сақтау мүмкін болмады.')); }
 }
+function passportBase() {
+  const id = heroRouteId(); if (!serverClient || !project() || !id) return '';
+  return `/api/projects/${encodeURIComponent(state.activeId)}/characters/${encodeURIComponent(id)}`;
+}
+async function obrazAction(method, tail, okText, body = {}) {
+  const base = passportBase(); if (!base) return;
+  try {
+    await serverClient.request(method, base + tail, body, { revision: serverClient.known.get(state.activeId)?._revision });
+    toast(okText); serverClient.known.delete(state.activeId); await refreshCinema();
+  } catch (error) { toast(error?.status === 409 ? t('Коллега только что внёс правку. Обновите цех и повторите.', 'Әріптес түзетті. Жаңартыңыз.') : (error?.message || t('Не получилось.', 'Болмады.'))); }
+}
+async function narisovat(rakurs, pravka = '', baseId = '') {
+  const base = passportBase(); if (!base) return;
+  const status = document.querySelector('[data-voice-status]'); if (status) status.textContent = t('рисую… обычно 10–30 секунд', 'салып жатырмын…');
+  try {
+    const result = await serverClient.request('POST', base + '/narisovat', { rakurs, ...(pravka ? { pravka } : {}), ...(baseId ? { baseId } : {}) }, { revision: serverClient.known.get(state.activeId)?._revision });
+    const d = result?.data || {};
+    if (d.tokeny) { meState.tokeny = d.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
+    toast(d.tokeny?.spisano ? t(`Готово · списано ${d.tokeny.spisano}`, `Дайын · ${d.tokeny.spisano} алынды`) : t('Готово.', 'Дайын.'));
+    serverClient.known.delete(state.activeId); await refreshCinema();
+  } catch (error) {
+    const message = error?.status === 402 ? t('Токенов не хватает. Откройте «Токены и пополнение» в меню.', 'Токен жетпейді.') : error?.status === 503 ? t('Картинки ещё не подключены на сервере: нет ключа модели.', 'Суреттер әлі қосылмаған.') : error?.status === 409 ? t('Коллега только что внёс правку. Обновите цех и повторите.', 'Әріптес түзетті.') : (error?.message || t('Не получилось нарисовать.', 'Салу мүмкін болмады.'));
+    toast(message);
+  } finally { if (status) status.textContent = ''; }
+}
+function pravkaDialog(obrazId, rakurs) {
+  openDialog(`${dialogHead(t('Правка словами', 'Сөзбен түзету'), t('Скажите художнику, что изменить. Образ останется тем же героем: лицо и одежда берутся с этого варианта.', 'Суретшіге не өзгерту керектігін айтыңыз.'))}<form id='pravka-form' data-obraz='${e(obrazId)}' data-rakurs='${e(rakurs)}'><label for='pravka-text'>${t('Что изменить', 'Не өзгерту керек')}</label><input id='pravka-text' name='pravka' required maxlength='1000' placeholder='${t('свет холоднее, шапка выше, без улыбки', 'жарық суығырақ, бас киім жоғарырақ')}'>${dialogActions(t('Нарисовать вариант', 'Нұсқа салу'))}</form>`);
+}
 async function runRazbor(opisanie = '') {
   if (!serverClient || !project()) { toast(t('Сначала подключите проект команды: кнопка «Сервер» и ваш ключ.', 'Алдымен команда жобасын қосыңыз.')); return; }
   const slug = state.activeId; const known = serverClient.known.get(slug);
@@ -964,6 +992,12 @@ app.addEventListener('click', async event => {
   if (pick) { const id = pick.dataset.project; await runOperation(async () => { if (!await flushDraft()) { render(); return; } if (serverClient) state.projects[id] = await serverClient.loadProject(id); state.activeId = id; selectedScene = null; sceneFilter = 'all'; playTime = 0; persistPreferences(); go('overview'); render(); }); return; }
   const waitRow = event.target.closest('[data-open-cell]');
   if (waitRow) { event.preventDefault(); mapFilter = 'awaiting'; go('map'); await runOperation(() => mapCellDialog(waitRow.dataset.openCell)); return; }
+  const utv = event.target.closest('[data-obraz-utverdit]');
+  if (utv) { await runOperation(() => obrazAction('POST', `/obrazy/${encodeURIComponent(utv.dataset.obrazUtverdit)}/utverdit`, t('Образ утверждён. Он пойдёт в следующие кадры.', 'Бейне бекітілді.'))); return; }
+  const udal = event.target.closest('[data-obraz-udalit]');
+  if (udal) { await runOperation(() => obrazAction('DELETE', `/obrazy/${encodeURIComponent(udal.dataset.obrazUdalit)}`, t('Вариант убран.', 'Нұсқа алынды.'))); return; }
+  const pravka = event.target.closest('[data-obraz-pravka]');
+  if (pravka) { pravkaDialog(pravka.dataset.obrazPravka, pravka.dataset.rakurs); return; }
   const depTab = event.target.closest('[data-dep-tab]');
   if (depTab) { const id = depTab.dataset.depTab; const art = ['heroes', 'locations', 'breakdown'].includes(id); if (art) { artTab = id; try { localStorage.setItem('nv-art-tab', id); } catch { /* optional */ } } else { directorTab = id; try { localStorage.setItem('nv-director-tab', id); } catch { /* optional */ } } go(art ? 'art' : 'director'); if (art) void refreshCinema(); return; }
   const helperToggle = event.target.closest('[data-helper-toggle]');
@@ -1000,6 +1034,10 @@ app.addEventListener('click', async event => {
   else if (action === 'edit-passport') {
     const control = event.target.closest('[data-action]');
     await runOperation(() => passportDialog(control.dataset.passportCollection, control.dataset.passportId));
+  }
+  else if (action === 'narisovat') {
+    const control = event.target.closest('[data-action]');
+    await runOperation(() => narisovat(control.dataset.rakurs));
   }
   else if (action === 'fill-hero-passport') {
     const record = cinemaState.snapshot?.characters?.find(item => item.id === heroRouteId());
@@ -1172,6 +1210,10 @@ dialog.addEventListener('submit', async event => {
     await runOperation(() => submitMapApproval(form, data, event.submitter?.value || data.get('verdict'))); return;
   }
   await runOperation(async () => {
+    if (form.id === 'pravka-form') {
+      const text = String(data.get('pravka') || '').trim(); if (!text) return;
+      dialog.close(); await narisovat(form.dataset.rakurs, text, form.dataset.obraz); return;
+    }
     if (form.id === 'tokeny-form') {
       const tokeny = Number(data.get('tokeny')); if (!Number.isInteger(tokeny) || tokeny < 1) return;
       try {
