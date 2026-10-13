@@ -91,7 +91,8 @@
   async function serverVersion(label) {
     const slug = serverMode.slug; clearTimeout(serverMode.timer);
     await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/script', 'PUT', { text: cur().text }); serverMode.lastText = cur().text;
-    await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/versions', 'POST', { label });
+    const r = await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/versions', 'POST', { label });
+    const rz = r.data && r.data.razbor; return rz ? ' · ' + T('сцен', 'көрініс') + ' ' + (rz.scenes ?? '—') + ' · ' + T('героев', 'кейіпкер') + ' ' + (rz.characters ?? '—') + ' · ' + T('локаций', 'локация') + ' ' + (rz.locations ?? '—') : '';
   }
   function serverDialog() {
     const s = load(LS.server, {}) || {};
@@ -371,7 +372,7 @@
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'F' || e.key === 'f' || e.key === 'А' || e.key === 'а')) { e.preventDefault(); toggleFocus(); return; }
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 's' || e.key === 'ы')) {
       e.preventDefault(); flush();
-      if (serverMode && serverMode.loaded && cur().server) { const stamp = new Date(); const label = 'сценарная · ' + stamp.toLocaleDateString('ru-RU') + ' ' + stamp.toTimeString().slice(0, 5); serverVersion(label).then(() => toast(T('Версия зафиксирована на сервере', 'Нұсқа серверде бекітілді'))).catch((err) => toast(T('Сервер не принял версию: ', 'Сервер нұсқаны қабылдамады: ') + err.message)); }
+      if (serverMode && serverMode.loaded && cur().server) { const stamp = new Date(); const label = 'сценарная · ' + stamp.toLocaleDateString('ru-RU') + ' ' + stamp.toTimeString().slice(0, 5); serverVersion(label).then((extra) => toast(T('Версия зафиксирована на сервере', 'Нұсқа серверде бекітілді') + (extra || '') + (extra ? T('. Режиссёрская уже видит героев', '. Режиссёр беті кейіпкерлерді көреді') : ''))).catch((err) => toast(T('Сервер не принял версию: ', 'Сервер нұсқаны қабылдамады: ') + err.message)); }
       else if (!storageOk) toast(T('Хранилище браузера недоступно — скачайте .fountain', 'Браузер қоймасы қолжетімсіз'));
       else toast(snapshot('') ? T('Версия сохранена', 'Нұсқа сақталды') : T('Без изменений с прошлой версии', 'Өзгеріс жоқ'));
     }
