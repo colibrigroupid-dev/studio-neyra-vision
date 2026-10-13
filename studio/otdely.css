@@ -35,3 +35,11 @@
 .geroy-variant img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;display:block}
 .geroy-variant-actions{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;color:var(--muted)}
 .geroy-variant-actions .btn.small{min-height:30px;padding:0 10px;font-size:12px}
+.writer-scenes .row b.ok{color:var(--text)}
+.writer-scenes .row b{color:var(--dim);font-weight:400}
+.writer-scenes .row small.mono{display:inline-block;min-width:28px;color:var(--dim)}
+.legacy-editor{margin-top:28px;border-top:1px solid var(--line-soft);padding-top:12px}
+.legacy-editor>summary{cursor:pointer;color:var(--dim);font-size:13px;list-style:none;padding:8px 0}
+.legacy-editor>summary::-webkit-details-marker{display:none}
+.legacy-editor>summary::before{content:'›';display:inline-block;margin-right:8px;transition:transform .2s}
+.legacy-editor[open]>summary::before{transform:rotate(90deg)}

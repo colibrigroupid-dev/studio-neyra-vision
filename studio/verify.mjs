@@ -674,12 +674,8 @@ const paperStorageKey = 'neyra-vision-script-paper-v1';
   await ui.click('server');
   await ui.submit('server-form', { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
   assert.equal(ui.document.documentElement.dataset.scriptPaper, 'graphite', 'Connecting retains the device paper choice');
-  assert.equal(ui.paperControl.value, 'graphite');
-  const callsBeforePaper = api.calls.length;
-  const serverBeforePaper = JSON.stringify(api.projects.get('film'));
-  await ui.change('script-paper-mode', 'light');
-  assert.equal(api.calls.length, callsBeforePaper, 'Changing paper does not write project data to the API');
-  assert.equal(JSON.stringify(api.projects.get('film')), serverBeforePaper);
+  assert.match(ui.app.innerHTML, /Открыть Writer|Writer ашу/, 'Server mode shows the Writer summary with one way into the editor');
+  assert.doesNotMatch(ui.app.innerHTML, /<iframe/, 'No embedded editor inside the window (Александр 13.10 13:00)');
   assert.equal(stored.get(workspaceKey), localBeforeConnect);
   assert.deepEqual(JSON.parse(stored.get(settingsStorageKey)), { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
 }
