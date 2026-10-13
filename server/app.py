@@ -19,9 +19,9 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 import uuid
 
 if __package__:
-    from .blocks import breakdown
+    from .blocks import breakdown, tokeny
 else:
-    from blocks import breakdown
+    from blocks import breakdown, tokeny
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -841,6 +841,21 @@ class Store:
             raise ApiError(500, "STORAGE_WRITE_FAILED", "Не удалось записать данные. Изменения не сохранены.") from None
         atomic_write(self.path(project["slug"]), project)
 
+    # Блок «Токены»: один файл на студию, рядом с проектами (имя без дефиса — не slug, в списки не попадает).
+    def tokeny_path(self):
+        return self.root / "tokeny.json"
+
+    def read_tokeny(self):
+        try:
+            return tokeny.validate(parse_json(self.tokeny_path().read_text(encoding="utf-8")))
+        except FileNotFoundError:
+            return tokeny.empty()
+        except (OSError, ValueError, TypeError, RecursionError):
+            raise ApiError(500, "STORAGE_READ_FAILED", "Не удалось прочитать кошельки.") from None
+
+    def save_tokeny(self, data):
+        atomic_write(self.tokeny_path(), data)
+
 
 class Handler(SimpleHTTPRequestHandler):
     server_version = "NeyraStudio/1"
@@ -973,6 +988,94 @@ class Handler(SimpleHTTPRequestHandler):
         if match != '"%s"' % project["revision"]:
             raise ApiError(409, "REVISION_CONFLICT", "Проект изменился. Загрузите актуальные данные.")
 
+    def route_tokeny(self, rest, principal):
+        """Блок «Токены»: мой счёт, заявка на пополнение; для admin — заявки и начисление."""
+        method, store = self.command, self.server.store
+        wallets = store.read_tokeny()
+        wallet = tokeny.ensure_wallet(wallets, principal)
+        try:
+            if rest == [] and method == "GET":
+                mine = [z for z in wallets["zayavki"] if z["keyId"] == principal["id"]][-10:]
+                store.save_tokeny(wallets)
+                data = dict(tokeny.public_wallet(wallet), ceny=tokeny.tarify()["ceny"], pakety=tokeny.tarify()["pakety"],
+                            oplata=tokeny.oplata(), zayavki=mine)
+                return 200, {"data": data}, None
+            if rest == ["zayavka"] and method == "POST":
+                body = self.body()
+                fields(body, ("tokeny", "sposob", "kommentariy"), ("tokeny",))
+                zayavka = tokeny.request_topup(wallets, principal, body["tokeny"], body.get("sposob", ""), body.get("kommentariy", ""))
+                store.save_tokeny(wallets)
+                return 201, {"data": zayavka}, None
+            if principal["role"] != "admin":
+                raise ApiError(403, "FORBIDDEN", "Заявки и начисления видит только владелец студии.")
+            if rest == ["zayavki"] and method == "GET":
+                open_items = [z for z in wallets["zayavki"] if z["status"] == "new"]
+                return 200, {"data": {"zayavki": open_items, "koshelki": [tokeny.public_wallet(w) for w in wallets["koshelki"].values()]}}, None
+            if rest == ["nachislit"] and method == "POST":
+                body = self.body()
+                fields(body, ("keyId", "tokeny", "zayavkaId", "kommentariy"), ("keyId", "tokeny"))
+                key_id = identifier(body["keyId"])
+                note = text(body.get("kommentariy", ""), "kommentariy", 120)
+                target = tokeny.grant(wallets, key_id, body["tokeny"], principal["id"], note)
+                if body.get("zayavkaId"):
+                    tokeny.close_request(wallets, text(body["zayavkaId"], "zayavkaId", 64), principal["id"], body["tokeny"])
+                store.save_tokeny(wallets)
+                return 200, {"data": tokeny.public_wallet(target)}, None
+            if len(rest) == 3 and rest[0] == "zayavki" and rest[2] == "otklonit" and method == "POST":
+                zayavka = tokeny.close_request(wallets, text(rest[1], "zayavkaId", 64), principal["id"], declined=True)
+                store.save_tokeny(wallets)
+                return 200, {"data": zayavka}, None
+        except tokeny.TokenyError as error:
+            raise ApiError(error.status, error.code, error.message) from None
+        raise ApiError(404, "NOT_FOUND", "Маршрут не найден.")
+
+    def proba(self):
+        """Пробный вход без ключа: имя + e-mail → свой проект, ключ продюсера и пробный пакет токенов."""
+        if self.command != "POST":
+            raise ApiError(405, "METHOD_NOT_ALLOWED", "Пробный доступ оформляется запросом POST.")
+        store = self.server.store
+        body = self.body()
+        fields(body, ("name", "email", "title"), ("name", "email"))
+        name = text(body["name"], "name", 80, required=True).strip()
+        email = text(body["email"], "email", 254, required=True).strip()
+        if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", email):
+            invalid("Нужен корректный e-mail.")
+        title = text(body.get("title", ""), "title", 240).strip() or ("Пробный проект — " + name)
+        now = datetime.now(timezone.utc).timestamp()
+        log = [t for t in getattr(self.server, "proba_log", []) if now - t < 3600]
+        if len(log) >= 30:
+            raise ApiError(429, "TOO_MANY", "Слишком много пробных входов за час. Попробуйте позже.")
+        wallets = store.read_tokeny()
+        if any(w.get("email", "").casefold() == email.casefold() for w in wallets["koshelki"].values()):
+            raise ApiError(409, "ALREADY_EXISTS", "На этот e-mail пробный доступ уже выдан. Ключ у вас в письме или в окне; если потеряли — напишите продюсеру.")
+        slug = "proba-" + secrets.token_hex(4)
+        while store.path(slug).exists():
+            slug = "proba-" + secrets.token_hex(4)
+        date = timestamp()
+        member = {"id": uuid.uuid4().hex, "name": name, "email": email, "role": "producer",
+                  "sections": sorted(SECTIONS), "createdAt": date}
+        member["keyId"] = "member-" + member["id"]
+        issued_key = "nv1." + slug + "." + member["keyId"] + "." + secrets.token_urlsafe(32)
+        member["keyHash"] = hashlib.sha256(issued_key.encode("ascii")).hexdigest()
+        project = {
+            "slug": slug, "title": title, "synopsis": "", "language": "ru",
+            "createdAt": date, "updatedAt": date, "revision": 1, "studio_id": store.studio_id,
+            "characters": [], "locations": [], "scenes": [], "shots": [], "versions": [], "cells": [],
+            "approvals": [], "activity": [], "members": [member],
+            "post": [{"id": task_id, "done": False} for task_id in ("edit", "color", "sound", "vfx")],
+            "script": {"text": "", "language": "ru", "status": "draft", "updatedAt": date},
+            "proba": {"email": email, "createdAt": date},
+        }
+        principal = issued_principal(member, slug)
+        activity(project, principal, "project.created", {"type": "project", "id": slug}, metadata(project))
+        wallet = tokeny.ensure_wallet(wallets, principal, name, email)
+        store.save(project)
+        store.save_tokeny(wallets)
+        log.append(now)
+        self.server.proba_log = log
+        return 201, {"data": {"slug": slug, "title": title, "key": issued_key, "tokeny": tokeny.summary(wallet),
+                              "okno": "/studio/?klyuch=" + quote(issued_key, safe="") + "#/studio/overview"}}, None
+
     def route(self, parts, query, principal, keys):
         method, store = self.command, self.server.store
         if parts == ["api", "session"]:
@@ -1008,8 +1111,15 @@ class Handler(SimpleHTTPRequestHandler):
                              "awaitingMe": len(board["awaitingMe"]), "myTasks": len(board["myTasks"]),
                              "sceneCount": len(project.get("scenes", [])), "shotCount": len(project.get("shots", []))})
                 mine.append(item)
-            return 200, {"data": {"principal": principal_info(principal), "projects": mine,
+            wallets = store.read_tokeny()
+            fresh = principal["id"] not in wallets["koshelki"]
+            wallet = tokeny.ensure_wallet(wallets, principal)
+            if fresh:
+                store.save_tokeny(wallets)
+            return 200, {"data": {"principal": principal_info(principal), "projects": mine, "tokeny": tokeny.summary(wallet),
                                   "awaitingMe": sum(p["awaitingMe"] for p in mine), "myTasks": sum(p["myTasks"] for p in mine)}}, None
+        if parts[:2] == ["api", "tokeny"]:
+            return self.route_tokeny(parts[2:], principal)
         if parts == ["api", "projects"]:
             if method == "GET":
                 projects = []
@@ -1085,9 +1195,20 @@ class Handler(SimpleHTTPRequestHandler):
             history = body.get("history", [])
             if not isinstance(history, list) or len(history) > 20:
                 raise ApiError(422, "VALIDATION", "history — список до 20 реплик.")
+            wallets = store.read_tokeny()
+            wallet = tokeny.ensure_wallet(wallets, principal)
+            if not tokeny.can_spend(wallet, "vopros"):
+                store.save_tokeny(wallets)
+                raise ApiError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и помощник продолжит.")
             context, mode = assistant_context(project, principal, mode_section)
             answer = assistant_answer(question, context, mode, history)
             answer["context"] = {"chars": len(context), "scenes": len(project.get("scenes", [])), "characters": len(project.get("characters", [])), "locations": len(project.get("locations", []))}
+            try:
+                wallet, cost = tokeny.spend(wallets, principal, "vopros")
+            except tokeny.TokenyError as error:
+                raise ApiError(error.status, error.code, error.message) from None
+            store.save_tokeny(wallets)
+            answer["tokeny"] = dict(tokeny.summary(wallet), spisano=cost)
             return 200, {"data": answer}, None
         write = method != "GET"
         authorize(principal, slug, section, project, write=write,
@@ -1445,8 +1566,11 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
                 parts = path.rstrip("/").split("/")[1:]
                 with self.server.store.lock:
-                    principal, keys = self.principal()
-                    status, payload, revision = self.route(parts, url.query, principal, keys)
+                    if parts == ["api", "proba"]:
+                        status, payload, revision = self.proba()
+                    else:
+                        principal, keys = self.principal()
+                        status, payload, revision = self.route(parts, url.query, principal, keys)
                 self.send_json(status, payload, revision)
             elif self.command in ("GET", "HEAD"):
                 self.static(path, head)

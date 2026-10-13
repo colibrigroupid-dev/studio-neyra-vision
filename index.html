@@ -255,6 +255,21 @@ footer .legal{grid-column:1/-1;border-top:1px solid var(--line-soft);padding-top
 .js [data-reveal].in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.js [data-reveal]{opacity:1;transform:none;transition:none}*,*::before,*::after{transition:none!important;animation:none!important}.clip:hover .clip__frame img{transform:none}.btn:active{transform:none}.faq details[open] summary::after{transform:none}}
 .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;opacity:.045;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");mix-blend-mode:overlay}
+/* пробный вход */
+.proba{border:0;border-radius:20px;background:var(--bg-2,#171717);color:var(--text);padding:0;max-width:min(520px,calc(100vw - 32px));width:100%}
+.proba::backdrop{background:rgba(0,0,0,.6)}
+.proba__form,.proba__done{position:relative;padding:28px 28px 24px}
+.proba h2{margin:0 0 .4em;padding-right:44px;font:600 1.5rem/1.15 var(--disp);letter-spacing:-.02em}
+.proba__lead{margin:0 0 1.2rem;color:var(--muted);line-height:1.5}
+.proba label{display:block;font-size:.85rem;color:var(--muted);margin:14px 0 6px}
+.proba input,.proba textarea{width:100%;box-sizing:border-box;background:#262626;border:1px solid transparent;border-radius:12px;color:var(--text);padding:12px 14px;font:inherit}
+.proba input:focus,.proba textarea:focus{outline:none;border-color:var(--muted)}
+.proba textarea{font-family:var(--mono);font-size:.82rem;word-break:break-all;resize:none}
+.proba__actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:18px}
+.proba__error{color:#e9a19a;font-size:.9rem;margin:10px 0 0}
+.proba__fine{font-size:.8rem;color:var(--dim);margin:14px 0 0;line-height:1.5}
+.proba__close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;border:0;background:#262626;color:var(--text);font-size:1.2rem;cursor:pointer}
+button.btn{font-family:inherit}
 </style>
 </head>
 <body class="grain">
@@ -301,9 +316,9 @@ footer .legal{grid-column:1/-1;border-top:1px solid var(--line-soft);padding-top
     </p>
     <div class="actions">
       <a class="btn btn--main" href="https://t.me/mis_ter_bro"><span class="ru">Прислать сценарий</span><span class="kz">Сценарий жіберу</span> <span class="arr">→</span></a>
-      <a class="btn btn--ghost" href="studio/#/studio/overview"><span class="ru">Открыть демопроект</span><span class="kz">Деможобаны ашу</span></a>
+      <button class="btn btn--ghost" type="button" data-proba><span class="ru">Попробовать бесплатно</span><span class="kz">Тегін байқап көру</span></button>
     </div>
-    <p class="trust"><span class="ru">Первое чтение — бесплатно. Продюсер отвечает в течение суток.</span><span class="kz">Алғашқы оқу — тегін. Продюсер бір тәулік ішінде жауап береді.</span></p>
+    <p class="trust"><span class="ru">Первое чтение — бесплатно. Пробный доступ — сразу, с пакетом токенов на вопросы помощнику.</span><span class="kz">Алғашқы оқу — тегін. Сынақ қолжетімділік — бірден, көмекшіге сұрақтарға токен пакетімен.</span></p>
 
     <figure class="monitor" aria-label="Кадр из аниматика">
       <img src="assets/kadr-aul-leto.jpg" width="1600" height="893" alt="Кадр: казахский аул летом, золотой свет" fetchpriority="high">
@@ -712,6 +727,64 @@ footer .legal{grid-column:1/-1;border-top:1px solid var(--line-soft);padding-top
   <a class="btn btn--main" href="https://t.me/mis_ter_bro"><span class="ru">Прислать сценарий</span><span class="kz">Сценарий жіберу</span> <span class="arr">→</span></a>
 </div>
 
+<dialog id="proba" class="proba" aria-labelledby="proba-title">
+  <form method="dialog" class="proba__form" id="proba-form" novalidate>
+    <button type="button" class="proba__close" data-proba-close aria-label="Закрыть">×</button>
+    <h2 id="proba-title"><span class="ru">Попробовать бесплатно</span><span class="kz">Тегін байқап көру</span></h2>
+    <p class="proba__lead"><span class="ru">Свой проект, окно команды и помощник NEYRA с пробным пакетом токенов. Ключ придёт на экран сразу.</span><span class="kz">Өз жобаңыз, команда терезесі және сынақ токен пакеті бар NEYRA көмекшісі. Кілт бірден экранға шығады.</span></p>
+    <label for="proba-name"><span class="ru">Как вас зовут</span><span class="kz">Атыңыз</span></label>
+    <input id="proba-name" name="name" required maxlength="80" autocomplete="name">
+    <label for="proba-email">E-mail</label>
+    <input id="proba-email" name="email" type="email" required maxlength="254" autocomplete="email">
+    <p class="proba__error" data-proba-error hidden></p>
+    <div class="proba__actions">
+      <button class="btn btn--main" type="submit" data-proba-submit><span class="ru">Получить доступ</span><span class="kz">Қолжетімділік алу</span></button>
+    </div>
+    <p class="proba__fine"><span class="ru">Один пробный доступ на один e-mail. Ключ показываем один раз — сохраните его.</span><span class="kz">Бір e-mail-ге бір сынақ қолжетімділік. Кілт бір рет көрсетіледі — сақтап қойыңыз.</span></p>
+  </form>
+  <div class="proba__done" id="proba-done" hidden>
+    <button type="button" class="proba__close" data-proba-close aria-label="Закрыть">×</button>
+    <h2><span class="ru">Доступ готов</span><span class="kz">Қолжетімділік дайын</span></h2>
+    <p class="proba__lead"><span class="ru">На счёте</span><span class="kz">Шотта</span> <b data-proba-tokeny></b> <span class="ru">токенов. Ваш ключ:</span><span class="kz">токен. Кілтіңіз:</span></p>
+    <textarea readonly rows="3" data-proba-key spellcheck="false"></textarea>
+    <div class="proba__actions">
+      <a class="btn btn--main" data-proba-open href="studio/"><span class="ru">Открыть окно проекта</span><span class="kz">Жоба терезесін ашу</span> <span class="arr">→</span></a>
+      <button type="button" class="btn btn--ghost" data-proba-copy><span class="ru">Скопировать ключ</span><span class="kz">Кілтті көшіру</span></button>
+    </div>
+    <p class="proba__fine"><span class="ru">Ключ уже сохранён в этом браузере. На другом устройстве введите его в окне: меню слева внизу → «Сервер и ключ».</span><span class="kz">Кілт осы браузерде сақталды. Басқа құрылғыда оны терезеде енгізіңіз: сол жақ төмендегі мәзір → «Сервер мен кілт».</span></p>
+  </div>
+</dialog>
+<script>
+(function(){
+  var API=(location.hostname==='localhost'||location.hostname==='127.0.0.1')?'http://127.0.0.1:8770':'https://api.studio.neyra.vision';
+  var dlg=document.getElementById('proba'); if(!dlg||!dlg.showModal) return;
+  var form=document.getElementById('proba-form'), done=document.getElementById('proba-done'), err=dlg.querySelector('[data-proba-error]');
+  document.querySelectorAll('[data-proba]').forEach(function(b){b.addEventListener('click',function(){form.hidden=false;done.hidden=true;err.hidden=true;dlg.showModal();dlg.querySelector('#proba-name').focus();});});
+  dlg.querySelectorAll('[data-proba-close]').forEach(function(b){b.addEventListener('click',function(){dlg.close();});});
+  dlg.addEventListener('click',function(e){if(e.target===dlg)dlg.close();});
+  form.addEventListener('submit',function(e){
+    e.preventDefault(); err.hidden=true;
+    var name=form.name.value.trim(), email=form.email.value.trim();
+    if(!name||!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)){err.textContent='Нужны имя и настоящий e-mail.';err.hidden=false;return;}
+    var btn=form.querySelector('[data-proba-submit]'); btn.disabled=true;
+    fetch(API+'/api/proba',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,email:email})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(res){
+        if(!res.ok){throw new Error((res.j&&res.j.error&&res.j.error.message)||'Сервер не ответил.');}
+        var d=res.j.data;
+        try{localStorage.setItem('neyra-vision-server-settings-v1',JSON.stringify({url:API,key:d.key}));}catch(x){}
+        dlg.querySelector('[data-proba-key]').value=d.key;
+        dlg.querySelector('[data-proba-tokeny]').textContent=d.tokeny&&d.tokeny.balance;
+        dlg.querySelector('[data-proba-open]').setAttribute('href','studio/?klyuch='+encodeURIComponent(d.key)+'#/studio/overview');
+        form.hidden=true; done.hidden=false;
+      })
+      .catch(function(x){err.textContent=x.message||'Не получилось. Попробуйте ещё раз или напишите продюсеру.';err.hidden=false;})
+      .then(function(){btn.disabled=false;});
+  });
+  var copy=dlg.querySelector('[data-proba-copy]');
+  copy.addEventListener('click',function(){var ta=dlg.querySelector('[data-proba-key]');ta.select();try{navigator.clipboard.writeText(ta.value);}catch(x){document.execCommand('copy');}copy.querySelector('.ru').textContent='Скопировано';});
+})();
+</script>
 <script>
 (function(){
   var root=document.documentElement;

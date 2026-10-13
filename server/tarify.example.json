@@ -1,0 +1,8 @@
+{
+  "probnyy_paket": 100,
+  "ceny": { "vopros": 1, "kartinka": 5, "video": 40 },
+  "pakety": [
+    { "tokeny": 500, "cena": "" },
+    { "tokeny": 2000, "cena": "" }
+  ]
+}

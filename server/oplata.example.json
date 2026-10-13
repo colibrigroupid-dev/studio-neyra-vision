@@ -1,0 +1,9 @@
+{
+  "sposoby": [
+    { "nazvanie": "Kaspi", "rekvizity": "", "podskazka": "в комментарии к переводу укажите e-mail" },
+    { "nazvanie": "Карта (РФ/KZ)", "rekvizity": "", "podskazka": "" },
+    { "nazvanie": "USDT (TRC-20)", "rekvizity": "", "podskazka": "" }
+  ],
+  "ssylka": "",
+  "podskazka": "После оплаты токены начисляет продюсер в течение часа."
+}

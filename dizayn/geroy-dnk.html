@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ru" data-theme="graphite">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171717">
+  <meta name="description" content="Паспорт Ер Төстіка, замок внешности, пять ракурсов и сцены с героем. Кликабельный прототип цеха «Герой».">
+  <title>Ер Төстік · Герой · Neyra Vision</title>
+  <link rel="icon" href="../assets/favicon-64.png">
+  <link rel="stylesheet" href="tokeny.css">
+  <style>
+    /* №58. Токены общие; в этом цехе только Onest и один акцент. */
+    :root { --disp:var(--body); --mono:var(--body); }
+    * { box-sizing:border-box; }
+    html { scroll-padding-top:88px; }
+    body { margin:0; background:var(--bg); color:var(--text); font:400 15px/1.5 var(--body); -webkit-font-smoothing:antialiased; }
+    button,input,textarea { font:inherit; color:inherit; }
+    button,a,input,textarea { -webkit-tap-highlight-color:transparent; }
+    button { cursor:pointer; }
+    a { color:inherit; text-decoration:none; }
+    h1,h2,h3,p { margin:0; }
+    h1 { font-size:26px; line-height:1.3; font-weight:600; }
+    h2 { font-size:17px; line-height:1.4; font-weight:500; }
+    h3 { font-size:17px; font-weight:500; }
+    svg { width:20px; height:20px; flex:none; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+    :focus-visible { outline:2px solid #9a9a9a; outline-offset:4px; }
+    ::selection { background:var(--accent); color:var(--accent-ink); }
+    [hidden] { display:none!important; }
+    .quiet { color:var(--muted); }
+    .small { font-size:13px; color:var(--muted); }
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:36px; padding:8px 16px; border:0; border-radius:var(--r-pill); background:var(--surface-2); font-weight:500; line-height:1.2; text-align:center; }
+    .btn:hover { background:var(--field); }
+    .btn:disabled { cursor:default; color:var(--muted); background:var(--surface-2); }
+    .icon-btn { width:36px; min-height:36px; padding:0; }
+    .topbar { position:sticky; top:0; z-index:3; display:flex; align-items:center; gap:16px; min-height:56px; padding:8px 24px; background:var(--bg-side); }
+    .brand { display:flex; align-items:center; justify-content:center; width:32px; flex:none; }
+    .brand img { display:block; width:32px; height:32px; border-radius:50%; }
+    .hero-name { min-width:0; font-size:17px; font-weight:500; overflow-wrap:anywhere; }
+    .status { margin-left:auto; flex:none; font-size:13px; font-weight:400; white-space:nowrap; }
+    .status-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+    body[data-status="awaiting"] .status-dot { background:var(--accent); }
+    .work { width:min(100% - 48px,900px); margin:0 auto; padding:48px 0 32px; display:grid; gap:32px; }
+    .intro { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .intro p { margin-top:8px; }
+    .section-head { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .section-head .heading { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+    .sheet { border:0; border-radius:var(--r); background:var(--surface); overflow:hidden; }
+    .passport { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px 32px; padding:24px; }
+    .field { min-width:0; }
+    .field dt { margin-bottom:8px; font-size:13px; color:var(--muted); }
+    .field dd { margin:0; font-size:17px; overflow-wrap:anywhere; }
+    .field-wide { grid-column:1/-1; }
+    dl { margin:0; }
+    .dna-row { display:grid; grid-template-columns:160px minmax(0,1fr); gap:24px; padding:16px 24px; }
+    .dna-row + .dna-row { border-top:1px solid var(--line-soft); }
+    .dna-row dt { color:var(--muted); }
+    .dna-row dd { margin:0; overflow-wrap:anywhere; }
+    .dna-row .small { display:block; margin-top:8px; }
+    .lock-note { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+    .section-note { margin:8px 0 16px; color:var(--muted); }
+    .dna-actions { display:flex; flex-wrap:wrap; gap:8px; }
+    .portraits { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px 16px; }
+    .portrait { display:block; width:100%; padding:0; border:0; background:transparent; text-align:left; border-radius:var(--r); }
+    .portrait-image { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; width:100%; aspect-ratio:16/9; border-radius:var(--r); background:var(--surface); color:var(--muted); }
+    .portrait:hover .portrait-image { background:var(--surface-2); }
+    .portrait-image .figure { width:40px; height:40px; }
+    .ratio { position:absolute; top:12px; right:16px; font-size:13px; font-variant-numeric:tabular-nums; }
+    .portrait-caption { display:flex; justify-content:space-between; gap:8px; padding:12px 4px 0; }
+    .portrait-caption svg { color:var(--muted); }
+    .scene-link { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:16px; padding:16px 24px; }
+    .scene-link + .scene-link { border-top:1px solid var(--line-soft); }
+    .scene-link:hover { background:var(--surface-2); }
+    .scene-number { font-variant-numeric:tabular-nums; color:var(--muted); }
+    .scene-title { font-weight:500; }
+    .scene-desc { display:block; margin-top:4px; color:var(--muted); }
+    .scene-link svg { color:var(--muted); }
+    .scene-foot { margin-top:12px; }
+    .assistant { position:sticky; bottom:0; z-index:2; padding:16px 24px max(16px,env(safe-area-inset-bottom)); background:var(--bg); }
+    .assistant-inner { max-width:900px; margin:0 auto; }
+    .assistant-message { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 24px; margin-bottom:8px; background:var(--surface); border-radius:var(--r); }
+    .assistant-message p { max-width:560px; }
+    .assistant-message .btn { flex:none; }
+    .composer { display:grid; grid-template-columns:36px minmax(0,1fr) 40px; align-items:end; gap:12px; padding:12px 16px; border-radius:var(--r-field); background:var(--field); }
+    .composer textarea { display:block; width:100%; min-height:36px; max-height:128px; padding:8px 0; resize:none; border:0; background:transparent; line-height:1.4; }
+    .composer textarea::placeholder { color:#b2b2b2; opacity:1; }
+    .composer .mic { background:var(--surface-2); }
+    .composer .send { width:40px; min-height:40px; background:var(--accent); color:var(--accent-ink); }
+    .composer .send:disabled { background:var(--surface-2); color:var(--muted); }
+    .save-note { display:block; margin-top:8px; text-align:center; }
+    .conversation { max-height:240px; overflow:auto; margin-bottom:8px; padding:16px 24px; border-radius:var(--r); background:var(--surface); }
+    .conversation p + p { margin-top:12px; }
+    .conversation b { font-weight:500; }
+    .conversation .thread-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .notice { position:fixed; z-index:7; top:72px; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 32px); padding:12px 24px; border-radius:var(--r); background:var(--field); color:var(--text); }
+    dialog { max-width:640px; width:calc(100% - 32px); max-height:calc(100dvh - 32px); margin:auto; padding:24px; border:0; border-radius:var(--r); background:var(--surface); color:var(--text); overflow:auto; }
+    dialog::backdrop { background:rgb(0 0 0 / .72); }
+    .dialog-head { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .dialog-copy { margin-bottom:24px; color:var(--muted); }
+    .editor-fields { display:grid; gap:16px; }
+    .editor-fields label { display:grid; gap:8px; }
+    .editor-fields input,.editor-fields textarea { width:100%; padding:12px 16px; min-height:44px; border:0; border-radius:12px; background:var(--field); }
+    .editor-fields textarea { min-height:88px; resize:vertical; }
+    .dialog-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:24px; }
+    .dialog-actions .btn { min-height:40px; }
+    .portrait-large { aspect-ratio:16/9; margin:16px 0; }
+    .portrait-large .figure { width:64px; height:64px; }
+    .scene-excerpt { line-height:1.7; white-space:pre-line; }
+    .noscript { width:min(100% - 48px,900px); margin:16px auto; color:var(--muted); }
+    @media(min-width:1000px) { .portraits .portrait:nth-child(4) { grid-column:1; } }
+    @media(max-width:640px) {
+      body { font-size:16px; }
+      html { scroll-padding-top:128px; }
+      .topbar { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:8px 12px; padding:8px 16px; }
+      .back { grid-column:2/-1; justify-self:start; grid-row:1; }
+      .hero-name { grid-column:1/3; grid-row:2; padding:4px 0; }
+      .status { grid-column:3; grid-row:2; font-size:16px; }
+      .btn,.icon-btn { min-height:44px; }
+      .icon-btn { width:44px; }
+      .work { width:calc(100% - 32px); padding-top:32px; }
+      .intro { align-items:start; }
+      .small,.field dt,.lock-note,.ratio { font-size:16px; }
+      .passport { grid-template-columns:1fr; padding:16px; gap:24px; }
+      .field-wide { grid-column:auto; }
+      .field dd { font-size:17px; }
+      .section-head { align-items:start; flex-wrap:wrap; gap:12px; }
+      .dna-row { grid-template-columns:1fr; gap:8px; padding:16px; }
+      .portraits { grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px 12px; }
+      .portrait-image .figure { width:32px; height:32px; }
+      .portrait-image .empty-copy { display:none; }
+      .ratio { top:8px; right:12px; }
+      .portrait-caption { padding-top:8px; }
+      .portrait-caption svg { display:none; }
+      .scene-link { grid-template-columns:24px minmax(0,1fr) 20px; padding:16px; gap:12px; }
+      .assistant { padding:12px 16px max(12px,env(safe-area-inset-bottom)); }
+      .assistant-message { padding:16px; flex-direction:column; align-items:start; gap:12px; }
+      .assistant-message .btn { width:100%; }
+      .composer { grid-template-columns:44px minmax(0,1fr) 44px; gap:8px; padding:8px 12px; }
+      .composer textarea { min-height:44px; padding:12px 0; }
+      .composer .send { width:44px; min-height:44px; }
+      .save-note { font-size:16px; }
+      .conversation { padding:16px; max-height:200px; }
+      dialog { padding:16px; }
+      .dialog-actions .btn { min-height:44px; }
+    }
+    @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+  </style>
+</head>
+<body data-status="draft">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0M12 14v3"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M10 4H4v16h16v-6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  </svg>
+
+  <header class="topbar" aria-label="Цех «Герой»">
+    <a class="brand" href="okno-proekta.html" aria-label="Neyra Vision — в кабинет"><img src="../assets/znak-nv.png" width="32" height="32" alt=""></a>
+    <a class="btn back" href="okno-proekta.html">← В кабинет</a>
+    <span class="hero-name" id="header-name">Ер Төстік</span>
+    <button class="btn status" type="button" id="status-button" aria-label="Статус паспорта: черновик"><span class="status-dot" aria-hidden="true"></span><span id="status-label">черновик</span></button>
+  </header>
+
+  <noscript><p class="noscript">Паспорт можно прочитать. Для правок и просмотра ракурсов включите JavaScript.</p></noscript>
+  <main class="work">
+    <section aria-labelledby="passport-title">
+      <div class="intro">
+        <div><h1 id="passport-title">Паспорт героя</h1><p class="quiet">Знакомимся с героем и уточняем главное.</p></div>
+        <button class="btn" type="button" id="edit-passport">Изменить</button>
+      </div>
+      <dl class="sheet passport">
+        <div class="field"><dt>Имя</dt><dd data-field="name">Ер Төстік</dd></div>
+        <div class="field"><dt>Возраст</dt><dd data-field="age">Ребёнок. Точный возраст уточним.</dd></div>
+        <div class="field field-wide"><dt>Роль в истории</dt><dd data-field="role">Главный герой. Мальчик, которого с рождения назначили батыром.</dd></div>
+        <div class="field field-wide"><dt>Характер</dt><dd data-field="character">Добрый, залюбленный, боится подвести семью.</dd></div>
+      </dl>
+    </section>
+
+    <section aria-labelledby="dna-title">
+      <div class="section-head">
+        <div class="heading"><h2 id="dna-title">ДНК внешности</h2><span class="lock-note"><svg aria-hidden="true"><use id="lock-icon" href="#i-unlock"/></svg><span id="lock-label">Замок открыт</span></span></div>
+        <div class="dna-actions"><button class="btn" type="button" id="edit-dna">Изменить ДНК</button><button class="btn" type="button" id="toggle-lock">Зафиксировать</button></div>
+      </div>
+      <p class="section-note" id="dna-note">Сверим детали, чтобы узнавать героя в каждом кадре.</p>
+      <dl class="sheet">
+        <div class="dna-row"><dt>Лицо</dt><dd data-field="face">Большие добрые испуганные глаза, подвижные брови, румянец.</dd></div>
+        <div class="dna-row"><dt>Волосы</dt><dd data-field="hair">Тёмные, коротко острижены, под войлочной шапочкой.</dd></div>
+        <div class="dna-row"><dt>Телосложение</dt><dd data-field="body">Казахский мальчик детского роста. Худой, угловатый, чуть сутулится.</dd></div>
+        <div class="dna-row"><dt>Одежда по сценам</dt><dd><span data-field="clothing">Синий кафтан, ржаво-красный кушак. Новые сапоги велики. Лук на спине, носит неловко.</span><span class="small">Базовый костюм. Смену одежды по сценам ещё уточним.</span></dd></div>
+        <div class="dna-row"><dt>Табу<span class="small">Чего не рисовать</span></dt><dd><span data-field="taboo">Лица знаменитостей, фотореализм, надписи, логотипы и водяные знаки.</span><span class="small" id="taboo-note">Личные табу героя ещё обсудим с художником.</span></dd></div>
+      </dl>
+    </section>
+
+    <section aria-labelledby="portraits-title">
+      <div class="section-head"><h2 id="portraits-title">Портреты</h2><span class="small">Пять ракурсов · 16:9</span></div>
+      <p class="section-note">Добавим портреты и сверим внешность со всех сторон.</p>
+      <div class="portraits">
+        <button class="portrait" type="button" data-portrait="Анфас" aria-label="Открыть ракурс «Анфас»"><span class="portrait-image"><span class="ratio">16:9</span><svg class="figure" aria-hidden="true"><use href="#i-person"/></svg><span class="empty-copy">Добавим портрет</span></span><span class="portrait-caption">Анфас<svg aria-hidden="true"><use href="#i-open"/></svg></span></button>
+        <button class="portrait" type="button" data-portrait="Три четверти" aria-label="Открыть ракурс «Три четверти»"><span class="portrait-image"><span class="ratio">16:9</span><svg class="figure" aria-hidden="true"><use href="#i-person"/></svg><span class="empty-copy">Добавим портрет</span></span><span class="portrait-caption">Три четверти<svg aria-hidden="true"><use href="#i-open"/></svg></span></button>
+        <button class="portrait" type="button" data-portrait="Левый профиль" aria-label="Открыть ракурс «Левый профиль»"><span class="portrait-image"><span class="ratio">16:9</span><svg class="figure" aria-hidden="true"><use href="#i-person"/></svg><span class="empty-copy">Добавим портрет</span></span><span class="portrait-caption">Левый профиль<svg aria-hidden="true"><use href="#i-open"/></svg></span></button>
+        <button class="portrait" type="button" data-portrait="Правый профиль" aria-label="Открыть ракурс «Правый профиль»"><span class="portrait-image"><span class="ratio">16:9</span><svg class="figure" aria-hidden="true"><use href="#i-person"/></svg><span class="empty-copy">Добавим портрет</span></span><span class="portrait-caption">Правый профиль<svg aria-hidden="true"><use href="#i-open"/></svg></span></button>
+        <button class="portrait" type="button" data-portrait="В полный рост" aria-label="Открыть ракурс «В полный рост»"><span class="portrait-image"><span class="ratio">16:9</span><svg class="figure" aria-hidden="true"><use href="#i-person"/></svg><span class="empty-copy">Добавим портрет</span></span><span class="portrait-caption">В полный рост<svg aria-hidden="true"><use href="#i-open"/></svg></span></button>
+      </div>
+    </section>
+
+    <section aria-labelledby="scenes-title">
+      <div class="section-head"><h2 id="scenes-title">В каких сценах появляется</h2></div>
+      <p class="section-note">Первые сцены прежней версии. Сверим с новым сценарием.</p>
+      <div class="sheet">
+        <a class="scene-link" href="#scena-01" data-scene="01"><span class="scene-number">01</span><span><span class="scene-title">Юрта · ночь</span><span class="scene-desc">Тень героя и голос за кадром.</span></span><svg aria-hidden="true"><use href="#i-chevron"/></svg></a>
+        <a class="scene-link" href="#scena-02" data-scene="02"><span class="scene-number">02</span><span><span class="scene-title">Аул Ерназара · день</span><span class="scene-desc">Рассказывает малышам о своих подвигах.</span></span><svg aria-hidden="true"><use href="#i-chevron"/></svg></a>
+      </div>
+      <p class="quiet scene-foot">Разберите новый сценарий — добавим остальные сцены.</p>
+    </section>
+  </main>
+
+  <footer class="assistant" aria-label="Помощник героя">
+    <div class="assistant-inner">
+      <div class="conversation" id="conversation" hidden aria-label="Разговор с помощником">
+        <div class="thread-head"><span class="quiet">Помощник</span><button class="btn icon-btn" type="button" id="hide-thread" aria-label="Свернуть разговор"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+        <div id="thread" role="log" aria-live="polite"></div>
+      </div>
+      <div class="assistant-message"><p id="assistant-note">ИИ заполнил паспорт по сценарию — проверьте и утвердите</p><button class="btn" type="button" id="review-button">На утверждение</button></div>
+      <form class="composer" id="assistant-form">
+        <button class="btn icon-btn mic" type="button" id="mic-button" aria-label="Сказать помощнику"><svg aria-hidden="true"><use href="#i-mic"/></svg></button>
+        <textarea id="assistant-input" rows="1" maxlength="1200" aria-label="Сообщение помощнику" placeholder="Скажите или напишите…"></textarea>
+        <button class="btn icon-btn send" type="submit" id="send-button" aria-label="Отправить сообщение"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
+      </form>
+      <span class="save-note small" id="save-note">Прототип. Правки остаются в этом браузере.</span>
+    </div>
+  </footer>
+
+  <p class="notice" id="notice" role="status" hidden></p>
+  <dialog id="editor" aria-labelledby="editor-title">
+    <form id="editor-form">
+      <div class="dialog-head"><h2 id="editor-title">Паспорт героя</h2><button class="btn icon-btn" type="button" data-close="editor" aria-label="Закрыть правки"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+      <p class="dialog-copy">Уточните описание — сохраним ваш вариант.</p>
+      <div class="editor-fields" id="editor-fields"></div>
+      <div class="dialog-actions"><button class="btn" type="button" data-close="editor">Отмена</button><button class="btn" type="submit">Сохранить правки</button></div>
+    </form>
+  </dialog>
+  <dialog id="review" aria-labelledby="review-title">
+    <div class="dialog-head"><h2 id="review-title">Отправить на утверждение?</h2><button class="btn icon-btn" type="button" data-close="review" aria-label="Закрыть утверждение"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <p class="dialog-copy" id="review-copy">Зафиксируем паспорт и описание внешности для проверки. Портреты добавим позже.</p>
+    <p class="quiet">Это пример утверждения. Команда его пока не увидит.</p>
+    <div class="dialog-actions"><button class="btn" type="button" data-close="review">Вернуться</button><button class="btn" type="button" id="confirm-review">Отправить на утверждение</button></div>
+  </dialog>
+  <dialog id="portrait-view" aria-labelledby="portrait-title">
+    <div class="dialog-head"><h2 id="portrait-title">Анфас</h2><button class="btn icon-btn" type="button" data-close="portrait-view" aria-label="Закрыть ракурс"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <div class="portrait-image portrait-large"><span class="ratio">16:9</span><svg class="figure" aria-hidden="true"><use href="#i-person"/></svg><span>Здесь будет портрет героя</span></div>
+    <p class="quiet">Сверим лицо, волосы и костюм с ДНК героя.</p>
+    <div class="dialog-actions"><button class="btn" type="button" id="previous-portrait" aria-label="Предыдущий ракурс">← Ракурс</button><button class="btn" type="button" id="next-portrait" aria-label="Следующий ракурс">Ракурс →</button></div>
+  </dialog>
+  <dialog id="scene-view" aria-labelledby="scene-view-title">
+    <div class="dialog-head"><h2 id="scene-view-title">Сцена</h2><button class="btn icon-btn" type="button" data-close="scene-view" aria-label="Закрыть сцену"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <p class="dialog-copy">Прежняя версия · фрагмент с героем</p>
+    <p class="scene-excerpt" id="scene-excerpt"></p>
+    <div class="dialog-actions"><button class="btn" type="button" data-close="scene-view">К герою</button></div>
+  </dialog>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = id => document.getElementById(id);
+      const storageKey = 'nv-prototip-58-geroy-dnk-v1';
+      const fields = [...document.querySelectorAll('[data-field]')];
+      const defaults = Object.fromEntries(fields.map(el => [el.dataset.field, el.textContent]));
+      const labels = {name:'Имя',age:'Возраст',role:'Роль в истории',character:'Характер',face:'Лицо',hair:'Волосы',body:'Телосложение',clothing:'Одежда по сценам',taboo:'Табу — чего не рисовать'};
+      const statusNames = {draft:'черновик',awaiting:'на утверждении',approved:'утверждён'};
+      let state = {values:{...defaults},status:'draft',locked:false};
+      let storageAvailable = true;
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+        if (saved && saved.values && typeof saved.values === 'object') {
+          for (const key of Object.keys(defaults)) {
+            if (typeof saved.values[key] === 'string' && saved.values[key].trim() && saved.values[key].length <= 600) state.values[key] = saved.values[key];
+          }
+          if (Object.hasOwn(statusNames,saved.status)) state.status = saved.status;
+          state.locked = saved.locked === true || state.status !== 'draft';
+        }
+      } catch (_) { storageAvailable = false; }
+      let noticeTimer;
+      function notify(message) {
+        clearTimeout(noticeTimer);
+        $('notice').textContent = message;
+        $('notice').hidden = false;
+        noticeTimer = setTimeout(() => { $('notice').hidden = true; }, 4500);
+      }
+      function persist() {
+        try {
+          localStorage.setItem(storageKey,JSON.stringify(state));
+          storageAvailable = true;
+          $('save-note').textContent = 'Прототип. Правки остаются в этом браузере.';
+        } catch (_) {
+          storageAvailable = false;
+          $('save-note').textContent = 'Правки видны до закрытия страницы. Скопируйте важное.';
+          notify('Не удалось сохранить правки. Скопируйте важное перед уходом.');
+        }
+      }
+      function render() {
+        fields.forEach(el => { el.textContent = state.values[el.dataset.field]; });
+        $('header-name').textContent = state.values.name;
+        document.title = state.values.name + ' · Герой · Neyra Vision';
+        document.body.dataset.status = state.status;
+        $('status-label').textContent = statusNames[state.status];
+        $('status-button').setAttribute('aria-label','Статус паспорта: ' + statusNames[state.status]);
+        $('lock-label').textContent = state.locked ? 'Внешность зафиксирована' : 'Замок открыт';
+        $('lock-icon').setAttribute('href',state.locked ? '#i-lock' : '#i-unlock');
+        $('toggle-lock').textContent = state.locked ? 'Открыть замок' : 'Зафиксировать';
+        $('toggle-lock').setAttribute('aria-pressed',String(state.locked));
+        $('edit-dna').disabled = state.locked;
+        $('edit-passport').disabled = state.status !== 'draft';
+        $('dna-note').textContent = state.locked ? 'Эти детали сохраняем во всех следующих кадрах.' : 'Сверим детали, чтобы узнавать героя в каждом кадре.';
+        $('taboo-note').hidden = state.values.taboo !== defaults.taboo;
+        $('review-button').textContent = state.status === 'draft' ? 'На утверждение' : state.status === 'awaiting' ? 'Проверить и утвердить' : 'Вернуть в черновик';
+        $('assistant-note').textContent = state.status === 'draft' ? 'ИИ заполнил паспорт по сценарию — проверьте и утвердите' : state.status === 'awaiting' ? 'Паспорт ждёт решения. Проверьте детали перед утверждением.' : 'Паспорт утверждён. Добавим портреты и сверим их с описанием.';
+        if (!storageAvailable) $('save-note').textContent = 'Правки видны до закрытия страницы. Скопируйте важное.';
+      }
+      function openEditor(keys,title) {
+        $('editor-title').textContent = title;
+        $('editor-fields').replaceChildren();
+        keys.forEach(key => {
+          const label = document.createElement('label');
+          const text = document.createElement('span');
+          text.textContent = labels[key];
+          const input = document.createElement(key === 'name' || key === 'age' ? 'input' : 'textarea');
+          input.name = key;
+          input.value = state.values[key];
+          input.required = true;
+          input.maxLength = 600;
+          label.append(text,input);
+          $('editor-fields').append(label);
+        });
+        $('editor').showModal();
+      }
+      $('edit-passport').addEventListener('click',() => openEditor(['name','age','role','character'],'Паспорт героя'));
+      $('edit-dna').addEventListener('click',() => openEditor(['face','hair','body','clothing','taboo'],'ДНК внешности'));
+      $('editor-form').addEventListener('submit',event => {
+        event.preventDefault();
+        const inputs = [...$('editor-fields').querySelectorAll('input,textarea')];
+        for (const input of inputs) {
+          if (!input.value.trim()) { input.setCustomValidity('Добавьте описание.'); input.reportValidity(); input.addEventListener('input',() => input.setCustomValidity(''),{once:true}); return; }
+        }
+        inputs.forEach(input => { state.values[input.name] = input.value.trim(); });
+        persist(); render(); $('editor').close();
+        if (storageAvailable) notify('Правки сохранены.');
+      });
+      $('toggle-lock').addEventListener('click',() => {
+        state.locked = !state.locked;
+        if (!state.locked) state.status = 'draft';
+        persist(); render();
+        if (storageAvailable) notify(state.locked ? 'Внешность зафиксирована. Описание можно отправить на проверку.' : 'Замок открыт. Можно уточнить внешность.');
+      });
+      function openReview() {
+        const copy = {
+          draft:['Отправить на утверждение?','Зафиксируем паспорт и описание внешности для проверки. Портреты добавим позже.','Отправить на утверждение'],
+          awaiting:['Утвердить паспорт?','Сейчас утверждаем описание героя. Портреты и смену одежды по сценам проверим отдельно.','Утвердить паспорт'],
+          approved:['Вернуть в черновик?','Откроем паспорт и замок внешности для правок. После изменений проверим описание заново.','Вернуть в черновик']
+        }[state.status];
+        $('review-title').textContent = copy[0]; $('review-copy').textContent = copy[1]; $('confirm-review').textContent = copy[2];
+        $('review').showModal();
+      }
+      $('review-button').addEventListener('click',openReview);
+      $('status-button').addEventListener('click',openReview);
+      $('confirm-review').addEventListener('click',() => {
+        state.status = state.status === 'draft' ? 'awaiting' : state.status === 'awaiting' ? 'approved' : 'draft';
+        state.locked = state.status !== 'draft';
+        persist(); render(); $('review').close();
+        if (storageAvailable) notify(state.status === 'awaiting' ? 'Паспорт на утверждении.' : state.status === 'approved' ? 'Паспорт утверждён.' : 'Вернули паспорт в черновик.');
+      });
+      document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click',() => $(button.dataset.close).close()));
+      document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click',event => {
+        if (event.target === dialog) { const rect = dialog.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close(); }
+      }));
+      const portraits = [...document.querySelectorAll('[data-portrait]')];
+      let portraitIndex = 0;
+      function showPortrait(index) { portraitIndex = (index + portraits.length) % portraits.length; $('portrait-title').textContent = portraits[portraitIndex].dataset.portrait; }
+      portraits.forEach((button,index) => button.addEventListener('click',() => { showPortrait(index); $('portrait-view').showModal(); }));
+      $('previous-portrait').addEventListener('click',() => showPortrait(portraitIndex - 1));
+      $('next-portrait').addEventListener('click',() => showPortrait(portraitIndex + 1));
+      $('portrait-view').addEventListener('keydown',event => { if (event.key === 'ArrowLeft') showPortrait(portraitIndex - 1); if (event.key === 'ArrowRight') showPortrait(portraitIndex + 1); });
+      const scenes = {
+        '01': {title:'01 · Юрта · ночь',text:'Тень младенца. Он растёт — рывками, как тень от прыгающего огня: мальчик, подросток, лук в руках.\n\nГОЛОС ТӨСТІКА (ЗК)\n...и с тех пор я спас аул ещё четыре раза.\n\nДомбра спотыкается.'},
+        '02': {title:'02 · Аул Ерназара · день',text:'ТӨСТІК\nЧетыре. Волк — раз. Буран — два. Сусликов, которые съели муку, — три.\n\nМАЛЫШ 1\nА четыре?\n\nТӨСТІК\nЧетыре было вчера, вы спали.'}
+      };
+      function openSceneFromHash() {
+        const match = /^#scena-(01|02)$/.exec(location.hash);
+        if (!match) { if ($('scene-view').open) $('scene-view').close(); return; }
+        const scene = scenes[match[1]];
+        $('scene-view-title').textContent = scene.title;
+        $('scene-excerpt').textContent = scene.text;
+        if (!$('scene-view').open) $('scene-view').showModal();
+      }
+      document.querySelectorAll('[data-scene]').forEach(link => link.addEventListener('click',event => {
+        event.preventDefault(); history.replaceState(null,'','#scena-' + link.dataset.scene); openSceneFromHash();
+      }));
+      window.addEventListener('hashchange',openSceneFromHash);
+      $('scene-view').addEventListener('close',() => { if (/^#scena-/.test(location.hash)) history.replaceState(null,'',location.pathname + location.search); });
+      function reply(question) {
+        let answer;
+        if (/возраст|сколько лет/i.test(question)) answer = 'В паспорте: ' + state.values.age;
+        else if (/одежд|костюм/i.test(question)) answer = 'Костюм героя: ' + state.values.clothing + ' Смену одежды по сценам ещё обсудим.';
+        else if (/табу|нельзя|запрет/i.test(question)) answer = state.values.taboo + (state.values.taboo === defaults.taboo ? ' Личные табу героя ещё обсудим с художником.' : ' Эти запреты записаны в ДНК героя.');
+        else if (/сцен/i.test(question)) answer = 'Здесь показаны первые сцены прежней версии. Новый сценарий ещё нужно разобрать.';
+        else if (/портрет|ракурс/i.test(question)) answer = 'Нужны анфас, три четверти, два профиля и полный рост. Откройте любой ракурс, чтобы посмотреть место для портрета.';
+        else answer = 'В этом прототипе можно править паспорт и ДНК, открыть ракурсы и пройти утверждение. Помощника подключим в рабочем цехе.';
+        $('conversation').hidden = false;
+        $('thread').replaceChildren();
+        for (const [author,text] of [['Вы',question],['Помощник · пример ответа',answer]]) {
+          const p = document.createElement('p'); const b = document.createElement('b'); b.textContent = author + ': '; p.append(b,document.createTextNode(text)); $('thread').append(p);
+        }
+      }
+      $('assistant-form').addEventListener('submit',event => {
+        event.preventDefault(); const input = $('assistant-input'); const question = input.value.trim();
+        if (!question) { input.focus(); notify('Напишите, что хотите уточнить у героя.'); return; }
+        reply(question); input.value = '';
+      });
+      $('assistant-input').addEventListener('keydown',event => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); $('assistant-form').requestSubmit(); }
+      });
+      $('hide-thread').addEventListener('click',() => { $('conversation').hidden = true; $('assistant-input').focus(); });
+      $('mic-button').addEventListener('click',() => { notify('Голос появится в рабочем цехе. Пока напишите здесь.'); $('assistant-input').focus(); });
+      render(); openSceneFromHash();
+    })();
+  </script>
+</body>
+</html>

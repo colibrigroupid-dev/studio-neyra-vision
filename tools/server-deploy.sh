@@ -21,6 +21,8 @@ scp -q "$KEYS" "$HOST:/opt/neyra-studio/keys.json"
 # ключ модели для помощника (№46): если лежит на маке в ~/.config/neyra-studio/key — уезжает на сервер
 MODELKEY="$HOME/.config/neyra-studio/key"
 if [ -f "$MODELKEY" ]; then ssh -o BatchMode=yes "$HOST" 'mkdir -p /root/.config/neyra-studio'; scp -q "$MODELKEY" "$HOST:/root/.config/neyra-studio/key"; ssh -o BatchMode=yes "$HOST" 'chmod 600 /root/.config/neyra-studio/key'; echo "ключ модели для помощника скопирован"; else echo "ключа модели нет (~/.config/neyra-studio/key) — помощник ответит 503, пока не появится"; fi
+# тарифы и способы оплаты (№60): если лежат на маке — уезжают на сервер
+for F in tarify.json oplata.json; do if [ -f "$HOME/.config/neyra-studio/$F" ]; then ssh -o BatchMode=yes "$HOST" 'mkdir -p /root/.config/neyra-studio'; scp -q "$HOME/.config/neyra-studio/$F" "$HOST:/root/.config/neyra-studio/$F"; echo "$F скопирован"; fi; done
 ssh -o BatchMode=yes "$HOST" 'chmod 600 /opt/neyra-studio/keys.json
 cat > /etc/systemd/system/neyra-studio.service <<UNIT
 [Unit]

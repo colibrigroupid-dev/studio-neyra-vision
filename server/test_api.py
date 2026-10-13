@@ -58,6 +58,10 @@ class ApiTests(unittest.TestCase):
         (self.repo / "index.html").write_text("<h1>Витрина</h1>", encoding="utf-8")
         self.data = self.repo / "server" / "data"
         self.keys = self.root / "keys.json"
+        # Тарифы и оплата — только из временной папки, не из ~/.config разработчика.
+        for name in ("NEYRA_TARIFY_FILE", "NEYRA_OPLATA_FILE"):
+            os.environ[name] = str(self.root / name.lower())
+            self.addCleanup(os.environ.pop, name, None)
         self.keys.write_text(json.dumps({"keys": [
             {"id": "admin", "key": "temporary-admin", "role": "admin",
              "projects": ["*"], "sections": ["*"]},
@@ -1406,6 +1410,65 @@ class TeamAccessTests(unittest.TestCase):
                     "sections": ["overview", "script"]}, 403, secret)
                 self.api("PATCH", path, {"role": "producer"}, 403, secret)
                 self.api("DELETE", path, status=403, key=secret)
+
+    def test_tokeny_trial_wallet_spend_request_and_grant(self):
+        # Блок «Токены» (Александр 13.10 08:33): всем, кто пробует, — пакет и возможность докупить.
+        tarify = Path(os.environ["NEYRA_TARIFY_FILE"])
+        tarify.write_text(json.dumps({"probnyy_paket": 2, "ceny": {"vopros": 1},
+                                      "pakety": [{"tokeny": 500, "cena": "по договорённости"}]}), encoding="utf-8")
+        Path(os.environ["NEYRA_OPLATA_FILE"]).write_text(json.dumps({"sposoby": [{"nazvanie": "Kaspi", "rekvizity": "+7 …"}]}), encoding="utf-8")
+        # Пробный вход без ключа: свой проект, ключ продюсера, пробный пакет.
+        self.assertEqual(self.request("GET", "/api/tokeny", key=None)[0], 401)
+        status, parsed, raw = self.request("POST", "/api/proba", {"name": "Айгерім", "email": "proba@example.test"}, key=None)
+        self.assertEqual(status, 201, raw)
+        proba = parsed["data"]
+        self.assertTrue(proba["slug"].startswith("proba-"))
+        self.assertTrue(proba["key"].startswith("nv1." + proba["slug"] + "."))
+        self.assertEqual(proba["tokeny"], {"balance": 2, "unlimited": False, "cena_voprosa": 1})
+        self.assertIn("klyuch=", proba["okno"])
+        status, parsed, raw = self.request("POST", "/api/proba", {"name": "Дубль", "email": "PROBA@example.test"}, key=None)
+        self.assertEqual(status, 409, raw)
+        key = proba["key"]
+        me = self.api("GET", "/api/me", key=key)["data"]
+        self.assertEqual(me["tokeny"]["balance"], 2)
+        self.assertEqual([p["slug"] for p in me["projects"]], [proba["slug"]])
+        self.assertEqual(me["projects"][0]["role"], "producer")
+        mine = self.api("GET", "/api/tokeny", key=key)["data"]
+        self.assertEqual(mine["balance"], 2)
+        self.assertEqual(mine["history"][0]["reason"], "probnyy_paket")
+        self.assertEqual(mine["pakety"][0]["tokeny"], 500)
+        self.assertEqual(mine["oplata"]["sposoby"][0]["nazvanie"], "Kaspi")
+        # Помощник списывает по токену за вопрос; на нуле — 402.
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        path = f"/api/projects/{proba['slug']}/assistant"
+        answer = self.api("POST", path, {"question": "что дальше?"}, key=key)["data"]
+        self.assertEqual(answer["tokeny"], {"balance": 1, "unlimited": False, "cena_voprosa": 1, "spisano": 1})
+        self.api("POST", path, {"question": "ещё"}, key=key)
+        self.api("POST", path, {"question": "и ещё"}, 402, key=key)
+        # Заявка на пополнение; чужим её не видно; владелец начисляет и закрывает.
+        zayavka = self.api("POST", "/api/tokeny/zayavka", {"tokeny": 500, "sposob": "Kaspi"}, 201, key=key)["data"]
+        self.assertEqual(zayavka["status"], "new")
+        self.api("GET", "/api/tokeny/zayavki", status=403, key=key)
+        self.api("POST", "/api/tokeny/nachislit", {"keyId": zayavka["keyId"], "tokeny": 5}, 403, key=key)
+        admin_view = self.api("GET", "/api/tokeny/zayavki")["data"]
+        self.assertEqual([z["id"] for z in admin_view["zayavki"]], [zayavka["id"]])
+        self.assertEqual(admin_view["zayavki"][0]["email"], "proba@example.test")
+        granted = self.api("POST", "/api/tokeny/nachislit", {"keyId": zayavka["keyId"], "tokeny": 500,
+                                                               "zayavkaId": zayavka["id"], "kommentariy": "оплата Kaspi"})["data"]
+        self.assertEqual(granted["balance"], 500)
+        self.assertEqual(self.api("GET", "/api/tokeny/zayavki")["data"]["zayavki"], [])
+        self.assertEqual(self.api("GET", "/api/tokeny", key=key)["data"]["zayavki"][0]["status"], "done")
+        self.api("POST", path, {"question": "снова можно"}, key=key)
+        # Владелец студии (admin) без лимита; виден остаток и у внешних ключей.
+        self.create()
+        self.assertTrue(self.api("GET", "/api/me")["data"]["tokeny"]["unlimited"])
+        self.assertEqual(self.api("GET", "/api/me", key="temporary-writer")["data"]["tokeny"]["balance"], 2)
+        # Некорректные заявки.
+        self.api("POST", "/api/tokeny/zayavka", {"tokeny": 0}, 422, key=key)
+        self.api("POST", "/api/tokeny/nachislit", {"keyId": "nobody", "tokeny": 5}, 404)
+        status, parsed, raw = self.request("POST", "/api/proba", {"name": "", "email": "x"}, key=None)
+        self.assertEqual(status, 422, raw)
 
     def test_any_section_can_be_opened_to_any_role_within_grantor_rights(self):
         # Роль задаёт набор по умолчанию, но продюсер может открыть сценаристу кадры (13.10).

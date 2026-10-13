@@ -48,6 +48,15 @@ const project = () => state.projects[state.activeId];
 const settingsKey = 'neyra-vision-server-settings-v1';
 let settings = { url: DEFAULT_SERVER_URL, key: '' };
 try { settings = { ...settings, ...JSON.parse(localStorage.getItem(settingsKey)) }; } catch { /* Device settings are optional. */ }
+// Ключ из ссылки (пробный вход с главной, ссылка из письма): сохраняем на устройстве и убираем из адреса.
+try {
+  const fromLink = /(?:^|[?&])klyuch=([^&]+)/.exec(String(location.search || ''));
+  if (fromLink) {
+    settings = { url: settings.url || DEFAULT_SERVER_URL, key: decodeURIComponent(fromLink[1]) };
+    try { localStorage.setItem(settingsKey, JSON.stringify(settings)); } catch { /* Device storage is optional. */ }
+    if (typeof history !== 'undefined' && history.replaceState) history.replaceState(null, '', location.pathname + (location.hash || '#/studio/overview'));
+  }
+} catch { /* A broken link must not break the window. */ }
 let localWorkspace = state;
 let serverClient = null;
 let connecting = false;
@@ -616,7 +625,7 @@ function workspace(page) {
   return `<div class='workspace ${page === 'map' ? 'map-workspace' : cinemaPages.includes(page) ? 'cinema-workspace' : ''}'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('Проект команды', 'Жұмыс кеңістігі')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `${navGroupLabel(n.id)}<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}${n.id === 'map' && serverClient && meState.awaiting ? `<span class='n hot' data-nav-awaiting>${e(String(meState.awaiting))}</span>` : ''}</a>`).join('')}${p ? `<span class='glabel'>${t('Выпуск', 'Шығарылым')}</span><a href='../p/${e(state.activeId)}/' target='_blank' rel='noopener' title='${t('Страница проекта по коду: общий взгляд для продюсера и партнёров', 'Жоба беті код арқылы')}'>${icon('globe')}${t('Страница проекта ↗', 'Жоба беті ↗')}</a>` : ''}</nav>${accountMenu(p)}</aside><main class='work-main'>${slate(p, page)}<div class='prototype-note'>${t('Картинки и видео подключим после ваших «да» на кадры.', 'Прототип · сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}</main></div>${helperStub(p)}${tabbar(page)}</div>`;
 }
 
-const meState = { awaiting: null, at: 0, loading: false };
+const meState = { awaiting: null, at: 0, loading: false, tokeny: null };
 async function refreshMe() {
   if (!serverClient || meState.loading || Date.now() - meState.at < 30000) return;
   meState.loading = true;
@@ -624,6 +633,7 @@ async function refreshMe() {
     const me = await serverClient.request('GET', '/api/me');
     const slug = project()?.slug; const mine = (me?.data?.projects || []).find(item => item.slug === slug);
     const next = mine ? mine.awaitingMe : (me?.data?.awaitingMe ?? 0); const changed = next !== meState.awaiting; meState.awaiting = next; meState.at = Date.now();
+    if (me?.data?.tokeny) { meState.tokeny = me.data.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
     for (const node of document.querySelectorAll('[data-awaiting]')) node.textContent = String(meState.awaiting);
     if (changed && route() !== 'home' && !busy && !dialog.open) render();
   } catch { meState.at = Date.now(); }
@@ -635,6 +645,44 @@ function slate(p, page) {
   const cell = (label, value) => `<div class='cell'><span>${label}</span><b>${e(String(value))}</b></div>`;
   return `<div class='slate' aria-label='${t('Где вы находитесь', 'Сіз қайдасыз')}'>${cell(t('Проект', 'Жоба'), local(p.title))}${cell(t('Раздел', 'Бөлім'), section)}${cell(t('Версия', 'Нұсқа'), 'v' + (p.version ?? 0))}${serverClient ? cell(t('Участник', 'Қатысушы'), roleName(p._principal?.role || 'viewer')) + `<div class='cell'><span>${t('Ждёт меня', 'Мені күтеді')}</span><b data-awaiting>${meState.awaiting == null ? '…' : e(String(meState.awaiting))}</b></div>` : cell(t('Хранение', 'Сақтау'), t('в браузере', 'браузерде'))}</div>`;
 }
+const tokenyLabel = () => { const w = meState.tokeny; if (!w) return t('остаток уточняю…', 'қалдықты тексеріп жатырмын…'); if (w.unlimited) return t('без лимита', 'шектеусіз'); return t(`осталось ${w.balance}`, `${w.balance} қалды`); };
+const tokenyWord = n => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? 'токенов' : b === 1 ? 'токен' : b >= 2 && b <= 4 ? 'токена' : 'токенов'; };
+async function tokenyDialog() {
+  if (!serverClient) { toast(t('Токены считаются на сервере команды: подключите ключ.', 'Токендер команда серверінде есептеледі: кілтті қосыңыз.')); return; }
+  let data;
+  try { data = (await serverClient.request('GET', '/api/tokeny'))?.data; } catch (error) { toast(error?.message || t('Не удалось получить остаток.', 'Қалдықты алу мүмкін болмады.')); return; }
+  meState.tokeny = { balance: data.balance, unlimited: data.unlimited, cena_voprosa: data.ceny?.vopros ?? 1 };
+  const pakety = Array.isArray(data.pakety) ? data.pakety : [];
+  const sposoby = Array.isArray(data.oplata?.sposoby) ? data.oplata.sposoby : [];
+  const reasonName = r => ({ probnyy_paket: t('пробный пакет', 'сынақ пакеті'), vopros: t('вопрос помощнику', 'көмекшіге сұрақ'), popolnenie: t('пополнение', 'толтыру'), kartinka: t('картинка', 'сурет'), video: t('видео', 'бейне') })[r] || r;
+  const history = (data.history || []).slice(-8).reverse();
+  const open = (data.zayavki || []).filter(z => z.status === 'new');
+  const balance = data.unlimited ? t('Без лимита', 'Шектеусіз') : `${data.balance} ${state.locale === 'kk' ? 'токен' : tokenyWord(data.balance)}`;
+  openDialog(`${dialogHead(t('Токены', 'Токендер'), t(`Вопрос помощнику стоит ${data.ceny?.vopros ?? 1} ${tokenyWord(data.ceny?.vopros ?? 1)}. Картинки и видео подключим следующими.`, `Көмекшіге бір сұрақ — ${data.ceny?.vopros ?? 1} токен.`))}
+    <div class='tokeny-balance'><span>${t('На счёте', 'Шотта')}</span><b>${e(balance)}</b></div>
+    ${data.unlimited ? '' : `<form id='tokeny-form'>
+      <label for='tokeny-amount'>${t('Сколько токенов докупить', 'Қанша токен сатып аласыз')}</label>
+      ${pakety.length ? `<div class='tokeny-pakety'>${pakety.map(pk => `<button type='button' class='chip' data-tokeny-paket='${e(String(pk.tokeny))}'>${e(String(pk.tokeny))}${pk.cena ? ` · ${e(String(pk.cena))}` : ''}</button>`).join('')}</div>` : ''}
+      <input id='tokeny-amount' name='tokeny' type='number' min='1' max='1000000' step='1' required value='${e(String(pakety[0]?.tokeny || 500))}' inputmode='numeric'>
+      ${sposoby.length ? `<label for='tokeny-sposob'>${t('Как удобно оплатить', 'Қалай төлейсіз')}</label><select id='tokeny-sposob' name='sposob'>${sposoby.map(sp => `<option value='${e(sp.nazvanie)}'>${e(sp.nazvanie)}</option>`).join('')}</select>` : `<input type='hidden' name='sposob' value=''>`}
+      <p class='access-note'>${sposoby.length ? sposoby.map(sp => `<b>${e(sp.nazvanie)}</b>${sp.rekvizity ? ` — ${e(sp.rekvizity)}` : ''}${sp.podskazka ? `. ${e(sp.podskazka)}` : ''}`).join('<br>') : t('Оставьте заявку: продюсер напишет вам на почту, как оплатить, и начислит токены сразу после оплаты.', 'Өтінім қалдырыңыз: продюсер поштаңызға қалай төлеу керектігін жазады да, төлемнен кейін бірден токен қосады.')}${data.oplata?.podskazka ? `<br>${e(data.oplata.podskazka)}` : ''}</p>
+      ${data.oplata?.ssylka ? `<a class='btn' href='${e(data.oplata.ssylka)}' target='_blank' rel='noopener'>${t('Оплатить онлайн ↗', 'Онлайн төлеу ↗')}</a>` : ''}
+      ${dialogActions(t('Оставить заявку', 'Өтінім қалдыру'))}
+    </form>`}
+    ${open.length ? `<p class='role-hint'>${t(`Ваша заявка на ${open[open.length - 1].tokeny} ${tokenyWord(open[open.length - 1].tokeny)} у продюсера. Токены появятся после оплаты.`, `Өтініміңіз продюсерде. Токендер төлемнен кейін қосылады.`)}</p>` : ''}
+    ${history.length ? `<div class='tokeny-history'><div class='menu-group'>${t('Последние движения', 'Соңғы қозғалыстар')}</div>${history.map(h => `<div class='tokeny-row'><span>${e(reasonName(h.reason))}${h.note ? ` · ${e(h.note)}` : ''}</span><small>${e(String(h.at || '').slice(0, 10))}</small><b class='${h.delta > 0 ? 'plus' : ''}'>${h.delta > 0 ? '+' : ''}${e(String(h.delta))}</b></div>`).join('')}</div>` : ''}
+    ${data.unlimited ? `<div class='dialog-actions'><button class='btn' data-close>${t('Готово', 'Дайын')}</button></div>` : ''}`);
+  dialog.classList.add('tokeny-dialog');
+  if (project()?._principal?.role === 'admin') await tokenyAdminBlock();
+}
+async function tokenyAdminBlock() {
+  let data;
+  try { data = (await serverClient.request('GET', '/api/tokeny/zayavki'))?.data; } catch { return; }
+  const list = data?.zayavki || [];
+  const block = document.createElement('div'); block.className = 'tokeny-admin';
+  block.innerHTML = `<div class='menu-group'>${t('Заявки на пополнение', 'Толтыру өтінімдері')}${list.length ? ` · ${list.length}` : ''}</div>${list.length ? list.map(z => `<div class='tokeny-row'><span><b>${e(z.name || z.keyId)}</b> ${e(z.email || '')}<br><small>${e(String(z.tokeny))} ${tokenyWord(z.tokeny)}${z.sposob ? ` · ${e(z.sposob)}` : ''}${z.kommentariy ? ` · ${e(z.kommentariy)}` : ''}</small></span><button type='button' class='btn small primary' data-tokeny-grant='${e(z.id)}' data-key-id='${e(z.keyId)}' data-tokeny-sum='${e(String(z.tokeny))}'>${t('Начислить', 'Қосу')}</button><button type='button' class='btn small ghost' data-tokeny-decline='${e(z.id)}'>${t('Отклонить', 'Қабылдамау')}</button></div>`).join('') : `<p class='role-hint'>${t('Открытых заявок нет.', 'Ашық өтінімдер жоқ.')}</p>`}`;
+  dialog.querySelector('.dialog-actions')?.before(block);
+}
 function accountMenu(p) {
   const principal = p?._principal; const who = principal ? (principal.name || principal.id || '') : t('Гость', 'Қонақ');
   const role = principal ? roleName(principal.role) : t('без ключа', 'кілтсіз');
@@ -642,6 +690,7 @@ function accountMenu(p) {
   return `<details class='menu'><summary><span class='ava' aria-hidden='true'>${e(initial)}</span><span class='who'><b>${e(who)}</b><small>${e(role)}</small></span></summary><div class='pop' role='menu'>
     ${Object.keys(state.projects).length > 1 ? `<div class='menu-group'>${t('Мои проекты', 'Менің жобаларым')}</div>${Object.entries(state.projects).slice(0, 6).map(([id, record]) => `<button type='button' role='menuitem' data-project='${e(id)}' ${id === state.activeId ? `aria-current='true'` : ''}>${icon('overview')}${e(local(record.title) || id)}</button>`).join('')}<hr>` : ''}
     <a href='../pomoshch/' role='menuitem'>${icon('script')}${t('Как это работает', 'Бұл қалай жұмыс істейді')}</a>
+    ${serverClient ? `<button type='button' role='menuitem' data-action='tokeny'>${icon('post')}<span>${t('Токены и пополнение', 'Токендер мен толтыру')}<small class='sub' data-tokeny>${e(tokenyLabel())}</small></span></button>` : ''}
     <button type='button' role='menuitem' data-action='server'>${icon('team')}${t('Сервер и ключ', 'Сервер мен кілт')}</button>
     <button type='button' role='menuitem' data-action='create'>${icon('plus')}${t('Новый проект', 'Жаңа жоба')}</button>
     <a href='../' role='menuitem'>${icon('overview')}${t('На главную', 'Басты бетке')}</a>
@@ -662,7 +711,7 @@ function helperStub(p) {
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Чтобы открыть проект команды, введите свой ключ. Его выдаёт продюсер.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
 }
-function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog', 'map-dialog', 'passport-dialog', 'server-dialog', 'assistant-dialog'); dialog.innerHTML = html; dialog.showModal(); }
+function openDialog(html) { if (!dialog.open) lastFocus = document.activeElement; delete dialog.dataset.memberKey; dialog.classList.remove('team-dialog', 'map-dialog', 'passport-dialog', 'server-dialog', 'assistant-dialog', 'tokeny-dialog'); dialog.innerHTML = html; dialog.showModal(); }
 const dialogHead = (title, subtitle = '') => `<div class='dialog-header'><div><div class='eyebrow'>NEYRA.VISION / STUDIO</div><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div><button class='icon-btn' data-close aria-label='${t('Закрыть', 'Жабу')}'>${icon('close')}</button></div>`;
 const dialogActions = label => `<div class='dialog-actions'><button type='button' class='btn' data-close>${t('Отмена', 'Бас тарту')}</button><button type='submit' class='btn primary'>${label}${icon('arrow')}</button></div>`;
 function createDialog() { openDialog(`${dialogHead(t('Начнём новую историю.', 'Жаңа оқиғаны бастайық.'), t('Ваш текущий проект останется в списке проектов.', 'Қазіргі жобаңыз жобалар тізімінде сақталады.'))}<form id='create-form'>${serverClient ? `<label for='project-slug'>${t('Код проекта (латиница)', 'Жоба коды (латынша)')}</label><input id='project-slug' name='slug' maxlength='64'><small>${t('Необязательно. Этот код задаёт проект в правах ключа; пустое поле создаст новый код автоматически.', 'Міндетті емес. Бұл код кілт құқықтарындағы жобаны белгілейді; бос өріс жаңа кодты автоматты түрде жасайды.')}</small>` : ''}<label for='project-title'>${t('Название проекта', 'Жоба атауы')}</label><input id='project-title' name='title' required maxlength='120' placeholder='${t('Название вашего фильма', 'Фильміңіздің атауы')}'><label for='project-synopsis'>${t('О чём ваша история?', 'Оқиғаңыз не туралы?')}</label><textarea id='project-synopsis' name='synopsis' rows='3' maxlength='4000'></textarea>${dialogActions(t('Создать проект', 'Жоба құру'))}</form>`); }
@@ -784,9 +833,10 @@ async function askAssistant(question) {
     const page = route();
     const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/assistant`, { question, section: page === 'overview' ? '' : page, history: assistantHistory.slice(0, -1).slice(-10) });
     const answer = result?.data?.answer || t('Пустой ответ.', 'Бос жауап.');
+    if (result?.data?.tokeny) { meState.tokeny = result.data.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
     assistantHistory.push({ role: 'assistant', content: answer });
   } catch (error) {
-    const message = error?.status === 503 ? t('Помощника ещё не подключили. Вопрос я записал и отвечу, как только он заработает.', 'Көмекші әлі қосылмаған: серверде модель кілті жоқ.') : (error?.message || t('Помощник не ответил.', 'Көмекші жауап бермеді.'));
+    const message = error?.status === 402 ? t('Токены закончились. Откройте «Токены и пополнение» в меню слева внизу, и я продолжу.', 'Токендер бітті. Сол жақ төмендегі мәзірден «Токендер мен толтыру» бөлімін ашыңыз.') : error?.status === 503 ? t('Помощника ещё не подключили. Вопрос я записал и отвечу, как только он заработает.', 'Көмекші әлі қосылмаған: серверде модель кілті жоқ.') : (error?.message || t('Помощник не ответил.', 'Көмекші жауап бермеді.'));
     assistantHistory.push({ role: 'assistant', content: message });
   } finally { assistantPending = ''; refreshThread(); }
 }
@@ -842,6 +892,7 @@ app.addEventListener('click', async event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
   const p = project();
   if (action === 'server') serverDialog();
+  else if (action === 'tokeny') await runOperation(() => tokenyDialog());
   else if (action === 'refresh-map') await refreshProductionMap();
   else if (action === 'refresh-breakdown') await runOperation(() => refreshCinema());
   else if (action === 'import-breakdown') await runOperation(() => breakdownImportDialog());
@@ -940,6 +991,28 @@ dialog.addEventListener('change', event => {
 dialog.addEventListener('click', async event => {
   if (busy || connecting) return;
   if (event.target.closest('[data-close]')) dialog.close();
+  const paket = event.target.closest('[data-tokeny-paket]');
+  if (paket) { const input = dialog.querySelector('#tokeny-amount'); if (input) input.value = paket.dataset.tokenyPaket; return; }
+  const grantBtn = event.target.closest('[data-tokeny-grant]');
+  if (grantBtn) {
+    await runOperation(async () => {
+      try {
+        await serverClient.request('POST', '/api/tokeny/nachislit', { keyId: grantBtn.dataset.keyId, tokeny: Number(grantBtn.dataset.tokenySum), zayavkaId: grantBtn.dataset.tokenyGrant });
+        toast(t('Начислено. Участник увидит токены при следующем вопросе.', 'Қосылды.'));
+      } catch (error) { toast(error?.message || t('Не получилось начислить.', 'Қосу мүмкін болмады.')); }
+      await tokenyDialog();
+    });
+    return;
+  }
+  const declineBtn = event.target.closest('[data-tokeny-decline]');
+  if (declineBtn) {
+    await runOperation(async () => {
+      try { await serverClient.request('POST', `/api/tokeny/zayavki/${encodeURIComponent(declineBtn.dataset.tokenyDecline)}/otklonit`, {}); }
+      catch (error) { toast(error?.message || t('Не получилось отклонить.', 'Қабылдамау мүмкін болмады.')); }
+      await tokenyDialog();
+    });
+    return;
+  }
   const reopenMapCell = event.target.closest('[data-reopen-map-cell]');
   if (reopenMapCell) { await runOperation(() => mapCellDialog(reopenMapCell.dataset.reopenMapCell)); return; }
   if (event.target.closest('[data-copy-member-key]')) {
@@ -992,6 +1065,15 @@ dialog.addEventListener('submit', async event => {
     await runOperation(() => submitMapApproval(form, data, event.submitter?.value || data.get('verdict'))); return;
   }
   await runOperation(async () => {
+    if (form.id === 'tokeny-form') {
+      const tokeny = Number(data.get('tokeny')); if (!Number.isInteger(tokeny) || tokeny < 1) return;
+      try {
+        await serverClient.request('POST', '/api/tokeny/zayavka', { tokeny, sposob: String(data.get('sposob') || '') });
+        toast(t('Заявка у продюсера. Токены появятся сразу после оплаты.', 'Өтінім продюсерде. Токендер төлемнен кейін бірден қосылады.'));
+        dialog.close();
+      } catch (error) { toast(error?.message || t('Не получилось отправить заявку.', 'Өтінімді жіберу мүмкін болмады.')); }
+      return;
+    }
     if (form.id === 'server-form') {
       await flushDraft(); await writeQueue;
       if (serverClient && storageError) useLocal(true);

@@ -1021,3 +1021,17 @@ UTF-8, `ensure_ascii=False`, `sort_keys=True`, `separators=(',', ':')`.
 исходники Python, Markdown и внешние
 символьные ссылки не раздаются; списка содержимого папок нет. Конфигурация
 ключей, данные и внутренние документы не выдаются HTTP-сервером.
+
+
+## Токены и пробный вход (№60, 13.10.2026)
+
+Подробно — `server/blocks/tokeny/README.md`.
+
+- `POST /api/proba` — **без ключа**: `{name, email, title?}` → `201 {slug, title, key, tokeny, okno}`. Свой проект, ключ продюсера, пробный пакет. `409` — на этот e-mail уже выдан; `429` — больше 30 в час.
+- `GET /api/me` — теперь содержит `tokeny: {balance, unlimited, cena_voprosa}`.
+- `GET /api/tokeny` — мой счёт: `balance, unlimited, history[-20:], ceny, pakety, oplata, zayavki` (мои последние 10).
+- `POST /api/tokeny/zayavka` — `{tokeny, sposob?, kommentariy?}` → `201` заявка `status: new`. До 5 открытых на участника.
+- `GET /api/tokeny/zayavki` — только `admin`: открытые заявки и все кошельки.
+- `POST /api/tokeny/nachislit` — только `admin`: `{keyId, tokeny, zayavkaId?, kommentariy?}` → кошелёк; заявка закрывается `done`.
+- `POST /api/tokeny/zayavki/<id>/otklonit` — только `admin`.
+- `POST /api/projects/<slug>/assistant` — перед ответом проверяет остаток (`402 TOKENY_EMPTY`), после ответа списывает `ceny.vopros` и возвращает `tokeny: {balance, unlimited, cena_voprosa, spisano}`.
