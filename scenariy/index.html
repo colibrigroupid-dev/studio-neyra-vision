@@ -2,130 +2,140 @@
 <html lang="ru" data-lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Сценарий · Neyra Vision Studio</title>
+<title>Сценарная · Neyra Vision Studio</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Сценарная студии Neyra Vision: пишите сценарий в формате Fountain на русском и казахском, держите структуру и героев, улучшайте текст с NEYRA.">
+<meta name="description" content="Сценарная Neyra Vision Studio: лист сценария как в профессиональных программах, Tab и Enter переключают абзацы, сцены и хронометраж, помощник NEYRA.">
 <meta name="theme-color" content="#1c1a16">
 <meta name="robots" content="noindex">
-<meta property="og:title" content="Сценарий · Neyra Vision Studio">
-<meta property="og:description" content="Редактор сценария на русском и казахском: Fountain, структура, герои, ассистент NEYRA.">
+<meta property="og:title" content="Сценарная · Neyra Vision Studio">
+<meta property="og:description" content="Редактор сценария на русском и казахском: лист, сцены, хронометраж, NEYRA.">
 <meta property="og:image" content="https://studio.neyra.vision/assets/og-scenariy.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:type" content="website"><meta property="og:url" content="https://studio.neyra.vision/scenariy/">
 <link rel="icon" href="../assets/favicon-64.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;500;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=48">
+<link rel="stylesheet" href="app.css?v=49">
 </head>
 <body>
-<noscript><div class="nojs">Редактор работает только с включённым JavaScript. Сценарии хранятся в вашем браузере; без JS открыть их нельзя.</div></noscript>
+<noscript><div class="nojs">Сценарная работает только с включённым JavaScript.</div></noscript>
 <div class="app">
   <header class="top">
-    <a class="brand" href="../" title="На главную studio.neyra.vision" aria-label="Neyra Vision Studio"><img src="../assets/znak-nv.png" alt="" width="32" height="32"></a>
-    <button class="btn btn--sm mob" id="mobLeft" type="button" data-t="Сцены">Сцены</button>
-    <input class="title-in" id="title" type="text" placeholder="Название проекта" data-tp="Название проекта" aria-label="Название проекта" spellcheck="false">
-    <div class="stats" id="stats" aria-live="polite"></div>
-    <div class="tb">
-      <button class="btn btn--sm" id="btnProjects" type="button"><span data-t="Проекты">Проекты</span> ▾</button>
-      <button class="btn btn--sm" id="btnExport" type="button"><span data-t="Экспорт">Экспорт</span> ▾</button>
-      <div class="seg" role="group" aria-label="Вид">
-        <button type="button" data-view="text" aria-pressed="false" data-t="Текст">Текст</button>
-        <button type="button" data-view="both" aria-pressed="true" data-t="Оба">Оба</button>
-        <button type="button" data-view="page" aria-pressed="false" data-t="Страница">Страница</button>
-      </div>
-      <button class="btn btn--sm" id="btnFocus" type="button" title="Фокус: только текст (⌘⇧F)" data-t="Фокус">Фокус</button>
-      <div class="lang" role="group" aria-label="Тіл / Язык"><button type="button" data-lang="ru" aria-pressed="true">RU</button><button type="button" data-lang="kz" aria-pressed="false">KZ</button></div>
-      <button class="btn btn--sm" id="btnHelp" type="button" title="Клавиши и подсказки" aria-label="Справка">?</button>
-      <button class="btn btn--sm mob" id="mobRight" type="button">NEYRA</button>
+    <button class="ic" id="btnMenu" type="button" aria-label="Меню" title="Меню: проекты, импорт, экспорт, сервер">≡</button>
+    <a class="brand" href="../" title="На главную studio.neyra.vision"><img src="../assets/logo-nv-512.png" alt="" width="26" height="26"><b>Neyra Vision</b></a>
+    <input class="title-in" id="title" type="text" placeholder="Название проекта" data-tp="Жоба атауы" aria-label="Название проекта" spellcheck="false">
+    <div class="pages" role="group" aria-label="Страницы">
+      <span class="pg on" data-t="Сценарная">Сценарная</span>
+      <a class="pg" id="lnkDirector" href="../studio/" data-t="Режиссёрская">Режиссёрская</a>
     </div>
+    <span class="state" id="aiState" title=""><span class="dot" id="aiDot"></span><span id="aiStateText" data-t="проверяю связь">проверяю связь</span></span>
+    <button class="ic mob" id="mobNav" type="button" aria-label="Навигатор">☰</button>
   </header>
 
   <div class="main">
-    <aside class="pane left">
-      <div class="pane-h">
-        <div class="tabs" role="tablist">
-          <button role="tab" aria-selected="true" data-tab="scenes" data-t="Сцены">Сцены</button>
-          <button role="tab" aria-selected="false" data-tab="chars" data-t="Герои">Герои</button>
-          <button role="tab" aria-selected="false" data-tab="beats" data-t="Структура">Структура</button>
-          <button role="tab" aria-selected="false" data-tab="notes" data-t="Замысел">Замысел</button>
-          <button role="tab" aria-selected="false" data-tab="versions" data-t="Версии">Версии</button>
+    <aside class="nav" id="nav">
+      <div class="nav-b">
+        <div class="docs" id="docs">
+          <button type="button" class="doc-i" data-doc="title"><i>▤</i><span data-t="Титульная страница">Титульная страница</span></button>
+          <button type="button" class="doc-i" data-doc="synopsis"><i>≣</i><span data-t="Синопсис">Синопсис</span></button>
+          <button type="button" class="doc-i on" data-doc="script"><i>✎</i><span data-t="Сценарий">Сценарий</span></button>
+          <button type="button" class="doc-i" data-doc="stats"><i>▦</i><span data-t="Статистика">Статистика</span></button>
+          <button type="button" class="doc-i" data-doc="chars"><i>☺</i><span data-t="Персонажи">Персонажи</span><small id="charsCount"></small></button>
+          <button type="button" class="doc-i" data-doc="locs"><i>⌂</i><span data-t="Локации">Локации</span><small id="locsCount"></small></button>
+        </div>
+        <div class="scenes hidden" id="scenesPane">
+          <div class="caps" style="padding:.6rem .7rem .2rem" data-t="Сцены">Сцены</div>
+          <ul class="scene-list" id="scenes"></ul>
         </div>
       </div>
-      <div class="pane-b">
-        <ul class="list" id="scenes" data-panel="scenes"></ul>
-        <ul class="list hidden" id="chars" data-panel="chars"></ul>
-        <div class="beats hidden" id="beats" data-panel="beats"></div>
-        <div class="fields hidden" id="notes" data-panel="notes">
-          <label><span class="caps" data-t="Логлайн">Логлайн</span><textarea id="f-logline" rows="3" placeholder="[герой с изъяном] должен [цель], иначе [ставки], но [препятствие]" data-tp="[кемшілігі бар кейіпкер] [мақсатқа] жетуі керек, әйтпесе [тәуекел], бірақ [кедергі]"></textarea></label>
-          <label><span class="caps" data-t="Жанр · формат">Жанр · формат</span><input id="f-genre" type="text" placeholder="драма, полный метр, 90 мин" data-tp="драма, толық метр, 90 мин"></label>
-          <label><span class="caps" data-t="Синопсис">Синопсис</span><textarea id="f-synopsis" rows="8" placeholder="10 строк о том, что происходит" data-tp="не болатыны туралы 10 жол"></textarea></label>
-          <label><span class="caps" data-t="Заметки">Заметки</span><textarea id="f-notes" rows="6" placeholder="решения, вопросы, что отложили" data-tp="шешімдер, сұрақтар, кейінге қалдырылғаны"></textarea></label>
-        </div>
-        <div class="versions hidden" id="versions" data-panel="versions"></div>
-      </div>
-      <div class="pane-f" id="storeNote"></div>
+      <button type="button" class="nav-f" id="counter" title="Что считать"><span id="counterText">Длительность: 0:00</span> <span class="caret">▾</span></button>
+      <div class="nav-store" id="storeNote"></div>
     </aside>
 
-    <section class="pane center">
-      <div class="ed-tools" id="edTools">
-        <button type="button" data-ins="heading-int" data-t="ИНТ.">ИНТ.</button>
-        <button type="button" data-ins="heading-ext" data-t="НАТ.">НАТ.</button>
-        <button type="button" data-ins="character" data-t="ГЕРОЙ">ГЕРОЙ</button>
-        <button type="button" data-ins="paren" data-t="(ремарка)">(ремарка)</button>
-        <button type="button" data-ins="transition" data-t="ПЕРЕХОД">ПЕРЕХОД</button>
-        <button type="button" data-ins="title" data-t="ТИТР">ТИТР</button>
-        <button type="button" data-ins="note" data-t="[[заметка]]">[[заметка]]</button>
-        <button type="button" data-ins="section" data-t="#Акт">#Акт</button>
-        <button type="button" data-ins="pagebreak" data-t="=== разрыв">=== разрыв</button>
-        <label class="paper"><span class="caps" data-t="Бумага">Бумага</span><select id="paper" aria-label="Бумага"><option value="light" data-t="светлая">светлая</option><option value="graphite" data-t="графит">графит</option></select></label>
-        <span style="margin-left:auto" class="caps" id="saveState" data-t="сохранено">сохранено</span>
+    <section class="work" id="work">
+      <div class="tb" id="tb">
+        <button type="button" class="ic" id="btnUndo" title="Отменить (⌘Z)">↶</button>
+        <button type="button" class="ic" id="btnRedo" title="Повторить (⌘⇧Z)">↷</button>
+        <span class="sep"></span>
+        <select id="ptype" class="ptype" aria-label="Тип абзаца">
+          <option value="scene_heading" data-t="Заголовок сцены">Заголовок сцены</option>
+          <option value="action" data-t="Описание действия">Описание действия</option>
+          <option value="character" data-t="Персонаж">Персонаж</option>
+          <option value="parenthetical" data-t="Ремарка">Ремарка</option>
+          <option value="dialogue" data-t="Реплика">Реплика</option>
+          <option value="lyrics" data-t="Лирика">Лирика</option>
+          <option value="shot" data-t="Кадр">Кадр</option>
+          <option value="transition" data-t="Переход">Переход</option>
+          <option value="inline_note" data-t="Заметка по тексту">Заметка по тексту</option>
+          <option value="sequence_heading" data-t="Группа (эпизод)">Группа (эпизод)</option>
+          <option value="act_heading" data-t="Акт">Акт</option>
+          <option value="page_break" data-t="Разрыв страницы">Разрыв страницы</option>
+        </select>
+        <span class="sep"></span>
+        <button type="button" class="ic" id="btnFocus" title="Только лист (⌘⇧F)">⛶</button>
+        <button type="button" class="ic" id="btnPaper" title="Бумага: светлая / графит">◐</button>
+        <button type="button" class="ic wand" id="btnNeyra" title="NEYRA — помощник">✦</button>
+        <button type="button" class="ic" id="btnHelp" title="Клавиши">?</button>
+        <span class="save" id="saveState" data-t="сохранено">сохранено</span>
       </div>
-      <div class="ed-wrap both" id="edWrap">
-        <div class="ed">
-          <div class="hint hidden" id="hint" role="listbox" aria-label="Подсказка"></div>
-          <textarea id="src" spellcheck="true" placeholder="Title: Название&#10;Author: Автор&#10;&#10;ИНТ. КУХНЯ — НОЧЬ&#10;&#10;Тусклый свет над плитой. АЙГЕРИМ (30) смотрит на закрытую дверь.&#10;&#10;АЙГЕРИМ&#10;(тихо)&#10;Ты обещал." data-tp="Title: Атауы&#10;Author: Автор&#10;&#10;ІШКІ. АСҮЙ — ТҮН&#10;&#10;Пештің үстіндегі күңгірт жарық. АЙГЕРІМ (30) жабық есікке қарайды.&#10;&#10;АЙГЕРІМ&#10;(ақырын)&#10;Сен уәде бергенсің."></textarea>
+
+      <div class="view" id="view-script">
+        <div class="sheet-host"><div class="sheet" id="editor" data-placeholder="ИНТ. МЕСТО - ВРЕМЯ"></div></div>
+      </div>
+      <div class="view doc hidden" id="view-title">
+        <div class="card"><h2 data-t="Титульная страница">Титульная страница</h2>
+          <label><span data-t="Название">Название</span><input id="t-title" type="text"></label>
+          <label><span data-t="Подзаголовок / жанр">Подзаголовок / жанр</span><input id="t-credit" type="text" placeholder="сценарий · драма · короткий метр"></label>
+          <label><span data-t="Автор">Автор</span><input id="t-author" type="text"></label>
+          <label><span data-t="Дата черновика">Дата черновика</span><input id="t-date" type="text"></label>
+          <label><span data-t="Контакты">Контакты</span><textarea id="t-contact" rows="3"></textarea></label>
         </div>
-        <div class="pv" id="pv"><div class="sp" id="page"></div></div>
+        <div class="sheet tp" id="titlePreview"></div>
       </div>
+      <div class="view doc hidden" id="view-synopsis">
+        <div class="card"><h2 data-t="Синопсис">Синопсис</h2>
+          <label><span data-t="Логлайн">Логлайн</span><textarea id="f-logline" rows="2" placeholder="[герой с изъяном] должен [цель], иначе [ставки], но [препятствие]"></textarea></label>
+          <label><span data-t="Синопсис">Синопсис</span><textarea id="f-synopsis" rows="14" placeholder="что происходит, по порядку"></textarea></label>
+          <label><span data-t="Заметки">Заметки</span><textarea id="f-notes" rows="6" placeholder="решения, вопросы, что отложили"></textarea></label>
+        </div>
+      </div>
+      <div class="view doc hidden" id="view-stats"><div class="card" id="statsCard"></div></div>
+      <div class="view doc hidden" id="view-chars"><div class="card" id="charsCard"></div></div>
+      <div class="view doc hidden" id="view-locs"><div class="card" id="locsCard"></div></div>
+      <div class="ruler" id="ruler"></div>
     </section>
 
-    <aside class="pane right">
-      <div class="pane-h ai-h"><span class="dot" id="aiDot"></span><b style="font-weight:500">NEYRA</b><span class="caps" id="aiState" data-t="проверяю связь">проверяю связь</span><div class="seg tier" role="group" aria-label="Режим NEYRA" style="margin-left:auto" title="PRO — глубокий разбор всего сценария; на простых действиях со сценой сам переключается на Стандарт"><button type="button" data-tier="standard" aria-pressed="true" data-t="Стандарт">Стандарт</button><button type="button" data-tier="pro" aria-pressed="false">PRO</button></div><button class="btn btn--sm" id="btnServer" type="button" data-t="Сервер">Сервер</button></div>
-      <div class="scope">
-        <span class="caps" data-t="Работать с">Работать с</span>
-        <select id="scope" aria-label="Область">
-          <option value="auto" data-t="выделение → сцена → всё">выделение → сцена → всё</option>
-          <option value="selection" data-t="выделенным">выделенным</option>
-          <option value="scene" data-t="текущей сценой">текущей сценой</option>
-          <option value="all" data-t="всем сценарием">всем сценарием</option>
-        </select>
-        <span class="what" id="scopeWhat"></span>
+    <aside class="neyra hidden" id="neyra">
+      <div class="neyra-h"><b>NEYRA</b>
+        <div class="seg tier" role="group"><button type="button" data-tier="standard" aria-pressed="true" data-t="Стандарт">Стандарт</button><button type="button" data-tier="pro" aria-pressed="false">PRO</button></div>
+        <button type="button" class="ic" id="btnNeyraClose" aria-label="Закрыть">×</button>
       </div>
+      <div class="scope"><span class="caps" data-t="Работать с">Работать с</span>
+        <select id="scope"><option value="auto" data-t="выделение → сцена → всё">выделение → сцена → всё</option><option value="selection" data-t="выделенным">выделенным</option><option value="scene" data-t="текущей сценой">текущей сценой</option><option value="all" data-t="всем сценарием">всем сценарием</option></select>
+        <span class="what" id="scopeWhat"></span></div>
       <div class="actions" id="actions">
-        <button type="button" data-act="coverage" class="wide"><span data-t="Читательское заключение">Читательское заключение</span><small data-t="весь сценарий: что работает, что ломается, вопросы автору">весь сценарий: что работает, что ломается, вопросы автору</small></button>
+        <button type="button" data-act="coverage" class="wide"><span data-t="Читательское заключение">Читательское заключение</span><small data-t="весь сценарий: что работает, что ломается">весь сценарий: что работает, что ломается</small></button>
         <button type="button" data-act="beats"><span data-t="Бит-шит">Бит-шит</span><small data-t="15 битов, где дыра">15 битов, где дыра</small></button>
         <button type="button" data-act="continuity"><span data-t="Непрерывность">Непрерывность</span><small data-t="имена, время, ружья">имена, время, ружья</small></button>
         <button type="button" data-act="improve"><span data-t="Улучшить сцену">Улучшить сцену</span><small data-t="цель · препятствие · перемена">цель · препятствие · перемена</small></button>
         <button type="button" data-act="dialogue"><span data-t="Диалог живее">Диалог живее</span><small data-t="подтекст, голоса героев">подтекст, голоса героев</small></button>
         <button type="button" data-act="modernize"><span data-t="Модернизировать">Модернизировать</span><small data-t="в наше время и язык">в наше время и язык</small></button>
         <button type="button" data-act="turns"><span data-t="3 поворота">3 поворота</span><small data-t="варианты для сцены">варианты для сцены</small></button>
-        <button type="button" data-act="logline"><span data-t="Логлайн и синопсис">Логлайн и синопсис</span><small data-t="в карточку «Замысел»">в карточку «Замысел»</small></button>
+        <button type="button" data-act="logline"><span data-t="Логлайн и синопсис">Логлайн и синопсис</span><small data-t="в документ «Синопсис»">в документ «Синопсис»</small></button>
         <button type="button" data-act="kazakh"><span data-t="На казахский">На казахский</span><small data-t="перевод с форматом">перевод с форматом</small></button>
         <button type="button" data-act="russian"><span data-t="На русский">На русский</span><small data-t="перевод с форматом">перевод с форматом</small></button>
-        <button type="button" data-act="expand"><span data-t="Расписать">Расписать</span><small data-t="из синопсиса или заметки — сцены">из синопсиса или заметки — сцены</small></button>
+        <button type="button" data-act="expand"><span data-t="Расписать">Расписать</span><small data-t="из синопсиса — сцены">из синопсиса — сцены</small></button>
         <button type="button" data-act="cut"><span data-t="Сжать">Сжать</span><small data-t="входи поздно, выходи рано">входи поздно, выходи рано</small></button>
       </div>
       <div class="chat" id="chat"></div>
-      <form class="ask" id="askForm">
-        <textarea id="askIn" rows="1" placeholder="Спросить NEYRA о сценарии…" data-tp="NEYRA-дан сценарий туралы сұрау…" aria-label="Вопрос"></textarea>
-        <button class="btn btn--main btn--sm" type="submit" aria-label="Отправить">→</button>
-      </form>
+      <form class="ask" id="askForm"><textarea id="askIn" rows="1" placeholder="Спросить NEYRA о сценарии…" data-tp="NEYRA-дан сценарий туралы сұрау…" aria-label="Вопрос"></textarea><button class="btn btn--main btn--sm" type="submit" aria-label="Отправить">→</button></form>
     </aside>
   </div>
 </div>
 <input type="file" id="fileIn" accept=".fountain,.txt,.md,.fdx,.json" class="hidden">
 <div class="toast" id="toast" role="status"></div>
-<script src="fountain.js?v=48"></script>
-<script src="app.js?v=48"></script>
+<script src="fountain.js?v=49"></script>
+<script src="editor.js?v=49"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>

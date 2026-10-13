@@ -73,7 +73,7 @@
       }
       if (/^>.*<$/.test(line)) { toks.push({ type: 'centered', text: line.slice(1, -1).trim(), line: i }); inDialogue = false; continue; }
       if (line.startsWith('>') || (RE.transition.test(line) && RE.allCaps.test(line) && prevBlank)) { toks.push({ type: 'transition', text: line.replace(/^>\s*/, ''), line: i }); inDialogue = false; continue; }
-      if (line.startsWith('!')) { toks.push({ type: 'action', text: line.slice(1), line: i }); inDialogue = false; continue; }
+      if (line.startsWith('!')) { toks.push({ type: 'action', text: line.slice(1), line: i, forced: true }); inDialogue = false; continue; }
 
       const forcedChar = line.startsWith('@');
       if (!inDialogue && prevBlank && !nextBlank && (forcedChar || (RE.allCaps.test(line) && RE.hasLetter.test(line) && !RE.parenthetical.test(line)))) {
