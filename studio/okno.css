@@ -91,7 +91,14 @@ body{font-size:16px;line-height:1.5}
 .helper-stub .chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 6px}
 .helper-stub .chip{min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:13px;cursor:pointer}
 .helper-stub .chip:hover{background:var(--surface2);color:var(--text)}
-/* диалог помощника */
+/* нить помощника над строкой команд — одно окно, как в чате */
+.helper-stub .thread{display:grid;gap:6px;padding:4px 6px 8px;border-bottom:1px solid var(--line-soft);margin-bottom:6px}
+.helper-stub .thread-bar{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim)}
+.helper-stub .thread-bar .chip{min-height:28px;margin-left:auto}
+.helper-stub .thread-bar .chip+.chip{margin-left:0}
+.helper-stub .thread-log{display:grid;gap:8px;max-height:min(46vh,520px);overflow:auto;padding-right:4px}
+.helper-stub .thread.collapsed .thread-log{display:none}
+/* диалог помощника (старое, оставлено для совместимости) */
 .assistant-log{display:grid;gap:10px;margin:8px 0 16px;max-height:50vh;overflow:auto}
 .assistant-msg{display:grid;gap:4px;padding:10px 14px;border-radius:14px;background:var(--surface2)}
 .assistant-msg.user{background:transparent;border:1px solid var(--line-soft)}
@@ -124,7 +131,7 @@ dialog .eyebrow{font:400 .75rem/1 var(--mono);letter-spacing:.14em;color:var(--d
 dialog input,dialog select,dialog textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:16px;min-height:44px;padding:10px 12px}
 /* помощник внизу: пока заглушка (№46) */
 .helper-stub{position:fixed;left:272px;right:0;bottom:0;z-index:30;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent);pointer-events:none}
-.helper-stub .box{pointer-events:auto;max-width:940px;margin:0 auto;background:var(--field);border:1px solid transparent;border-radius:24px;padding:10px 12px 8px;display:grid;gap:6px}.helper-stub .box:focus-within{border-color:var(--line)}
+.helper-stub .box{pointer-events:auto;max-width:940px;margin:0 auto;background:var(--field);border:1px solid transparent;border-radius:24px;padding:10px 12px 8px;display:grid;gap:6px;max-height:calc(100vh - 80px)}.helper-stub .box:focus-within{border-color:var(--line)}
 .helper-stub .q{display:flex;align-items:center;gap:8px;min-height:44px;margin:0}
 .helper-stub .q input{flex:1;min-width:0;min-height:44px;border:0;background:transparent;color:var(--text);font:inherit;font-size:15px;padding:0 6px}
 .helper-stub .q input::placeholder{color:var(--dim)}

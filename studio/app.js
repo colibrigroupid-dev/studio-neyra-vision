@@ -658,7 +658,7 @@ function helperStub(p) {
   if (!p) return '';
   const mic = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const micTitle = t('Голос недоступен в этом браузере', 'Бұл браузерде дауыс қолжетімсіз');
-  return `<div class='helper-stub' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'><form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Команда или вопрос: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${t('помощник подключится после ключа модели', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
+  return `<div class='helper-stub' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'>${assistantThread()}<form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Команда или вопрос: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${t('помощник подключится после ключа модели', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
 }
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Введите ключ участника, чтобы открыть проект команды.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ участника', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
@@ -761,27 +761,35 @@ function runCommand(text) {
   say(describeCommand(cmd, state.locale));
 }
 const assistantHistory = [];
-function assistantDialog(answer, pending = '') {
-  const items = assistantHistory.slice(-8).map(m => `<div class='assistant-msg ${m.role}'><span class='label'>${m.role === 'user' ? t('Вы', 'Сіз') : t('Помощник', 'Көмекші')}</span><p>${e(m.content).replace(/\n/g, '<br>')}</p></div>`).join('');
-  openDialog(`${dialogHead(t('Помощник проекта', 'Жоба көмекшісі'), t('Помнит весь проект: сценарий, сцены, паспорта, карту, ленту. Ничего не меняет и не запускает платное.', 'Бүкіл жобаны есте сақтайды. Ештеңені өзгертпейді, ақылыны іске қоспайды.'))}<div class='assistant-log'>${items}${pending ? `<div class='assistant-msg assistant pending'><span class='label'>${t('Помощник', 'Көмекші')}</span><p>${e(pending)}</p></div>` : ''}</div><form id='assistant-form'><label for='assistant-q'>${t('Спросить ещё', 'Тағы сұрау')}</label><input id='assistant-q' name='q' maxlength='4000' autocomplete='off'>${dialogActions(t('Спросить', 'Сұрау'))}</form>`);
-  dialog.classList.add('assistant-dialog');
+let assistantPending = '';
+let assistantCollapsed = false;
+function assistantThread() {
+  if (!assistantHistory.length && !assistantPending) return '';
+  const items = assistantHistory.slice(-12).map(m => `<div class='assistant-msg ${m.role}'><span class='label'>${m.role === 'user' ? t('Вы', 'Сіз') : t('Помощник', 'Көмекші')}</span><p>${e(m.content).replace(/\n/g, '<br>')}</p></div>`).join('');
+  const pending = assistantPending ? `<div class='assistant-msg assistant pending'><span class='label'>${t('Помощник', 'Көмекші')}</span><p>${e(assistantPending)}</p></div>` : '';
+  return `<div class='thread ${assistantCollapsed ? 'collapsed' : ''}' data-assistant-thread><div class='thread-bar'><span>${t('Разговор с помощником', 'Көмекшімен әңгіме')} · ${assistantHistory.length}</span><button type='button' class='chip' data-thread='toggle'>${assistantCollapsed ? t('развернуть', 'ашу') : t('свернуть', 'жию')}</button><button type='button' class='chip' data-thread='clear'>${t('очистить', 'тазалау')}</button></div><div class='thread-log'>${items}${pending}</div></div>`;
+}
+function refreshThread() {
+  const box = document.querySelector('.helper-stub .box');
+  if (!box) return;
+  const current = box.querySelector('[data-assistant-thread]');
+  const html = assistantThread();
+  if (current) current.outerHTML = html; else box.insertAdjacentHTML('afterbegin', html);
+  const log = box.querySelector('.thread-log'); if (log) log.scrollTop = log.scrollHeight;
 }
 async function askAssistant(question) {
   if (!question.trim()) return;
   if (!serverClient || !project()) { toast(t('Помощник работает с проектом на сервере: подключите сервер и ключ.', 'Көмекші сервердегі жобамен жұмыс істейді: сервер мен кілтті қосыңыз.')); return; }
-  assistantHistory.push({ role: 'user', content: question });
-  assistantDialog(null, t('думаю…', 'ойланып тұрмын…'));
+  assistantHistory.push({ role: 'user', content: question }); assistantCollapsed = false; assistantPending = t('думаю…', 'ойланып тұрмын…'); refreshThread();
   try {
     const page = route();
     const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/assistant`, { question, section: page === 'overview' ? '' : page, history: assistantHistory.slice(0, -1).slice(-10) });
     const answer = result?.data?.answer || t('Пустой ответ.', 'Бос жауап.');
     assistantHistory.push({ role: 'assistant', content: answer });
-    if (dialog.open && dialog.classList.contains('assistant-dialog')) assistantDialog(answer);
   } catch (error) {
-    assistantHistory.pop();
-    const message = error?.status === 503 ? t('Помощник ещё не подключён: на сервере нет ключа модели. Вопрос не потерян — задайте его, когда ключ появится.', 'Көмекші әлі қосылмаған: серверде модель кілті жоқ.') : (error?.message || t('Помощник не ответил.', 'Көмекші жауап бермеді.'));
-    if (dialog.open && dialog.classList.contains('assistant-dialog')) assistantDialog(null, message); else toast(message);
-  }
+    const message = error?.status === 503 ? t('Помощник ещё не подключён: на сервере нет ключа модели. Вопрос записан, отвечу, когда ключ появится.', 'Көмекші әлі қосылмаған: серверде модель кілті жоқ.') : (error?.message || t('Помощник не ответил.', 'Көмекші жауап бермеді.'));
+    assistantHistory.push({ role: 'assistant', content: message });
+  } finally { assistantPending = ''; refreshThread(); }
 }
 function listenVoice() {
   const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -803,6 +811,8 @@ app.addEventListener('submit', event => {
 app.addEventListener('click', async event => {
   if (busy || connecting) return;
   if (event.target.closest("[data-action='voice']")) { listenVoice(); return; }
+  const threadBtn = event.target.closest('[data-thread]');
+  if (threadBtn) { if (threadBtn.dataset.thread === 'clear') assistantHistory.length = 0; else assistantCollapsed = !assistantCollapsed; refreshThread(); return; }
   const chip = event.target.closest('[data-cmd]');
   if (chip) { runCommand(chip.dataset.cmd); return; }
   const pick = event.target.closest('[data-project]');
@@ -971,7 +981,6 @@ dialog.addEventListener('click', async event => {
   });
 });
 dialog.addEventListener('submit', async event => {
-  if (event.target?.id === 'assistant-form') { event.preventDefault(); const q = event.target.querySelector('#assistant-q')?.value || ''; if (q.trim()) void askAssistant(q); return; }
   event.preventDefault();
   const form = event.target; const data = new FormData(form);
   if (form.id === 'passport-form') {
