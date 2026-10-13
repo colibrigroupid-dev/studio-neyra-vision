@@ -152,12 +152,12 @@ export async function verifyBreakdownModules() {
       const readOnly = renderBreakdownSection({ section, snapshot, locale, connected: true });
       assert.ok(!readOnly.includes("data-action='edit-passport'") && !readOnly.includes("data-action='import-breakdown'"));
       const empty = renderBreakdownSection({ section, snapshot: { scenes: [], characters: [], locations: [], denied: [] }, connected: true, canImport: true, locale });
-      assert.match(empty, /razbivka\.json/);
+      assert.match(empty, /Разберите сценарий|Талдау|сценарий/i);
       assert.match(empty, /data-action='import-breakdown'/);
       const collection = ({ breakdown: 'scenes', heroes: 'characters', locations: 'locations' })[section];
       const denied = renderBreakdownSection({ section, snapshot: { ...snapshot, denied: [collection] }, connected: true, locale });
       assert.ok(!denied.includes('passport-card') && !denied.includes('breakdown-table'));
-      assert.ok(!denied.includes('razbivka.json'), 'Forbidden is not a false empty/import state');
+      assert.ok(!denied.includes('файл разбивки'), 'Forbidden is not a false empty/import state');
     }
   }
   assert.deepEqual(snapshot, before, 'Renderers never mutate authoritative data');
@@ -165,7 +165,7 @@ export async function verifyBreakdownModules() {
   assert.ok(kkCard.includes('Ә Ғ Қ Ң Ө Ұ Ү Һ І') && kkCard.includes('Қазақша келбет') && kkCard.includes('Қазақша тыйым'));
   const errorHtml = renderBreakdownSection({ connected: true, error: injected });
   assert.match(errorHtml, /role='alert'/); assert.ok(!errorHtml.includes('<script>'));
-  assert.ok(!errorHtml.includes('razbivka.json'));
+  assert.ok(!errorHtml.includes('файл разбивки'));
   assert.match(renderBreakdownSection({ connected: false }), /Введите ключ участника/);
   assert.match(renderBreakdownSection({ connected: true, loading: true }), /aria-busy='true'/);
   const editor = renderPassportEditor({ record: character, collection: 'characters', locale: 'kk' });

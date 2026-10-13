@@ -698,14 +698,14 @@ console.log('Actual app device paper preference, system changes, editor preserva
     assert.equal(receivers.length, 0, 'No connection without a saved role key');
     await first.click('server');
     await first.submit('server-form', { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
-    assert.equal(first.label.textContent, 'сохранено на сервере', 'The first submit must connect without a retry');
+    assert.equal(first.label.textContent, 'всё сохранено', 'The first submit must connect without a retry');
     assert.equal(first.storageErrorNode.textContent, '');
     assert.deepEqual(JSON.parse(stored.get(settingsStorageKey)), { url: 'http://127.0.0.1:8770', key: 'admin-secret' });
     assert.equal(api.calls.filter(c => c.path === '/api/projects').length, 1);
 
     const callsBeforeReload = api.calls.length;
     const reloaded = await appHarness({ stored, useDefaultFetch: true });
-    assert.equal(reloaded.label.textContent, 'сохранено на сервере', 'Saved settings must reconnect on startup without clicks');
+    assert.equal(reloaded.label.textContent, 'всё сохранено', 'Saved settings must reconnect on startup without clicks');
     assert.equal(reloaded.storageErrorNode.textContent, '');
     assert.equal(vm.runInContext('serverClient instanceof StudioServer', reloaded.context), true);
     assert.equal(vm.runInContext('state.activeId', reloaded.context), 'film');
@@ -758,7 +758,7 @@ console.log('Actual app local startup, default settings, escaping, persistence a
   const originalLocal = JSON.stringify(localState(makeDemo()));
   const stored = new Map([[workspaceKey, originalLocal], [settingsStorageKey, JSON.stringify({ url: 'http://127.0.0.1:8770', key: 'admin-secret' })]]);
   const ui = await appHarness({ stored, api });
-  assert.equal(ui.label.textContent, 'сохранено на сервере');
+  assert.equal(ui.label.textContent, 'всё сохранено');
   assert.equal(stored.get(workspaceKey), originalLocal, 'Connecting retains the independent browser workspace');
   await ui.click('add-scene');
   assert.ok(native.script.text.includes('НОВАЯ СЦЕНА'));
@@ -771,7 +771,7 @@ console.log('Actual app local startup, default settings, escaping, persistence a
   assert.ok(!ui.toast.textContent.includes('Версия сценария сохранена'));
   await ui.click('save-script');
   assert.ok(native.versions.at(-1).script.text.includes('Правка с ошибкой сохранения'), 'Explicit save retries a failed draft');
-  assert.equal(ui.label.textContent, 'сохранено на сервере');
+  assert.equal(ui.label.textContent, 'всё сохранено');
 }
 console.log('Actual app server label, derived draft follow-up, failed-save label and explicit retry: passed.');
 
@@ -814,7 +814,7 @@ console.log('Actual app server label, derived draft follow-up, failed-save label
   assert.equal(ui.app.inert, true);
   assert.equal(ui.dialog.inert, true);
   release(); await savingVersion;
-  assert.equal(ui.label.textContent, 'сохранено на сервере');
+  assert.equal(ui.label.textContent, 'всё сохранено');
   assert.equal(ui.app.inert, false);
 }
 console.log('Actual app in-flight author edits and full-draft retry after partial failure: passed.');
@@ -1432,7 +1432,7 @@ console.log('Actual app production read-only viewer and forged form guard: passe
   await ui.settle();
   assert.equal(vm.runInContext('project()._scriptText', ui.context), author, 'Remote revision during map entry preserves pending author text after save conflict');
   assert.equal(p.script.text, '');
-  assert.match(ui.app.innerHTML, /Сначала сохраните текущий сценарий/);
+  assert.match(ui.app.innerHTML, /Сначала сохраните сценарий/);
   assert.ok(!/data-map-cell=/.test(ui.app.innerHTML));
 }
 console.log('Actual app map entry preserves pending screenplay across a remote revision conflict: passed.');
@@ -1498,7 +1498,7 @@ const importFixture = () => ({
 });
 {
   const ui = await appHarness({ hash: '#/studio/breakdown' });
-  assert.match(ui.app.innerHTML, /Введите ключ участника/);
+  assert.match(ui.app.innerHTML, /введите свой ключ/);
   assert.doesNotMatch(ui.app.innerHTML, /data-scene-id=/, 'Local demo is not presented as server breakdown');
   await ui.click('server');
   assert.match(ui.dialog.innerHTML, /value='https:\/\/api\.studio\.neyra\.vision'/);
@@ -1558,9 +1558,9 @@ console.log('Actual app cinema routes, server default/entry hint, RU/KK and shar
   assert.equal(film.characters[0].role, 'Обновлено художником');
   await artist.navigate('locations'); await artist.settle();
   assert.doesNotMatch(artist.app.innerHTML, /data-action='edit-passport'/, 'Member sections limit the principal sections');
-  assert.match(artist.app.innerHTML, /только просмотр/);
+  assert.match(artist.app.innerHTML, /открыт просмотр/);
   await artist.navigate('breakdown'); await artist.settle();
-  assert.match(artist.app.innerHTML, /раздел недоступен/);
+  assert.match(artist.app.innerHTML, /пока нельзя/);
   assert.doesNotMatch(artist.app.innerHTML, /data-scene-id=/);
 }
 console.log('Actual app passport PATCH, untouched translations/refs, shared revision and artist section permissions: passed.');
@@ -1621,7 +1621,7 @@ console.log('Actual app file breakdown import, normalized passports, pending aut
   p.revision += 1;
   await ui.submit('passport-form', { ...passportFields(p.characters[0]), identity: 'Не сохранять' }, { passportId: 'hero-1', passportCollection: 'characters' });
   assert.equal(ui.dialog.open, true);
-  assert.match(ui.passportErrorNode.textContent, /Проект изменился/);
+  assert.match(ui.passportErrorNode.textContent, /Коллега только что внёс правку/);
   assert.equal(p.characters[0].identity, 'Шрам на левой щеке');
   await ui.submit('passport-form', { ...passportFields(p.characters[0]), identity: 'Повтор' }, { passportId: 'hero-1', passportCollection: 'characters' });
   assert.equal(api.calls.filter(c => c.method === 'PATCH' && c.path.endsWith('/hero-1')).length, 1, 'Conflict requires opening a fresh card');
@@ -1631,7 +1631,7 @@ console.log('Actual app file breakdown import, normalized passports, pending aut
   assert.match(ui.passportErrorNode.textContent, /некорректный JSON/);
   api.failOnce(c => c.method === 'POST' && c.path.endsWith('/breakdown'), 403, 'FORBIDDEN');
   await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
-  assert.match(ui.passportErrorNode.textContent, /Нет доступа/);
+  assert.match(ui.passportErrorNode.textContent, /Сюда вам пока нельзя/);
   await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
   assert.equal(api.calls.filter(c => c.method === 'POST' && c.path.endsWith('/breakdown')).length, 1, 'Rejected import is not replayed');
 }
@@ -1648,7 +1648,7 @@ console.log('Actual app passport conflict, retained form, malformed file and imp
   await ui.click('import-breakdown');
   await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
   assert.equal(p.scenes.length, 2, 'Server committed before losing the response');
-  assert.match(ui.passportErrorNode.textContent, /Сервер не подтвердил/);
+  assert.match(ui.passportErrorNode.textContent, /Связь прервалась/);
   await ui.submit('breakdown-import-form', { file: fileFor(JSON.stringify(importFixture())) });
   assert.equal(api.calls.filter(c => c.method === 'POST' && c.path.endsWith('/breakdown')).length, 1);
   ui.dialog.close(); await ui.click('refresh-breakdown');
