@@ -26,7 +26,8 @@ body{font-size:16px;line-height:1.5}
 .workspace .btn,dialog .btn{min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--text);font-size:15px;font-weight:500;gap:8px;transition:background .15s,border-color .15s}
 .workspace .btn:hover,dialog .btn:hover{background:var(--surface2)}
 .workspace .btn.primary,dialog .btn.primary{background:var(--accent);border-color:transparent;color:var(--ink);font-weight:600}
-.workspace .btn.small{width:40px;padding:0;justify-content:center}
+.workspace .btn.small{min-height:36px;padding:0 14px;font-size:14px}
+.workspace .work-header .btn.small{width:40px;min-height:40px;padding:0;justify-content:center}
 .workspace .badge{font-size:13px;font-weight:400;border-radius:999px;padding:4px 10px;background:transparent;border:1px solid var(--line);color:var(--muted);gap:8px}
 .workspace .badge .dot{width:9px;height:9px;border-radius:50%;background:var(--lamp-off)}
 .workspace .badge.approved .dot{background:var(--lamp-green)}.workspace .badge.review .dot,.workspace .badge.working .dot{background:var(--lamp-amber)}.workspace .badge.returned .dot{background:var(--lamp-red)}
