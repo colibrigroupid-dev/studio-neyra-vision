@@ -1,4 +1,4 @@
-/* Окно проекта в дизайне рабочих приложений (№52, RAZBOR/11, dizayn/tokeny.css). Слой поверх styles.css: токены и каркас.
+/* Окно проекта в дизайне рабочих приложений (№52, RAZBOR/14 §1–8). Слой поверх styles.css: токены и каркас.
    Нейтральный графит, один янтарный акцент, лампы статусов, тихие кнопки, два уровня текста. */
 @import url('https://fonts.googleapis.com/css2?family=Geologica:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 :root{
@@ -6,15 +6,15 @@
   --line:#383838;--line-soft:#2e2e2e;--text:#ececec;--muted:#9a9a9a;--dim:#6f6f6f;
   --accent:oklch(0.82 0.11 75);--ink:oklch(0.22 0.03 75);--good:oklch(0.72 0.13 150);
   --lamp-red:oklch(0.62 0.17 25);--lamp-amber:oklch(0.78 0.14 80);--lamp-green:oklch(0.72 0.13 150);--lamp-off:oklch(0.40 0 0);
-  --disp:Geologica,Onest,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;--radius:16px;
+  --body:Onest,"Helvetica Neue",Arial,sans-serif;--disp:Geologica,Onest,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;--radius:16px;
   --shadow:none;
 }
 .production-map,.map-dialog{--map-bg:var(--surface);--map-surface:var(--surface2);--map-text:var(--text);--map-muted:var(--muted);--map-line:var(--line-soft);--map-accent:var(--accent);--map-ink:var(--ink);--map-good:var(--lamp-green);--map-working:var(--lamp-amber);--map-returned:var(--lamp-red)}
 .cinema-section,.passport-dialog{--cinema-bg:var(--surface);--cinema-surface:var(--surface2);--cinema-text:var(--text);--cinema-muted:var(--muted);--cinema-line:var(--line-soft);--cinema-accent:var(--accent);--cinema-ink:var(--ink);--cinema-error:var(--lamp-red)}
 :root[data-script-paper='graphite']{--paper-bg:var(--surface);--paper-text:var(--text);--paper-muted:var(--muted);--paper-line:var(--line)}
 body{font-size:16px;line-height:1.5}
-/* фокус — только с клавиатуры, кольцо серое */
-.workspace :focus{outline:none}.workspace :focus-visible{outline:2px solid #6f6f6f;outline-offset:2px}
+/* Фокус с клавиатуры; более точные правила для полей и диалогов — ниже. */
+.workspace :focus{outline:none}.workspace :focus-visible{outline:2px solid #e8c27a;outline-offset:2px}
 /* шапка */
 .workspace .work-header{min-height:56px;padding:8px 20px;border-bottom:1px solid var(--line-soft);background:var(--bg)}
 .workspace .work-header .brand{display:inline-flex;align-items:center;justify-content:center;min-height:36px;min-width:36px;opacity:.92;transition:opacity .2s}
@@ -47,7 +47,7 @@ body{font-size:16px;line-height:1.5}
 .side-nav a .icon{width:18px;height:18px}
 .side-foot{margin-top:24px;padding:12px;border-top:1px solid var(--line-soft);font:400 13px/1.5 var(--body,Onest);color:var(--dim)}
 /* обзор: карточки цифр как листы */
-.workspace .stats>*,.workspace .stat,.workspace .overview-grid>*{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px}
+.workspace .stats>*,.workspace .stat,.workspace .overview-grid>*{background:var(--surface);border:0;border-radius:16px}
 /* карта: технический id объекта (ULID) не показываем, имя достаточно */
 .production-map .map-object-id{display:none}
 /* хлопушка */
@@ -80,9 +80,9 @@ body{font-size:16px;line-height:1.5}
   .helper-stub{bottom:60px}.work-main{padding-bottom:250px}.work-main .sheet .row{grid-template-columns:1fr}.work-main .sheet .row .c{grid-column:1;grid-row:auto}.helper-stub .chips .chip{min-height:44px;padding:0 14px;font-size:14px}
 }
 /* группа листов на Обзоре (как в прототипе) */
-.work-main .group{display:grid;gap:12px;margin-bottom:28px}
+.work-main .group{display:grid;gap:16px;margin-bottom:32px}
 .work-main .group>header{display:flex;align-items:baseline;gap:12px;padding:0 2px}
-.work-main .group>header h2{font:500 1.125rem/1.2 var(--disp);margin:0}
+.work-main .group>header h2{font:500 17px/1.5 var(--body);margin:0}
 .work-main .group>header .label{margin-left:auto;font-size:13px;color:var(--muted)}
 .work-main .sheet{background:var(--surface);border:1px solid var(--line-soft);border-radius:16px}
 .work-main .sheet .row{display:grid;grid-template-columns:1fr auto;gap:2px 24px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line-soft);min-height:64px;color:var(--text);text-decoration:none}
@@ -104,7 +104,7 @@ body{font-size:16px;line-height:1.5}
 /* диалог помощника (старое, оставлено для совместимости) */
 .assistant-log{display:grid;gap:10px;margin:8px 0 16px;max-height:50vh;overflow:auto}
 .assistant-msg{display:grid;gap:4px;padding:10px 14px;border-radius:14px;background:var(--surface2)}
-.assistant-msg.user{background:transparent;border:1px solid var(--line-soft)}
+.assistant-msg.user{background:var(--surface);border:0}
 .assistant-msg .label{font-size:13px;color:var(--dim)}.assistant-msg p{margin:0;font-size:15px;line-height:1.5}
 .assistant-msg.pending p{color:var(--muted)}
 /* встроенный редактор NEYRA на странице «Сценарий» */
@@ -119,9 +119,9 @@ body{font-size:16px;line-height:1.5}
 .work-main{position:relative;z-index:0}
 .work-main .project-hero,.work-main .shot-card,.work-main .cinema-section,.work-main .production-map{isolation:isolate}
 /* рабочее поле */
-.work-main{max-width:940px;padding:36px 24px 160px}
+.work-main{max-width:948px;padding:32px 24px 200px}
 .prototype-note{font:400 13px/1.4 var(--body,Onest);letter-spacing:0;text-transform:none;color:var(--dim);margin-bottom:24px}
-.page-heading{margin-bottom:28px}
+.page-heading{margin-bottom:32px}
 .page-heading h1,.production-map h1,.cinema-section h1,.team-space h1{font:500 1.75rem/1.15 var(--disp);letter-spacing:-.015em}
 .page-heading p,.production-map .page-heading p,.cinema-section .page-heading p{color:var(--muted);max-width:62ch}
 .production-map,.cinema-section,.team-space{padding:20px;border-radius:16px;border:1px solid var(--line-soft);background:var(--surface)}
@@ -130,11 +130,9 @@ body{font-size:16px;line-height:1.5}
 .empty{border:1px dashed var(--line);border-radius:12px;color:var(--muted)}
 .participant-hint{border:1px solid var(--line-soft);border-left:2px solid var(--accent);border-radius:8px;padding:12px 16px;background:var(--surface);margin-bottom:20px}
 dialog{background:var(--surface);border:1px solid var(--line-soft);border-radius:16px}
-dialog .eyebrow{font:400 .75rem/1 var(--mono);letter-spacing:.14em;color:var(--dim)}
-dialog input,dialog select,dialog textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:16px;min-height:44px;padding:10px 12px}
 /* помощник внизу: пока заглушка (№46) */
-.helper-stub{position:fixed;left:272px;right:0;bottom:0;z-index:30;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent);pointer-events:none}
-.helper-stub .box{pointer-events:auto;max-width:940px;margin:0 auto;background:var(--field);border:1px solid transparent;border-radius:24px;padding:10px 12px 8px;display:grid;gap:6px;max-height:calc(100vh - 80px)}.helper-stub .box:focus-within{border-color:var(--line)}
+.helper-stub{position:fixed;left:272px;right:0;bottom:0;z-index:30;padding:16px 24px calc(16px + env(safe-area-inset-bottom));background:var(--bg);pointer-events:none}
+.helper-stub .box{pointer-events:auto;max-width:900px;margin:0 auto;background:var(--field);border:0;border-radius:24px;padding:16px;display:grid;gap:8px;max-height:calc(100vh - 80px)}
 .helper-stub .q{display:flex;align-items:center;gap:8px;min-height:44px;margin:0}
 .helper-stub .q input{flex:1;min-width:0;min-height:44px;border:0;background:transparent;color:var(--text);font:inherit;font-size:15px;padding:0 6px}
 .helper-stub .q input::placeholder{color:var(--dim)}
@@ -161,3 +159,249 @@ dialog input,dialog select,dialog textarea{background:var(--bg);border:1px solid
 .tokeny-row>span{flex:1;min-width:0}.tokeny-row small{color:var(--dim);font-size:12px}.tokeny-row b{font-weight:500;color:var(--muted)}.tokeny-row b.plus{color:var(--accent)}
 .tokeny-admin .tokeny-row{flex-wrap:wrap}
 .tokeny-dialog .access-note{border-left:0;background:var(--surface2);border-radius:12px;padding:14px 16px}
+
+/* №52: единый слой для каждого экрана. Область .workspace перекрывает
+   специализированные правила styles.css; #dialog — общий лист вне окна. */
+.workspace,.workspace :is(h2,h3),#dialog{font-family:var(--body);letter-spacing:0}
+.workspace :is(.page-heading,.production-map,.cinema-section,.team-space) h1{font:500 26px/1.2 var(--disp);letter-spacing:0}
+.workspace :is(.glabel,.prototype-note,.side-foot,.menu .who small,.menu-group),
+.helper-stub :is(.label,.thread-bar,.tc){font-family:var(--body);color:var(--muted);letter-spacing:0;text-transform:none}
+.workspace :is(.row,.page-heading,.filter-row,.editor-toolbar,.editor-foot,.sheet .row,.tokeny-row)>*{min-width:0}
+.workspace :is(.page-heading p,.panel p,.scene-mini,.shot-body,.post-task label,.sheet .row,.access-note),
+#dialog :is(p,h2,h3,label,small,dd){overflow-wrap:anywhere}
+
+/* 3. Шапка: одна строка, все элементы управления высотой 36. */
+.workspace .work-header{height:56px;min-height:56px;padding:8px 16px;gap:16px;flex-wrap:nowrap}
+.workspace .work-header>.row{flex-wrap:nowrap;min-width:0;gap:8px}
+.workspace .work-header>.row:first-child{flex:0 1 auto}
+.workspace .work-header .storage-label{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace .work-header .work-controls{width:auto;flex:0 1 auto;max-width:100%;gap:8px}
+.workspace .work-header :is(.btn,select,.langs button,.brand){height:36px;min-height:36px;font-size:15px}
+.workspace .work-header .btn{flex:none;padding:0 16px;white-space:nowrap}
+.workspace .work-header .btn.small{width:36px;min-width:36px;padding:0;margin-left:0}
+.workspace .work-header .brand{flex:none}
+.workspace .work-header .work-controls #project-switch{flex:0 1 210px;min-width:0;width:210px;max-width:210px!important;padding-top:0;padding-bottom:0}
+.workspace .work-header .langs{height:36px;flex:none;padding:0;gap:0}
+.workspace .work-header .langs button{min-width:44px;padding:0 12px}
+
+/* 4. Листы и карточки: фон вместо рамки, без теней и подъёма. */
+.workspace :is(.panel,.stat-row,.shot-card,.post-task,.scene-list,.scene-card,
+  .team-member,.passport-card,.production-map,.cinema-section,.team-space,
+  .map-state,.cinema-state,.map-activity,.empty,.editor-frame-wrap){
+  border:0;border-radius:16px;background:var(--surface);box-shadow:none;
+}
+.workspace :is(.panel,.post-task,.team-member,.production-map,.cinema-section,.team-space){padding:24px}
+.workspace :is(.map-state,.cinema-state,.map-activity,.passport-card){padding:16px}
+.workspace :is(.map-state,.cinema-state,.map-activity,.passport-card,.team-member){background:var(--surface2)}
+.workspace :is(.production-map,.cinema-section,.team-space){background:transparent;padding:0}
+.workspace :is(.panel,.team-space) :is(.panel,.empty,.access-note){background:transparent}
+.workspace .server-draft{border:0;border-radius:16px;padding:16px}
+.workspace .panel h2{font-size:17px}
+.workspace .panel p{font-size:15px}
+.workspace .stat small{font-size:13px}
+.workspace .stat-row{gap:8px;padding:8px;margin-bottom:32px}
+.workspace .stat-row .stat{border:0;background:transparent;padding:16px}
+.workspace .shot-card:hover{transform:none;background:var(--surface2)}
+.workspace :is(.shot-image,.animatic-screen){aspect-ratio:16/9;border:0}
+.workspace .animatic-screen{border-radius:16px}
+.workspace .shot-body :is(h2,p,small){letter-spacing:0;font-family:var(--body)}
+.workspace .shot-body h2{font-size:17px;line-height:1.4;margin:16px 0 8px}
+.workspace .shot-body p{font-size:15px;line-height:1.5}
+.workspace .shot-body small{font-size:13px}
+.workspace .shot-body .mono{font-family:var(--mono)}
+.workspace .post-task{gap:16px}
+.workspace .post-task h2{font-size:17px;letter-spacing:0}
+.workspace .post-task p{font-size:15px}
+.workspace .post-task .badge{display:inline-flex}
+.workspace .access-note,.workspace .participant-hint{border:0;background:var(--surface);border-radius:16px;padding:16px;font-size:15px}
+.workspace .participant-hint{margin-bottom:24px}
+.workspace .menu .pop{background:var(--surface);border:0;box-shadow:none;padding:8px;gap:4px}
+
+/* 1. Таблицы и списки: только горизонтальные разделители. */
+.workspace :is(.production-map-scroll,.breakdown-scroll){border:0;border-radius:16px;background:var(--surface)}
+.workspace :is(.team-table,.production-map-table,.breakdown-table){color:var(--text);background:var(--surface);font-size:15px}
+.workspace :is(.team-table,.production-map-table,.breakdown-table) :is(th,td){
+  border:0;border-bottom:1px solid var(--line-soft);padding:16px;box-shadow:none;
+}
+.workspace :is(.team-table,.production-map-table,.breakdown-table) thead th{
+  font:400 12px/1.5 var(--body);color:var(--muted);letter-spacing:0;text-transform:none;background:var(--surface);
+}
+.workspace :is(.team-table,.production-map-table,.breakdown-table) tbody tr:last-child>:is(th,td){border-bottom:0}
+.workspace :is(.team-table,.production-map-table,.breakdown-table) tbody tr>:is(th,td){background:var(--surface)}
+.workspace :is(.team-table,.production-map-table,.breakdown-table) tbody tr:hover>:is(th,td){background:var(--surface2)}
+.workspace :is(.production-map-table,.breakdown-table) tbody th{font-size:15px;color:var(--text)}
+.workspace .team-table .member-info{min-width:0}
+.workspace .team-table .badge{font-size:13px}
+.workspace .stage-list li a,.workspace .scene-mini{border:0;border-bottom:1px solid var(--line-soft);font-size:15px;padding:16px 0}
+.workspace .stage-list li:last-child a,.workspace .scene-mini:last-child{border-bottom:0}
+.workspace .scene-mini{background:transparent;border-radius:0;gap:8px}
+.workspace .scene-list{padding:8px}
+.workspace .scene-list h2{font:500 13px/1.5 var(--body);letter-spacing:0;text-transform:lowercase;margin:8px 8px 16px}
+.workspace .scene-option{border:0;border-radius:12px;margin:0;padding:16px 8px;background:transparent;font-size:15px;gap:8px}
+.workspace .scene-option+.scene-option{border-top:1px solid var(--line-soft)}
+.workspace .scene-option:is(:hover,.active){background:var(--surface2);color:var(--text)}
+.workspace .scene-option .mono{font:400 13px/1.5 var(--mono)}
+.workspace .timeline{gap:8px;padding:8px 0}
+.workspace .timeline button{border:0;border-radius:12px;padding:16px;background:var(--surface);font-size:15px;color:var(--text)}
+.workspace .timeline button:is(:hover,.active){background:var(--field)}
+.workspace .timeline .duration{font:400 13px/1.5 var(--body);margin-top:8px}
+.workspace :is(.map-activity li+li,.map-approval-history li+li){margin-top:16px;padding-top:16px;border-top-color:var(--line-soft)}
+.workspace .version-entry,#dialog .version-entry{border:0;border-bottom:1px solid var(--line-soft);border-radius:0;padding:16px 0}
+.workspace .version-entry:last-child,#dialog .version-entry:last-child{border-bottom:0}
+.workspace .work-main .sheet .row{padding:16px;gap:8px 24px;min-width:0}
+.workspace .work-main .sheet .row .c{flex-wrap:wrap;gap:8px}
+
+/* Тёмная оболочка и диалоги едины при обоих режимах бумаги.
+   --paper-* и светлая страница авторского сценария не переопределяются. */
+.workspace .production-map,#dialog.map-dialog{
+  --map-bg:var(--surface);--map-surface:var(--surface2);--map-text:var(--text);--map-muted:var(--muted);
+  --map-line:var(--line-soft);--map-accent:var(--accent);--map-ink:var(--ink);
+  --map-good:var(--lamp-green);--map-working:var(--lamp-amber);--map-returned:var(--lamp-red);color-scheme:dark;
+}
+.workspace .cinema-section,#dialog.passport-dialog{
+  --cinema-bg:var(--surface);--cinema-surface:var(--surface2);--cinema-text:var(--text);--cinema-muted:var(--muted);
+  --cinema-line:var(--line-soft);--cinema-accent:var(--accent);--cinema-ink:var(--ink);--cinema-error:var(--text);color-scheme:dark;
+}
+.workspace .production-map .map-cell{border:0;border-radius:12px;padding:16px;gap:8px;background:var(--surface2);box-shadow:none;font-size:15px}
+.workspace .production-map .map-cell:hover{background:var(--field)}
+.workspace .production-map .btn.active{background:var(--field);color:var(--text)}
+.workspace :is(.map-status,.map-cell-assignee,.passport-status){font-size:13px}
+:is(.workspace,#dialog) .map-status{color:var(--muted);font-size:13px;align-items:center}
+:is(.workspace,#dialog) .map-status>span{width:8px;height:8px;display:inline-block;border-radius:50%;font-size:0;background:var(--lamp-off);box-shadow:none}
+:is(.workspace,#dialog) :is(.map-status-working,.map-status-done,.map-status-awaiting)>span{background:var(--lamp-amber)}
+:is(.workspace,#dialog) .map-status-approved>span{background:var(--lamp-green)}
+:is(.workspace,#dialog) .map-status-returned>span{background:var(--lamp-red)}
+.workspace .production-map .btn,.workspace .cinema-section .btn{padding:0 16px;min-height:36px;font-size:15px}
+.workspace :is(.passport-list,.team-members){gap:16px}
+.workspace :is(.passport-fields,.member-access){margin:16px 0;gap:16px}
+
+/* 2. Все шесть диалогов и обычные карточки кадра/версий — один лист. */
+#dialog{width:min(760px,calc(100% - 32px));max-width:calc(100% - 32px);max-height:calc(100dvh - 32px);padding:24px;background:var(--surface);color:var(--text);border:0;border-radius:16px;box-shadow:none;color-scheme:dark}
+#dialog::backdrop{background:#0009;backdrop-filter:none}
+#dialog .dialog-header{gap:16px;margin-bottom:24px;border:0}
+#dialog .dialog-header>div{min-width:0}
+#dialog .dialog-header .eyebrow{display:none}
+#dialog .dialog-header h2{font:500 26px/1.2 var(--body);letter-spacing:0;margin:0 0 8px;color:var(--text)}
+#dialog .dialog-header p{font-size:15px;line-height:1.5;color:var(--muted);margin:0}
+#dialog :is(.btn,.icon-btn,.chip){height:36px;min-height:36px;border:0;border-radius:999px;background:var(--surface2);color:var(--text);padding:0 16px;font-size:15px;line-height:1.2;box-shadow:none}
+#dialog :is(.btn,.icon-btn,.chip):hover{background:var(--field)}
+#dialog .btn.primary{background:var(--accent);color:var(--ink);font-weight:600}
+#dialog .icon-btn{width:36px;min-width:36px;max-width:36px;padding:0;flex:none}
+#dialog .dialog-actions{gap:8px;margin-top:24px;flex-wrap:wrap}
+#dialog .dialog-actions .btn{max-width:100%;white-space:nowrap}
+#dialog .form-row{gap:16px}
+#dialog label{margin:16px 0 8px;color:var(--muted);line-height:1.5}
+#dialog :is(.role-hint,.member-key-panel,.passport-language-note,.map-cell-fields){margin-top:24px;margin-bottom:16px}
+#dialog .passport-language-note{border:0;padding-left:0;color:var(--muted)}
+#dialog .map-cell-fields{gap:16px}
+#dialog :is(.member-section-fields,.access-note,.tokeny-balance,.comment,.assistant-msg){border:0;border-radius:16px;background:var(--surface2);padding:16px;box-shadow:none}
+#dialog .member-section-fields{margin-top:24px;gap:8px 16px}
+#dialog .member-section-fields legend{padding:0 8px}
+#dialog .field-check{margin:0;gap:8px;min-height:36px}
+#dialog .field-check input{width:20px;height:20px;min-height:20px;padding:0;flex:none}
+#dialog .access-note{margin:16px 0}
+#dialog :is(.comment-list,.map-approval-history,.tokeny-row){border-color:var(--line-soft)}
+#dialog .form-error{color:var(--text)}
+#dialog :is(.tokeny-history,.tokeny-admin){margin-top:16px}
+#dialog .tokeny-row{padding:16px 0;gap:8px;flex-wrap:wrap}
+#dialog .tokeny-row :is(span,small){overflow-wrap:anywhere}
+#dialog .tokeny-pakety{gap:8px;margin:0 0 16px}
+#dialog .dialog-preview{height:auto;aspect-ratio:16/9;border-radius:16px;margin-top:24px}
+#dialog .assistant-log{gap:8px;margin:8px 0 16px}
+#dialog .assistant-msg{border-radius:16px}
+
+/* 5. Поля. Чекбоксы, ползунок ИИматика и скрытый импорт сохраняют свою геометрию. */
+.workspace :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']),select,textarea),
+#dialog :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']),select,textarea){
+  background-color:var(--field);color:var(--text);border:0;border-radius:12px;padding:8px 12px;min-height:44px;min-width:0;max-width:100%;font:400 16px/1.5 var(--body);box-shadow:none;color-scheme:dark;
+}
+.workspace :is(input,textarea)::placeholder,#dialog :is(input,textarea)::placeholder{color:#a0a0a0;opacity:1}
+.workspace :is(input[type='checkbox'],input[type='radio']),#dialog :is(input[type='checkbox'],input[type='radio']){accent-color:#e8c27a}
+.workspace :is(input,select,textarea,button,a,[tabindex]):focus-visible,#dialog :focus-visible{outline:2px solid #e8c27a;outline-offset:2px}
+.workspace .work-header .work-controls #project-switch{background-color:var(--surface2);border-radius:999px;min-height:36px;height:36px;font-size:15px;padding:0 36px 0 16px}
+.workspace #voice-input{background:transparent;border:0;border-radius:12px;padding:8px;min-height:44px}
+.workspace .helper-stub :is(.box,.mic,.send){border:0;box-shadow:none}
+.helper-stub .tc{font-size:12px;line-height:1.5;flex-wrap:wrap;gap:8px;overflow-wrap:anywhere}
+.helper-stub .tc>span{min-width:0;max-width:100%}
+.helper-stub .chips{gap:8px;padding:0}
+.helper-stub .thread{gap:8px;padding:0 0 8px;margin:0 0 8px}
+.helper-stub .thread-log{gap:8px}
+.helper-stub .assistant-msg{border:0;border-radius:16px;padding:16px;background:var(--surface)}
+
+/* 6. Статусы: нейтральные плашки, цвет только у ламп. */
+.workspace .badge,#dialog .badge{border:0;border-radius:999px;background:var(--surface2);color:var(--muted);font:400 13px/1.5 var(--body);padding:4px 12px;gap:8px;box-shadow:none;white-space:normal;max-width:100%;overflow-wrap:anywhere}
+.workspace .badge .dot,#dialog .badge .dot{width:8px;height:8px;flex:none;background:var(--lamp-off);box-shadow:none}
+:is(.workspace,#dialog) .badge.approved .dot{background:var(--lamp-green)}
+:is(.workspace,#dialog) :is(.badge.review,.badge.working,.badge.awaiting) .dot{background:var(--lamp-amber)}
+:is(.workspace,#dialog) .badge.returned .dot{background:var(--lamp-red)}
+
+/* 8. Узкий тёмный скроллбар; прокрутка широких таблиц остаётся внутри листа. */
+html,.workspace *,#dialog,#dialog *{scrollbar-width:thin;scrollbar-color:#494949 #212121}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#212121}
+::-webkit-scrollbar-thumb{background:#494949;border:0;border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:#606060}
+::-webkit-scrollbar-corner{background:#212121}
+.workspace :is(.production-map-scroll,.breakdown-scroll){scrollbar-width:thin;scrollbar-color:#494949 #212121}
+.slate{scrollbar-width:none}.slate::-webkit-scrollbar{display:none}
+
+/* 7. Телефон: листы на доступную ширину, помощник в потоке после содержимого.
+   Запас под tabbar включает безопасную зону; длина истории не закрывает экран. */
+@media(max-width:768px){
+  .workspace{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+  .workspace .work-header{gap:8px}
+  .workspace .work-header .storage-label{display:none}
+  .workspace .work-header>.row:first-child{flex:0 0 36px}
+  .workspace .work-header .work-controls{flex:1 1 0;width:auto;gap:4px}
+  .workspace .work-header .work-controls #project-switch{flex:1 1 0;width:0;max-width:none!important;min-width:0;padding-left:12px;padding-right:24px;background-position:right 8px center}
+  .workspace .work-header .btn{padding:0 12px}
+  .workspace .work-header .btn.small{padding:0;margin-left:0}
+  .workspace .work-header .langs button{min-width:32px;padding:0 8px;font-size:13px}
+  .workspace .work-grid{display:block;min-height:0}
+  .workspace .sidebar{position:static;height:auto;min-width:0;padding:8px;overflow:visible}
+  .workspace .side-nav{flex-direction:row;flex-wrap:nowrap;min-width:0;max-width:100%;overflow-x:auto;gap:4px;scrollbar-width:none}
+  .workspace .side-nav::-webkit-scrollbar{display:none}
+  .workspace .side-nav a{flex:0 0 auto;min-height:44px;padding:8px 12px;white-space:nowrap}
+  .workspace .work-main{width:100%;max-width:100%;padding:24px 16px 32px}
+  .workspace .work-main :is(.sheet,.panel,.stat-row,.shot-card,.post-task,.team-member,.passport-card,.scene-list,.editor-frame-wrap,.production-map,.cinema-section,.team-space){width:100%;min-width:0;max-width:100%}
+  .workspace .work-main .sheet .row{grid-template-columns:minmax(0,1fr);gap:8px;padding:16px}
+  .workspace .work-main .sheet .row .c{grid-column:1;grid-row:auto}
+  .workspace :is(.panel,.post-task,.team-member){padding:16px}
+  .workspace .stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workspace .stat-row .stat{padding:8px}
+  .workspace .post-task{flex-wrap:wrap;gap:8px}
+  .workspace .post-task label{min-width:0;flex:1 1 200px}
+  .workspace .post-task .badge{margin-left:28px}
+  .workspace .scene-list{gap:8px;align-items:stretch}
+  .workspace .scene-option{flex:0 0 160px;min-width:160px}
+  .workspace .scene-option+.scene-option{border:0}
+  .workspace .scene-list>.btn{flex:none;font-size:15px;width:auto;padding:0 16px}
+  .workspace .filter-row{flex-wrap:wrap;gap:8px}
+  .workspace .filter-row select{min-width:0;width:100%}
+  .workspace .page-heading .row{max-width:100%;justify-content:flex-start}
+  .workspace .editor-foot{flex-wrap:wrap;gap:8px}
+  .workspace .helper-stub{position:static;inset:auto;width:100%;padding:0 16px 16px;z-index:auto;pointer-events:auto}
+  .workspace .helper-stub .box{width:100%;max-width:100%;max-height:none;padding:16px;gap:8px}
+  .workspace .helper-stub .thread-log{max-height:40dvh}
+  .workspace .helper-stub .thread-bar{flex-wrap:wrap}
+  .workspace .helper-stub .chips .chip{min-height:32px;padding:0 12px;font-size:13px}
+  .workspace .tabbar{height:calc(60px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+  .workspace .tabbar a{font:500 12px/1 var(--body);letter-spacing:0;text-transform:none;color:var(--muted)}
+  .workspace .tabbar a[aria-current]{color:var(--text)}
+}
+@media(max-width:480px){
+  #dialog{width:100%;max-width:100%;max-height:100dvh;margin:auto 0;padding:16px;border-radius:16px}
+  #dialog .dialog-header{gap:8px}
+  #dialog .dialog-header h2{font-size:26px}
+  #dialog .dialog-actions{flex-direction:column;align-items:stretch}
+  #dialog .dialog-actions .btn{width:100%;font-size:13px}
+  #dialog .form-row{grid-template-columns:minmax(0,1fr);gap:0}
+  #dialog .member-section-fields{grid-template-columns:minmax(0,1fr);padding:16px}
+  #dialog .tokeny-row .btn{font-size:13px}
+  .workspace .work-header{padding:8px}
+  .workspace .work-header .btn{font-size:13px}
+  .workspace .work-header .work-controls #project-switch{font-size:13px}
+  .workspace .work-main :is(.group,.page-heading){gap:16px;margin-bottom:24px}
+  .workspace .work-main .group>header{flex-wrap:wrap;gap:8px}
+  .workspace .work-main .group>header .label{margin-left:0}
+}
