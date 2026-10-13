@@ -20,8 +20,10 @@ import uuid
 
 if __package__:
     from .blocks import breakdown, tokeny
+    from .blocks.breakdown import parser as razbivka
 else:
     from blocks import breakdown, tokeny
+    from blocks.breakdown import parser as razbivka
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -759,6 +761,87 @@ def assistant_answer(question, context, mode, history, tier="standard"):
     return {"answer": text_out, "model": out.get("model", model), "usage": out.get("usage", {})}
 
 
+RAZBOR_ROLE = ("Ты — второй режиссёр и художник по персонажам. По тексту сценария (или по описанию продюсера) составь паспорта. "
+               "Отвечай ТОЛЬКО JSON без пояснений и без markdown: {\"characters\":[{\"name\":\"ИМЯ как в сценарии\",\"role\":\"роль в истории, до 120 знаков\","
+               "\"identity\":\"внешность: возраст, лицо, волосы, телосложение, одежда — 2–4 предложения, конкретно, чтобы художник узнал героя в каждом кадре\","
+               "\"taboo\":[\"чего не рисовать\"],\"height\":\"рост словами или см\"}],\"locations\":[{\"name\":\"НАЗВАНИЕ как в заголовке сцены\","
+               "\"role\":\"что это место в истории\",\"identity\":\"как выглядит: пространство, свет, фактуры, время года — 2–3 предложения\",\"taboo\":[]}]}. "
+               "Имена — ровно те, что переданы в списке; новых не добавляй, если список задан. Факты только из текста; чего нет — опиши правдоподобно для жанра и отметь словом «предположение». "
+               "Язык полей — язык сценария.")
+
+
+def razbor_passports(project, principal, names_chars, names_locs, opisanie="", tier="standard"):
+    """Модель заполняет паспорта героев и локаций. Возвращает (dict, usage, model)."""
+    if os.environ.get("NEYRA_ASSISTANT_FAKE") == "1":
+        fake = {"characters": [{"name": n, "role": "[проба] роль " + n, "identity": "[проба] внешность " + n, "taboo": ["[проба] табу"], "height": ""} for n in names_chars],
+                "locations": [{"name": n, "role": "[проба] место " + n, "identity": "[проба] вид " + n, "taboo": []} for n in names_locs]}
+        if opisanie and not names_chars and not names_locs:
+            fake = {"characters": [{"name": "ГЕРОЙ ИЗ ОПИСАНИЯ", "role": "[проба] " + opisanie[:60], "identity": "[проба] внешность", "taboo": [], "height": ""}],
+                    "locations": [{"name": "МЕСТО ИЗ ОПИСАНИЯ", "role": "[проба]", "identity": "[проба] вид", "taboo": []}]}
+        return fake, {}, "fake-razbor"
+    script = (project.get("script") or {}).get("text", "")[:60000]
+    parts = []
+    if names_chars or names_locs:
+        parts.append("ГЕРОИ (заполнить ровно эти): " + "; ".join(names_chars) + "\nЛОКАЦИИ (заполнить ровно эти): " + "; ".join(names_locs))
+    if opisanie:
+        parts.append("ОПИСАНИЕ ОТ ПРОДЮСЕРА (создать по нему героев и локации; имена КАПСОМ как в сценарии): " + opisanie[:4000])
+    if script:
+        parts.append("СЦЕНАРИЙ:\n" + script)
+    question = "\n\n".join(parts) or "Сценарий пуст."
+    answer = assistant_answer(question, "", RAZBOR_ROLE, [], tier)
+    raw = answer.get("answer", "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        raw = raw[raw.find("{"):]
+    start, end = raw.find("{"), raw.rfind("}")
+    try:
+        data = json.loads(raw[start:end + 1])
+        if not isinstance(data, dict):
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ApiError(502, "RAZBOR_BAD_JSON", "Помощник ответил не по форме. Попробуйте ещё раз.") from None
+    return data, answer.get("usage", {}), answer.get("model", "")
+
+
+def apply_passports(project, data, allow_new):
+    """Заполняет пустые поля черновых паспортов; создаёт новые, если allow_new. Замки (locked) не трогает."""
+    filled, created = 0, 0
+    date = timestamp()
+    for collection in ("characters", "locations"):
+        items = project.setdefault(collection, [])
+        for entry in (data.get(collection) or [])[:60]:
+            if not isinstance(entry, dict) or not isinstance(entry.get("name"), str) or not entry["name"].strip():
+                continue
+            key = breakdown.name_key(entry["name"])
+            target = next((it for it in items if breakdown.name_key(it["name"]) == key), None)
+            if target is None:
+                if not allow_new:
+                    continue
+                try:
+                    body = {"name": entry["name"].strip()[:240]}
+                    target = dict(breakdown.passport_input(body, True), id=breakdown.ulid(), createdAt=date, updatedAt=date, studio_id=project["studio_id"])
+                except breakdown.ValidationError:
+                    continue
+                items.append(target)
+                created += 1
+            if target.get("status") == "locked":
+                continue
+            changed = False
+            for field, limit in (("role", 240), ("identity", 2000), ("height", 240)):
+                value = entry.get(field)
+                if isinstance(value, str) and value.strip() and not (target.get(field) or "").strip():
+                    target[field] = value.strip()[:limit]
+                    changed = True
+            taboo = entry.get("taboo")
+            if isinstance(taboo, list) and taboo and not target.get("taboo"):
+                target["taboo"] = [str(x).strip()[:240] for x in taboo if isinstance(x, str) and x.strip()][:50]
+                changed = changed or bool(target["taboo"])
+            if changed:
+                target["updatedAt"] = date
+                filled += 1
+    return filled, created
+
+
 def production_map(project, principal):
     objects = [{"type": "scene", "id": s["id"]} for s in project["scenes"]]
     objects.extend({"type": "shot", "id": s["id"]} for s in project["shots"])
@@ -1218,7 +1301,7 @@ class Handler(SimpleHTTPRequestHandler):
         resource = parts[3] if len(parts) > 3 else "project"
         section = {"versions": "script", "scenes": "script", "members": "overview" if method == "GET" else "team", "project": "overview",
                    "map": "overview", "cells": "overview", "approvals": "overview",
-                   "activity": "overview", "characters": "overview" if method == "GET" else "heroes",
+                   "activity": "overview", "razbor": "breakdown", "characters": "overview" if method == "GET" else "heroes",
                    "locations": "overview" if method == "GET" else "locations"}.get(resource, resource)
         if resource == "assistant":
             # №46 помощник: читает весь проект (раздел overview), ничего не изменяет, память диалога — у клиента
@@ -1276,6 +1359,50 @@ class Handler(SimpleHTTPRequestHandler):
                 invalidated.extend(invalidate_cells(project, lambda c: c["object"]["type"] in ("scene", "shot")))
             project["script"] = draft
             data, status = draft, 200
+        elif resource == "razbor" and len(parts) == 4:
+            # №58.3: сценарий → сцены/герои/локации (парсер), помощник заполняет паспорта; или герои из описания продюсера
+            if method != "POST":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Разбор запускается методом POST.")
+            body = self.body(allow_empty=True)
+            fields(body, ("opisanie", "zapolnit", "tier"))
+            opisanie = text(body.get("opisanie", ""), "opisanie", 4000).strip()
+            zapolnit = body.get("zapolnit", True)
+            tier = body.get("tier", "standard")
+            if not isinstance(zapolnit, bool) or tier not in ASSISTANT_TIERS:
+                raise ApiError(422, "VALIDATION", "zapolnit — true/false, tier — standard или pro.")
+            summary = {"scenes": 0, "characters": 0, "locations": 0, "zapolneno": 0, "sozdano": 0}
+            wallets = store.read_tokeny()
+            wallet = tokeny.ensure_wallet(wallets, principal)
+            if (zapolnit or opisanie) and not tokeny.can_spend(wallet, tokeny.MIN_VOPROS.get(tier, 1)):
+                store.save_tokeny(wallets)
+                raise ApiError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и разбор продолжится.")
+            if not opisanie:
+                script_text = (project.get("script") or {}).get("text", "")
+                document = razbivka.parse(script_text)
+                if not document["scenes"]:
+                    raise ApiError(422, "NO_SCENES", "В сценарии пока нет сцен: нужны заголовки вида «ИНТ. ЮРТА — НОЧЬ». Напишите хотя бы одну сцену.")
+                document = breakdown.parse_input({k: document[k] for k in ("scenes", "characters", "locations", "title", "pages_est", "caps_mentions")})
+                data, import_events = breakdown.import_data(
+                    document, project["scenes"], project["characters"], project["locations"], timestamp(), project["studio_id"])
+                summary.update(scenes=len(document["scenes"]), characters=len(document["characters"]), locations=len(document["locations"]))
+                changed_scene_ids = {obj["id"] for action, obj, _ in import_events if action == "scene.updated"}
+                if changed_scene_ids:
+                    invalidated.extend(invalidate_cells(project, lambda c: c["object"]["type"] == "scene" and c["object"]["id"] in changed_scene_ids))
+            cost = 0
+            if zapolnit or opisanie:
+                names_chars = [it["name"] for it in project["characters"] if it.get("status") != "locked" and not (it.get("identity") or "").strip()] if not opisanie else []
+                names_locs = [it["name"] for it in project["locations"] if it.get("status") != "locked" and not (it.get("identity") or "").strip()] if not opisanie else []
+                if opisanie or names_chars or names_locs:
+                    passports, usage, model = razbor_passports(project, principal, names_chars[:40], names_locs[:40], opisanie, tier)
+                    filled, created = apply_passports(project, passports, allow_new=bool(opisanie))
+                    summary.update(zapolneno=filled, sozdano=created)
+                    try:
+                        wallet, cost = tokeny.spend(wallets, principal, "razbor", tokeny.cena_voprosa(model, usage, tier))
+                    except tokeny.TokenyError as error:
+                        raise ApiError(error.status, error.code, error.message) from None
+            store.save_tokeny(wallets)
+            data = dict(summary, opisanie=bool(opisanie), tokeny=dict(tokeny.summary(wallet), spisano=cost))
+            status = 200
         elif resource == "breakdown" and len(parts) == 4:
             if method != "POST":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Разбивка импортируется методом POST.")
@@ -1516,6 +1643,8 @@ class Handler(SimpleHTTPRequestHandler):
                 action, obj = "version.restored", {"type": "version", "id": data["restoredVersionId"]}
             if resource == "breakdown":
                 action = "breakdown.imported"
+            if resource == "razbor":
+                action, obj = "breakdown.razbor", {"type": "project", "id": slug}
         for import_action, import_object, import_data in import_events:
             activity(project, principal, import_action, import_object, import_data)
         activity(project, principal, action, obj, data, stage, invalidated)

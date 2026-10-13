@@ -1423,6 +1423,43 @@ class TeamAccessTests(unittest.TestCase):
                 self.api("PATCH", path, {"role": "producer"}, 403, secret)
                 self.api("DELETE", path, status=403, key=secret)
 
+    def test_razbor_builds_scenes_and_fills_passports_from_script_or_description(self):
+        # №58.3: «Разобрать сценарий помощником» — парсер + модель (проба), и герои из описания продюсера.
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        self.create()
+        self.api("POST", "/api/projects/film/razbor", {}, 422)  # сцен нет
+        script = "Title: Проба\n\nИНТ. ЮРТА — НОЧЬ\n\nТӨСТІК (10) сидит у очага.\n\nТӨСТІК\nМама, где отец?\n\nНАТ. СТЕПЬ — ДЕНЬ\n\nМАТЬ\nИди.\n"
+        self.api("PUT", "/api/projects/film/script", {"text": script, "language": "ru"})
+        result = self.api("POST", "/api/projects/film/razbor", {})["data"]
+        self.assertEqual({k: result[k] for k in ("scenes", "characters", "locations", "zapolneno", "sozdano")},
+                         {"scenes": 2, "characters": 2, "locations": 2, "zapolneno": 4, "sozdano": 0})
+        self.assertTrue(result["tokeny"]["unlimited"])
+        heroes = self.api("GET", "/api/projects/film/characters")["data"]
+        self.assertEqual(sorted(h["name"] for h in heroes), ["МАТЬ", "ТӨСТІК"])
+        self.assertTrue(all(h["identity"].startswith("[проба]") and h["taboo"] for h in heroes))
+        scenes = self.api("GET", "/api/projects/film/scenes")["data"]
+        self.assertEqual([s["n"] for s in scenes], [1, 2])
+        # Повтор не затирает заполненное и не трогает замок.
+        tostik = next(h for h in heroes if h["name"] == "ТӨСТІК")
+        self.api("PATCH", f"/api/projects/film/characters/{tostik['id']}", {"identity": "Рукой художника", "status": "locked"})
+        again = self.api("POST", "/api/projects/film/razbor", {})["data"]
+        self.assertEqual(again["zapolneno"], 0)
+        self.assertEqual(self.api("GET", f"/api/projects/film/characters/{tostik['id']}")["data"]["identity"], "Рукой художника")
+        # Описание продюсера: создаются новые герои и локации.
+        described = self.api("POST", "/api/projects/film/razbor", {"opisanie": "три персонажа: старик-пастух, девочка, волк"})["data"]
+        self.assertEqual((described["sozdano"], described["scenes"]), (2, 0))
+        names = [h["name"] for h in self.api("GET", "/api/projects/film/characters")["data"]]
+        self.assertIn("ГЕРОЙ ИЗ ОПИСАНИЯ", names)
+        self.assertIn("MЕСТО ИЗ ОПИСАНИЯ".replace("M", "М"), [l["name"] for l in self.api("GET", "/api/projects/film/locations")["data"]])
+        # Лента: событие разбора есть; права: сценарист без записи в breakdown — 403; без токенов — 402.
+        self.assertIn("breakdown.razbor", [a["action"] for a in self.api("GET", "/api/projects/film/activity?limit=200")["data"]])
+        self.api("POST", "/api/projects/film/razbor", {}, 403, key="temporary-writer")
+        Path(os.environ["NEYRA_TARIFY_FILE"]).write_text(json.dumps({"probnyy_paket": 0}), encoding="utf-8")
+        producer = self.issue("producer", ["overview", "breakdown", "heroes", "locations", "script"], email="p@example.test")
+        self.api("POST", "/api/projects/film/razbor", {}, 402, key=producer["key"])
+        self.api("POST", "/api/projects/film/razbor", {"zapolnit": False}, key=producer["key"])
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

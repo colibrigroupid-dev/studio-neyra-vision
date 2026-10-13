@@ -1037,3 +1037,13 @@ UTF-8, `ensure_ascii=False`, `sort_keys=True`, `separators=(',', ':')`.
 - `POST /api/tokeny/nachislit` — только `admin`: `{keyId, tokeny, zayavkaId?, kommentariy?}` → кошелёк; заявка закрывается `done`.
 - `POST /api/tokeny/zayavki/<id>/otklonit` — только `admin`.
 - `POST /api/projects/<slug>/assistant` — перед ответом проверяет остаток (`402 TOKENY_EMPTY`), после ответа списывает `ceny.vopros` и возвращает `tokeny: {balance, unlimited, cena_voprosa, spisano}`.
+
+## Разбор сценария помощником (№58.3, 13.10.2026)
+
+`POST /api/projects/<slug>/razbor` — право записи в `breakdown`, `If-Match` как у остальных записей. Тело необязательно:
+`{opisanie?: "текст продюсера до 4000 знаков", zapolnit?: true, tier?: "standard"|"pro"}`.
+
+- Без `opisanie`: парсер (`server/blocks/breakdown/parser.py`, тот же, что `tools/razbivka.py`) читает `/script`, строит сцены/героев/локации и импортирует их через блок разбивки (ID и заполненные поля сохраняются, замки не трогаются). `422 NO_SCENES`, если в тексте нет заголовков сцен. Затем, если `zapolnit`, модель заполняет пустые поля черновых паспортов (роль, внешность, табу, рост) — JSON по строгой форме, `502 RAZBOR_BAD_JSON` при сбое формы.
+- С `opisanie`: модель создаёт героев и локации по описанию продюсера (имена капсом), новые добавляются, существующие дополняются в пустых полях.
+- Списание: по реальному расходу модели, причина `razbor`; `402 TOKENY_EMPTY` при пустом счёте до запуска. Событие в ленте `breakdown.razbor`.
+- Ответ: `{scenes, characters, locations, zapolneno, sozdano, opisanie, tokeny: {balance, unlimited, cena_voprosa, spisano}}`.

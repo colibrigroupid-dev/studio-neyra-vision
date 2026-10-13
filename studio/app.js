@@ -1,12 +1,12 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013h';
-import { frameAt, totalDuration } from './timeline.js?v=20261013h';
-import { StudioServer } from './storage.js?v=20261013h';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013h';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013h';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013h';
-import { renderGeroyWorkshop } from './geroy.js?v=20261013h';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013h';
-import { parseCommand, describeCommand } from './golos.js?v=20261013h';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013i';
+import { frameAt, totalDuration } from './timeline.js?v=20261013i';
+import { StudioServer } from './storage.js?v=20261013i';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013i';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013i';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013i';
+import { renderGeroyWorkshop } from './geroy.js?v=20261013i';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013i';
+import { parseCommand, describeCommand } from './golos.js?v=20261013i';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -745,7 +745,7 @@ function helperStub(p, cex = false) {
   if (!p) return '';
   const mic = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const micTitle = t('Голос недоступен в этом браузере', 'Бұл браузерде дауыс қолжетімсіз');
-  return `<div class='helper-stub${cex ? ' geroy-helper' : ''}' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'>${assistantThread()}<form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Скажите или напишите: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${cex ? t('Проверьте ответ и перенесите нужное в паспорт.', 'Жауапты тексеріп, керегін паспортқа көшіріңіз.') : t('помощник ответит, как только подключим модель', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
+  return `<div class='helper-stub${cex ? ' geroy-helper' : ''}' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'>${assistantThread()}<form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Скажите или напишите: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')], [t('создай героя: …', 'кейіпкер жаса: …'), t('создай героя: ', 'кейіпкер жаса: ')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${cex ? t('Проверьте ответ и перенесите нужное в паспорт.', 'Жауапты тексеріп, керегін паспортқа көшіріңіз.') : t('помощник ответит, как только подключим модель', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
 }
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Чтобы открыть проект команды, введите свой ключ. Его выдаёт продюсер.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
@@ -834,7 +834,33 @@ function persistPreferences() {
   try { localStorage.setItem(storeKey, JSON.stringify(localWorkspace)); }
   catch { toast(t('Не удалось сохранить настройки в браузере.', 'Браузерде параметрлерді сақтау мүмкін болмады.')); }
 }
+async function runRazbor(opisanie = '') {
+  if (!serverClient || !project()) { toast(t('Сначала подключите проект команды: кнопка «Сервер» и ваш ключ.', 'Алдымен команда жобасын қосыңыз.')); return; }
+  const slug = state.activeId; const known = serverClient.known.get(slug);
+  assistantHistory.push({ role: 'user', content: opisanie || t('Разобрать сценарий на сцены, героев и локации', 'Сценарийді талдау') }); assistantCollapsed = false;
+  assistantPending = opisanie ? t('создаю героев по описанию…', 'сипаттама бойынша кейіпкерлер жасап жатырмын…') : t('читаю сценарий, завожу сцены, героев и локации…', 'сценарийді оқып жатырмын…'); refreshThread();
+  try {
+    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(slug)}/razbor`, opisanie ? { opisanie } : {}, { revision: known?._revision });
+    const d = result?.data || {};
+    if (d.tokeny) { meState.tokeny = d.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
+    const parts = [];
+    if (d.scenes) parts.push(t(`сцен: ${d.scenes}`, `көрініс: ${d.scenes}`));
+    if (d.characters) parts.push(t(`героев: ${d.characters}`, `кейіпкер: ${d.characters}`));
+    if (d.locations) parts.push(t(`локаций: ${d.locations}`, `локация: ${d.locations}`));
+    if (d.sozdano) parts.push(t(`создано новых: ${d.sozdano}`, `жаңадан: ${d.sozdano}`));
+    if (d.zapolneno) parts.push(t(`паспортов заполнено: ${d.zapolneno}`, `паспорт толтырылды: ${d.zapolneno}`));
+    const spent = d.tokeny?.spisano ? t(` · списано ${d.tokeny.spisano}`, ` · ${d.tokeny.spisano} алынды`) : '';
+    assistantHistory.push({ role: 'assistant', content: (parts.length ? t('Готово: ', 'Дайын: ') + parts.join(', ') : t('Ничего нового: всё уже заполнено.', 'Жаңа ештеңе жоқ.')) + spent + ' ' + t('Проверьте паспорта в разделах «Герои» и «Локации» и зафиксируйте, что верно.', '«Кейіпкерлер» мен «Локациялар» бөлімдерін тексеріңіз.') });
+    serverClient.known.delete(slug);
+    if (cinemaPages.includes(route())) await refreshCinema(); else render();
+  } catch (error) {
+    const message = error?.status === 402 ? t('Токены закончились. Откройте «Токены и пополнение» в меню слева внизу.', 'Токендер бітті.') : error?.status === 409 ? t('Коллега только что внёс правку. Обновите раздел и повторите.', 'Әріптес жаңа ғана түзетті. Бөлімді жаңартыңыз.') : (error?.message || t('Не получилось разобрать.', 'Талдау мүмкін болмады.'));
+    assistantHistory.push({ role: 'assistant', content: message });
+  } finally { assistantPending = ''; refreshThread(); }
+}
+const describeHeroes = /^(создай|добавь|заведи|сделай|создать|добавить|жаса|қос)\s+(геро|персонаж|локац|кейіпкер|локация)/i;
 function runCommand(text) {
+  if (describeHeroes.test(String(text || '').trim())) { void runRazbor(String(text).trim()); return; }
   const cmd = parseCommand(text);
   const status = document.querySelector('[data-voice-status]');
   if (!cmd) return;
@@ -902,7 +928,7 @@ app.addEventListener('click', async event => {
   const threadBtn = event.target.closest('[data-thread]');
   if (threadBtn) { if (threadBtn.dataset.thread === 'clear') assistantHistory.length = 0; else assistantCollapsed = !assistantCollapsed; refreshThread(); return; }
   const chip = event.target.closest('[data-cmd]');
-  if (chip) { runCommand(chip.dataset.cmd); return; }
+  if (chip) { if (/:\s*$/.test(chip.dataset.cmd)) { const input = document.querySelector('#voice-input'); if (input) { input.value = chip.dataset.cmd; input.focus(); } return; } runCommand(chip.dataset.cmd); return; }
   const pick = event.target.closest('[data-project]');
   if (pick) { const id = pick.dataset.project; await runOperation(async () => { if (!await flushDraft()) { render(); return; } if (serverClient) state.projects[id] = await serverClient.loadProject(id); state.activeId = id; selectedScene = null; sceneFilter = 'all'; playTime = 0; persistPreferences(); go('overview'); render(); }); return; }
   const waitRow = event.target.closest('[data-open-cell]');
@@ -935,6 +961,7 @@ app.addEventListener('click', async event => {
   else if (action === 'refresh-map') await refreshProductionMap();
   else if (action === 'refresh-breakdown') await runOperation(() => refreshCinema());
   else if (action === 'import-breakdown') await runOperation(() => breakdownImportDialog());
+  else if (action === 'razbor') await runOperation(() => runRazbor());
   else if (action === 'edit-passport') {
     const control = event.target.closest('[data-action]');
     await runOperation(() => passportDialog(control.dataset.passportCollection, control.dataset.passportId));
