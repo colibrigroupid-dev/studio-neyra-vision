@@ -1000,7 +1000,7 @@ class Handler(SimpleHTTPRequestHandler):
             if rest == [] and method == "GET":
                 mine = [z for z in wallets["zayavki"] if z["keyId"] == principal["id"]][-10:]
                 store.save_tokeny(wallets)
-                data = dict(tokeny.public_wallet(wallet), ceny=tokeny.tarify()["ceny"], pakety=tokeny.tarify()["pakety"],
+                data = dict(tokeny.public_wallet(wallet), ceny=tokeny.ceny(), pakety=tokeny.pakety(),
                             oplata=tokeny.oplata(), zayavki=mine)
                 return 200, {"data": data}, None
             if rest == ["zayavka"] and method == "POST":
@@ -1108,14 +1108,14 @@ class Handler(SimpleHTTPRequestHandler):
             question, mode_section, history, tier = self.assistant_body()
             wallets = store.read_tokeny()
             wallet = tokeny.ensure_wallet(wallets, principal)
-            if not tokeny.can_spend(wallet, "vopros"):
+            if not tokeny.can_spend(wallet, tokeny.MIN_VOPROS.get(tier, 1)):
                 store.save_tokeny(wallets)
                 raise ApiError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и помощник продолжит.")
             context = "ПРОЕКТ НЕ ВЫБРАН: сценарий автора хранится у него в браузере; отвечай только по тексту вопроса."
             answer = assistant_answer(question, context, ASSISTANT_MODES.get(mode_section, ""), history, tier)
             answer["context"] = {"chars": 0, "scenes": 0, "characters": 0, "locations": 0}
             try:
-                wallet, cost = tokeny.spend(wallets, principal, "vopros")
+                wallet, cost = tokeny.spend(wallets, principal, "vopros" if tier == "standard" else "vopros_pro", tokeny.cena_voprosa(answer.get("model", ""), answer.get("usage"), tier))
             except tokeny.TokenyError as error:
                 raise ApiError(error.status, error.code, error.message) from None
             store.save_tokeny(wallets)
@@ -1228,14 +1228,14 @@ class Handler(SimpleHTTPRequestHandler):
             question, mode_section, history, tier = self.assistant_body()
             wallets = store.read_tokeny()
             wallet = tokeny.ensure_wallet(wallets, principal)
-            if not tokeny.can_spend(wallet, "vopros"):
+            if not tokeny.can_spend(wallet, tokeny.MIN_VOPROS.get(tier, 1)):
                 store.save_tokeny(wallets)
                 raise ApiError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и помощник продолжит.")
             context, mode = assistant_context(project, principal, mode_section)
             answer = assistant_answer(question, context, mode, history, tier)
             answer["context"] = {"chars": len(context), "scenes": len(project.get("scenes", [])), "characters": len(project.get("characters", [])), "locations": len(project.get("locations", []))}
             try:
-                wallet, cost = tokeny.spend(wallets, principal, "vopros")
+                wallet, cost = tokeny.spend(wallets, principal, "vopros" if tier == "standard" else "vopros_pro", tokeny.cena_voprosa(answer.get("model", ""), answer.get("usage"), tier))
             except tokeny.TokenyError as error:
                 raise ApiError(error.status, error.code, error.message) from None
             store.save_tokeny(wallets)

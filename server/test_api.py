@@ -1423,6 +1423,22 @@ class TeamAccessTests(unittest.TestCase):
                 self.api("PATCH", path, {"role": "producer"}, 403, secret)
                 self.api("DELETE", path, status=403, key=secret)
 
+    def test_tokeny_prices_follow_cost_plus_margin(self):
+        # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
+        tokeny = app.tokeny
+        self.assertEqual(tokeny.cena_voprosa("claude-sonnet-5-5", {"input_tokens": 4706, "output_tokens": 1500}), 3)
+        self.assertEqual(tokeny.cena_voprosa("claude-sonnet-5-5", {"input_tokens": 4689, "output_tokens": 37}), 2)
+        self.assertEqual(tokeny.cena_voprosa("claude-opus-5-5", {"input_tokens": 17000, "output_tokens": 6000}, "pro"), 21)
+        self.assertEqual(tokeny.cena_voprosa("claude-sonnet-5-5", {}, "standard"), 1)
+        self.assertEqual(tokeny.cena_voprosa("claude-opus-5-5", {}, "pro"), 5)
+        self.assertEqual(tokeny.cena_kartinki("2k"), 12)
+        self.assertEqual(tokeny.cena_video(5, "720p"), 128)
+        self.assertEqual(tokeny.cena_video(5, "1080p"), 313)
+        self.assertEqual([p["usd"] for p in tokeny.pakety()], [5.0, 20.0, 100.0])
+        Path(os.environ["NEYRA_TARIFY_FILE"]).write_text(json.dumps({"kurs_kzt": 450, "pakety": [{"tokeny": 500, "cena": "2 500 ₸"}, {"tokeny": 2000}]}), encoding="utf-8")
+        self.assertEqual(tokeny.pakety(), [{"tokeny": 500, "usd": 5.0, "kzt": 2250, "cena": "2 500 ₸"}, {"tokeny": 2000, "usd": 20.0, "kzt": 9000}])
+        self.assertEqual(self.api("GET", "/api/tokeny")["data"]["ceny"]["kartinka_2k"], 12)
+
     def test_tokeny_trial_wallet_spend_request_and_grant(self):
         # Блок «Токены» (Александр 13.10 08:33): всем, кто пробует, — пакет и возможность докупить.
         tarify = Path(os.environ["NEYRA_TARIFY_FILE"])

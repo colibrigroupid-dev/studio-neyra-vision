@@ -1,8 +1,37 @@
 {
-  "probnyy_paket": 100,
-  "ceny": { "vopros": 1, "kartinka": 5, "video": 40 },
+  "_": "Себестоимость по тарифам 13.10.2026; токен = 1 цент; платформе 10 %. kurs_kzt > 0 покажет цены пакетов в тенге; cena в пакете — свой текст вместо расчёта.",
+  "token_usd": 0.01,
+  "nacenka": 0.1,
+  "probnyy_paket": 300,
+  "kurs_kzt": 0,
+  "modeli_usd_1m": {
+    "claude-sonnet-5-5": [
+      2,
+      10
+    ],
+    "claude-opus-5-5": [
+      4,
+      20
+    ]
+  },
+  "kartinka_usd": {
+    "1k": 0.067,
+    "2k": 0.101,
+    "4k": 0.151
+  },
+  "video_usd_sek": {
+    "720p": 0.231,
+    "1080p": 0.569
+  },
   "pakety": [
-    { "tokeny": 500, "cena": "" },
-    { "tokeny": 2000, "cena": "" }
+    {
+      "tokeny": 500
+    },
+    {
+      "tokeny": 2000
+    },
+    {
+      "tokeny": 10000
+    }
   ]
 }

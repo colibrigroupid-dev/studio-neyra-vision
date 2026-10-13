@@ -654,15 +654,18 @@ async function tokenyDialog() {
   meState.tokeny = { balance: data.balance, unlimited: data.unlimited, cena_voprosa: data.ceny?.vopros ?? 1 };
   const pakety = Array.isArray(data.pakety) ? data.pakety : [];
   const sposoby = Array.isArray(data.oplata?.sposoby) ? data.oplata.sposoby : [];
-  const reasonName = r => ({ probnyy_paket: t('пробный пакет', 'сынақ пакеті'), vopros: t('вопрос помощнику', 'көмекшіге сұрақ'), popolnenie: t('пополнение', 'толтыру'), kartinka: t('картинка', 'сурет'), video: t('видео', 'бейне') })[r] || r;
+  const reasonName = r => ({ probnyy_paket: t('пробный пакет', 'сынақ пакеті'), vopros: t('вопрос помощнику', 'көмекшіге сұрақ'), vopros_pro: t('вопрос PRO', 'PRO сұрақ'), popolnenie: t('пополнение', 'толтыру'), kartinka: t('картинка', 'сурет'), video: t('видео', 'бейне') })[r] || r;
   const history = (data.history || []).slice(-8).reverse();
   const open = (data.zayavki || []).filter(z => z.status === 'new');
   const balance = data.unlimited ? t('Без лимита', 'Шектеусіз') : `${data.balance} ${state.locale === 'kk' ? 'токен' : tokenyWord(data.balance)}`;
-  openDialog(`${dialogHead(t('Токены', 'Токендер'), t(`Вопрос помощнику стоит ${data.ceny?.vopros ?? 1} ${tokenyWord(data.ceny?.vopros ?? 1)}. Картинки и видео подключим следующими.`, `Көмекшіге бір сұрақ — ${data.ceny?.vopros ?? 1} токен.`))}
+  const c = data.ceny || {}; const range = v => Array.isArray(v) ? `${v[0]}–${v[1]}` : String(v ?? '');
+  const cenyText = c.vopros ? t(`1 токен = ${Math.round((c.token_usd || 0.01) * 100)} ¢. Вопрос помощнику ${range(c.vopros)}, в режиме PRO ${range(c.vopros_pro)}, картинка 2K ${c.kartinka_2k}, видео 5 с ${c.video_5s_720p}. Списание по реальному расходу.`, `1 токен = ${Math.round((c.token_usd || 0.01) * 100)} ¢. Сұрақ ${range(c.vopros)}, PRO ${range(c.vopros_pro)}, сурет 2K ${c.kartinka_2k}, бейне 5 с ${c.video_5s_720p}.`) : t('Списание по реальному расходу модели.', 'Нақты шығын бойынша есептеледі.');
+  const paketLabel = pk => `${pk.tokeny}${pk.cena ? ` · ${pk.cena}` : pk.kzt ? ` · ${pk.kzt.toLocaleString('ru-RU')} ₸` : pk.usd ? ` · $${pk.usd}` : ''}`;
+  openDialog(`${dialogHead(t('Токены', 'Токендер'), e(cenyText))}
     <div class='tokeny-balance'><span>${t('На счёте', 'Шотта')}</span><b>${e(balance)}</b></div>
     ${data.unlimited ? '' : `<form id='tokeny-form'>
       <label for='tokeny-amount'>${t('Сколько токенов докупить', 'Қанша токен сатып аласыз')}</label>
-      ${pakety.length ? `<div class='tokeny-pakety'>${pakety.map(pk => `<button type='button' class='chip' data-tokeny-paket='${e(String(pk.tokeny))}'>${e(String(pk.tokeny))}${pk.cena ? ` · ${e(String(pk.cena))}` : ''}</button>`).join('')}</div>` : ''}
+      ${pakety.length ? `<div class='tokeny-pakety'>${pakety.map(pk => `<button type='button' class='chip' data-tokeny-paket='${e(String(pk.tokeny))}'>${e(paketLabel(pk))}</button>`).join('')}</div>` : ''}
       <input id='tokeny-amount' name='tokeny' type='number' min='1' max='1000000' step='1' required value='${e(String(pakety[0]?.tokeny || 500))}' inputmode='numeric'>
       ${sposoby.length ? `<label for='tokeny-sposob'>${t('Как удобно оплатить', 'Қалай төлейсіз')}</label><select id='tokeny-sposob' name='sposob'>${sposoby.map(sp => `<option value='${e(sp.nazvanie)}'>${e(sp.nazvanie)}</option>`).join('')}</select>` : `<input type='hidden' name='sposob' value=''>`}
       <p class='access-note'>${sposoby.length ? sposoby.map(sp => `<b>${e(sp.nazvanie)}</b>${sp.rekvizity ? ` — ${e(sp.rekvizity)}` : ''}${sp.podskazka ? `. ${e(sp.podskazka)}` : ''}`).join('<br>') : t('Оставьте заявку: продюсер напишет вам на почту, как оплатить, и начислит токены сразу после оплаты.', 'Өтінім қалдырыңыз: продюсер поштаңызға қалай төлеу керектігін жазады да, төлемнен кейін бірден токен қосады.')}${data.oplata?.podskazka ? `<br>${e(data.oplata.podskazka)}` : ''}</p>

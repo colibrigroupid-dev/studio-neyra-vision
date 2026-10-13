@@ -14,14 +14,24 @@
 
 from datetime import datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 import uuid
 
-# Значения по умолчанию, пока Александр не задал свои в ~/.config/neyra-studio/tarify.json.
-# Пробный пакет — 100 токенов; вопрос помощнику — 1 токен. Деньги за токен здесь не
-# придумываем: цену и способы оплаты задаёт владелец в oplata.json (см. README).
-TARIFY_DEFAULT = {"probnyy_paket": 100, "ceny": {"vopros": 1, "kartinka": 5, "video": 40}, "pakety": []}
+# Себестоимость по официальным тарифам на 13.10.2026 (USD). Токен — 1 цент, платформе 10 % сверху.
+# Модели: Anthropic API — Sonnet 5.5 $2/$10 за 1M токенов входа/выхода, Opus 5.5 $4/$20 (режим PRO).
+# Картинки: Nano Banana 2 (Gemini 3.1 Flash Image, прямой ключ Google) 1K $0.067, 2K $0.101, 4K $0.151.
+# Видео: Seedance 2.5 (BytePlus ModelArk, прямой ключ) 720p $0.231/с, 1080p $0.569/с.
+# Higgsfield как запасное окно: ≈$0.055 за кредит (докупка), картинка 2K = 2 кр, видео 5 с 720p = 35 кр — дороже прямых ключей.
+TARIFY_DEFAULT = {
+    "token_usd": 0.01, "nacenka": 0.10, "probnyy_paket": 300, "kurs_kzt": 0,
+    "modeli_usd_1m": {"claude-sonnet-5-5": [2, 10], "claude-opus-5-5": [4, 20]},
+    "kartinka_usd": {"1k": 0.067, "2k": 0.101, "4k": 0.151},
+    "video_usd_sek": {"720p": 0.231, "1080p": 0.569},
+    "pakety": [{"tokeny": 500}, {"tokeny": 2000}, {"tokeny": 10000}],
+}
+MIN_VOPROS = {"standard": 1, "pro": 5}   # минимальный остаток, чтобы задать вопрос (и минимальное списание)
 OPLATA_DEFAULT = {"sposoby": [], "ssylka": "", "podskazka": ""}
 MAX_HISTORY = 200
 MAX_OPEN_ZAYAVOK = 5
@@ -54,10 +64,67 @@ def _config(env_name, default_name, fallback, shape):
 
 def tarify():
     result = _config("NEYRA_TARIFY_FILE", "tarify.json", TARIFY_DEFAULT,
-                     {"probnyy_paket": int, "ceny": dict, "pakety": list})
+                     {"token_usd": (int, float), "nacenka": (int, float), "probnyy_paket": int, "kurs_kzt": (int, float),
+                      "modeli_usd_1m": dict, "kartinka_usd": dict, "video_usd_sek": dict, "pakety": list})
+    result["token_usd"] = max(0.001, float(result["token_usd"]))
+    result["nacenka"] = max(0.0, float(result["nacenka"]))
+    result["kurs_kzt"] = max(0.0, float(result["kurs_kzt"]))
     result["probnyy_paket"] = max(0, min(int(result["probnyy_paket"]), MAX_TOKENY))
-    result["ceny"] = {k: max(0, int(v)) for k, v in result["ceny"].items() if isinstance(k, str) and isinstance(v, int)}
     result["pakety"] = [p for p in result["pakety"] if isinstance(p, dict) and isinstance(p.get("tokeny"), int) and p["tokeny"] > 0][:8]
+    return result
+
+
+def tokens_for_usd(usd, minimum=1):
+    """Себестоимость в USD → токены с наценкой, вверх до целого."""
+    t = tarify()
+    return max(minimum, math.ceil(usd * (1 + t["nacenka"]) / t["token_usd"] - 1e-9))
+
+
+def cena_voprosa(model, usage, tier="standard"):
+    """Вопрос помощнику: по реальному расходу модели (usage из ответа API). Без usage — минимум режима."""
+    t = tarify()
+    rates = t["modeli_usd_1m"].get(model) or t["modeli_usd_1m"].get("claude-opus-5-5" if tier == "pro" else "claude-sonnet-5-5") or [2, 10]
+    inp = int((usage or {}).get("input_tokens") or 0) + int((usage or {}).get("cache_creation_input_tokens") or 0)
+    cached = int((usage or {}).get("cache_read_input_tokens") or 0)
+    out = int((usage or {}).get("output_tokens") or 0)
+    usd = (inp * rates[0] + cached * rates[0] * 0.1 + out * rates[1]) / 1_000_000
+    return tokens_for_usd(usd, MIN_VOPROS.get(tier, 1))
+
+
+def cena_kartinki(size="2k"):
+    return tokens_for_usd(tarify()["kartinka_usd"].get(size, 0.101))
+
+
+def cena_video(sekundy=5, kachestvo="720p"):
+    return tokens_for_usd(tarify()["video_usd_sek"].get(kachestvo, 0.231) * max(1, int(sekundy)))
+
+
+def ceny():
+    """Таблица для окна: что сколько стоит в токенах (вопрос — диапазон по типичному расходу)."""
+    t = tarify()
+    def vopros(model, in_tok, out_tok, tier):
+        return cena_voprosa(model, {"input_tokens": in_tok, "output_tokens": out_tok}, tier)
+    table = {
+        "vopros": [vopros("claude-sonnet-5-5", 5000, 300, "standard"), vopros("claude-sonnet-5-5", 20000, 2500, "standard")],
+        "vopros_pro": [vopros("claude-opus-5-5", 5000, 1500, "pro"), vopros("claude-opus-5-5", 20000, 6000, "pro")],
+        "kartinka_2k": cena_kartinki("2k"), "kartinka_4k": cena_kartinki("4k"),
+        "video_5s_720p": cena_video(5, "720p"), "video_5s_1080p": cena_video(5, "1080p"),
+        "token_usd": t["token_usd"], "nacenka": t["nacenka"], "kurs_kzt": t["kurs_kzt"],
+    }
+    return table
+
+
+def pakety():
+    t = tarify()
+    result = []
+    for p in t["pakety"]:
+        usd = round(p["tokeny"] * t["token_usd"], 2)
+        item = {"tokeny": p["tokeny"], "usd": usd}
+        if t["kurs_kzt"]:
+            item["kzt"] = int(round(usd * t["kurs_kzt"] / 10.0) * 10)
+        if p.get("cena"):
+            item["cena"] = str(p["cena"])[:40]
+        result.append(item)
     return result
 
 
@@ -102,24 +169,20 @@ def ensure_wallet(data, principal, name="", email=""):
     return wallet
 
 
-def price(operation):
-    return tarify()["ceny"].get(operation, 0)
+def can_spend(wallet, tokeny):
+    return wallet.get("unlimited") or wallet["balance"] >= tokeny
 
 
-def can_spend(wallet, operation):
-    return wallet.get("unlimited") or wallet["balance"] >= price(operation)
-
-
-def spend(data, principal, operation, note=""):
+def spend(data, principal, operation, tokeny, note=""):
+    """Списать tokeny за операцию. Остаток может уйти чуть ниже нуля, если реальный расход превысил предварительную проверку."""
     wallet = ensure_wallet(data, principal)
-    cost = price(operation)
-    if wallet.get("unlimited") or cost == 0:
+    if wallet.get("unlimited") or tokeny <= 0:
         return wallet, 0
-    if wallet["balance"] < cost:
+    if wallet["balance"] <= 0:
         raise TokenyError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и помощник продолжит.")
-    wallet["balance"] -= cost
-    _append(wallet, {"at": timestamp(), "delta": -cost, "reason": operation, "by": principal["id"], "note": note[:120]})
-    return wallet, cost
+    wallet["balance"] -= tokeny
+    _append(wallet, {"at": timestamp(), "delta": -tokeny, "reason": operation, "by": principal["id"], "note": note[:120]})
+    return wallet, tokeny
 
 
 def grant(data, key_id, tokeny, by, note=""):
@@ -166,7 +229,7 @@ def public_wallet(wallet):
 
 
 def summary(wallet):
-    return {"balance": wallet["balance"], "unlimited": bool(wallet.get("unlimited")), "cena_voprosa": price("vopros")}
+    return {"balance": wallet["balance"], "unlimited": bool(wallet.get("unlimited")), "cena_voprosa": MIN_VOPROS["standard"]}
 
 
 def _append(wallet, entry):
