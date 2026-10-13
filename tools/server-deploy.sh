@@ -11,9 +11,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEYS="$HOME/.config/neyra-studio/keys-prod.json"
 [ -f "$KEYS" ] || { echo "нет $KEYS"; exit 2; }
 ssh -o BatchMode=yes "$HOST" 'mkdir -p /opt/neyra-studio/server /opt/neyra-studio/data'
-# на сервер идёт ПРИНЯТАЯ версия (последний коммит), не рабочее дерево: там могут лежать незавершённые правки Codex
-TMP="$(mktemp -d)"; git -C "$ROOT" show HEAD:server/app.py > "$TMP/app.py"
-scp -q "$TMP/app.py" "$HOST:/opt/neyra-studio/server/app.py"; rm -rf "$TMP"
+# на сервер идёт ПРИНЯТАЯ версия (последний коммит) всей папки server/ (app.py + blocks/), не рабочее дерево
+TMP="$(mktemp -d)"; git -C "$ROOT" archive HEAD server | tar -x -C "$TMP"
+ssh -o BatchMode=yes "$HOST" 'rm -rf /opt/neyra-studio/server.new; mkdir -p /opt/neyra-studio/server.new'
+scp -qr "$TMP/server/." "$HOST:/opt/neyra-studio/server.new/"
+ssh -o BatchMode=yes "$HOST" 'rm -rf /opt/neyra-studio/server.old; mv /opt/neyra-studio/server /opt/neyra-studio/server.old 2>/dev/null; mv /opt/neyra-studio/server.new /opt/neyra-studio/server; find /opt/neyra-studio/server -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null; true'
+rm -rf "$TMP"
 scp -q "$KEYS" "$HOST:/opt/neyra-studio/keys.json"
 # ключ модели для помощника (№46): если лежит на маке в ~/.config/neyra-studio/key — уезжает на сервер
 MODELKEY="$HOME/.config/neyra-studio/key"
@@ -32,7 +35,9 @@ RestartSec=3
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload && systemctl enable --now neyra-studio.service && systemctl restart neyra-studio.service && sleep 2
-systemctl is-active neyra-studio.service && curl -s -o /dev/null -w "api на сервере: %{http_code}\n" http://127.0.0.1:8770/api/projects
+sleep 2; systemctl is-active neyra-studio.service; curl -s -o /dev/null -w "api на сервере: %{http_code} (401 = жив)\n" http://127.0.0.1:8770/api/projects; journalctl -u neyra-studio.service -n 3 --no-pager -p err | grep -v "^-- " || true
+# nginx-сайт создаётся один раз; если он уже есть (certbot дописал туда HTTPS) — не трогаем
+if [ ! -f /etc/nginx/sites-available/neyra-studio-api ]; then
 cat > /etc/nginx/sites-available/neyra-studio-api <<NG
 server {
     listen 80;
@@ -48,7 +53,10 @@ server {
 }
 NG
 ln -sf /etc/nginx/sites-available/neyra-studio-api /etc/nginx/sites-enabled/neyra-studio-api
-nginx -t 2>&1 | tail -1 && systemctl reload nginx && echo "nginx: сайт api.studio.neyra.vision включён (80)"
+nginx -t 2>&1 | tail -1 && systemctl reload nginx && echo "nginx: сайт api.studio.neyra.vision создан (80); дальше certbot"
+else
+echo "nginx: сайт уже есть ($(grep -c "listen 443" /etc/nginx/sites-enabled/neyra-studio-api) × listen 443) — не трогаю"
+fi
 command -v certbot >/dev/null || (apt-get install -y -qq certbot python3-certbot-nginx >/dev/null 2>&1 && echo "certbot установлен")
 # №56: ежедневный бэкап данных (7 дней), 03:17 UTC
 mkdir -p /opt/backups/neyra-studio
@@ -76,5 +84,5 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
-systemctl daemon-reload && systemctl enable --now neyra-studio-backup.timer && /usr/local/bin/neyra-studio-backup && echo "бэкап: таймер включён, первый архив: \$(ls -1t /opt/backups/neyra-studio | head -1)"'
+systemctl daemon-reload && systemctl enable --now neyra-studio-backup.timer && /usr/local/bin/neyra-studio-backup && echo "бэкап: таймер включён, архивов: $(ls -1 /opt/backups/neyra-studio | wc -l | tr -d " ")"'
 echo "готово: дальше DNS A api.studio.neyra.vision → 212.192.8.91 (Cloudflare, DNS only) и команда certbot из шапки этого файла"
