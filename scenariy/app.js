@@ -429,6 +429,7 @@ Draft date: 13.10.2026
     <li><kbd>#</kbd>${T('раздел (акт), = синопсис сцены, === разрыв страницы', 'бөлім (акт), = синопсис, === бет үзілісі')}</li>
   </ul><div class="row" style="margin-top:.8rem"><button class="btn btn--main" data-m="close" type="button">OK</button></div>`, async () => true));
   $('#btnServer').addEventListener('click', serverDialog);
+  $('#aiState').addEventListener('click', () => { const p = cur(); if (server && p && !p.server) chooseCtx(p); });
 
   // ---------- NEYRA ----------
   function scopeHint() {
@@ -501,11 +502,11 @@ Draft date: 13.10.2026
       const history = p.chat.filter((m) => m.role === 'assistant' && m.text).slice(-2).map((m) => ({ role: 'assistant', content: m.text.slice(0, 3000) }));
       let j;
       if (server) {
-        let slug = p.server;
-        if (!slug) { // локальный проект: помощник отвечает через проект команды, к которому есть доступ
-          const lst = await serverFetch('/api/projects'); const arr = (lst.data && (lst.data.projects || lst.data)) || [];
-          if (!Array.isArray(arr) || !arr.length) throw new Error(T('у ключа нет ни одного проекта на сервере', 'кілттің серверде бірде-бір жобасы жоқ'));
-          slug = arr[0].slug;
+        let slug = p.server || p.ctxSlug;
+        if (!slug) { // локальный проект: пользователь один раз выбирает, память какого проекта команды подключать
+          wait.remove(); busy = false; p.chat.pop(); renderChat();
+          slug = await chooseCtx(p); if (!slug) return;
+          return ask(prompt, label, info);
         }
         const r = await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/assistant', 'POST', { question: prompt, section: 'script', history: info.free ? history : [] });
         j = { text: (r.data && r.data.answer) || '' };
@@ -575,10 +576,20 @@ Draft date: 13.10.2026
     src.setSelectionRange(start, start + m.text.length); src.focus(); src.dispatchEvent(new Event('input')); toast(T('Заменено. Старый текст — в заметках и версиях', 'Ауыстырылды. Ескі мәтін — жазбалар мен нұсқаларда'));
   }
 
+  async function chooseCtx(p) {
+    let arr; try { const lst = await serverFetch('/api/projects'); arr = (lst.data && (lst.data.projects || lst.data)) || []; } catch (e) { toast(T('Сервер: ', 'Сервер: ') + e.message); return ''; }
+    if (!Array.isArray(arr) || !arr.length) { toast(T('У ключа нет ни одного проекта на сервере', 'Кілттің серверде бірде-бір жобасы жоқ')); return ''; }
+    return new Promise((resolve) => {
+      let picked = '';
+      modal(`<h2>${T('Память для NEYRA', 'NEYRA жады')}</h2><p>${T('Этот сценарий хранится в браузере. Выберите проект команды, чьи герои, мир и решения NEYRA будет помнить, отвечая по нему. Для чистого листа подойдёт пустой проект.', 'Бұл сценарий браузерде сақталады. NEYRA жауап бергенде қай команда жобасының кейіпкерлері мен шешімдерін есте сақтайтынын таңдаңыз.')}</p><ul class="keys" style="margin-bottom:.8rem">${arr.map((x) => `<li><button class="btn btn--sm" type="button" data-m="p:${esc(x.slug)}">${esc(typeof x.title === 'string' ? x.title : (x.title && x.title.ru) || x.slug)}</button><span class="caps">${esc(x.slug)}</span></li>`).join('')}</ul><div class="row"><button class="btn" data-m="close" type="button">${T('Отмена', 'Болдырмау')}</button></div>`,
+        async (act) => { if (!act.startsWith('p:')) return false; picked = act.slice(2); p.ctxSlug = picked; save(); checkApi(); return true; });
+      const iv = setInterval(() => { if (!document.querySelector('.modal')) { clearInterval(iv); resolve(picked); } }, 200);
+    });
+  }
   async function checkApi() {
     const dot = $('#aiDot'), st = $('#aiState');
     if (server) {
-      try { await serverFetch('/api/me'); dot.className = 'dot on'; st.textContent = T('сервер команды', 'команда сервері') + (serverMode ? ' · ' + serverMode.slug : ''); }
+      try { await serverFetch('/api/me'); dot.className = 'dot on'; const p = cur(); st.textContent = T('сервер команды', 'команда сервері') + (p && p.server ? ' · ' + p.server : (p && p.ctxSlug ? ' · ' + T('память', 'жады') + ': ' + p.ctxSlug : '')); st.style.cursor = (p && !p.server) ? 'pointer' : ''; st.title = (p && !p.server) ? T('Сменить проект-память для NEYRA', 'NEYRA жадын ауыстыру') : ''; }
       catch (e) { dot.className = 'dot off'; st.textContent = T('сервер: ', 'сервер: ') + e.message; }
       return;
     }
