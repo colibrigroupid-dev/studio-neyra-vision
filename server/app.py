@@ -812,8 +812,7 @@ def apply_passports(project, data, allow_new):
         for entry in (data.get(collection) or [])[:60]:
             if not isinstance(entry, dict) or not isinstance(entry.get("name"), str) or not entry["name"].strip():
                 continue
-            key = breakdown.name_key(entry["name"])
-            target = next((it for it in items if breakdown.name_key(it["name"]) == key), None)
+            target = breakdown.find_passport(items, entry["name"])
             if target is None:
                 if not allow_new:
                     continue

@@ -148,7 +148,7 @@ function nativeApi(slugs = ['film']) {
         return reply(200, parts[4] ? { data: clone(item) } : paginate(p[collection], url), p.revision);
       }
       assert.equal(method, 'PATCH');
-      checkFields(body, ['name', 'role', 'identity', 'taboo', 'height', 'status', 'scenes', 'refs', 'translations']);
+      checkFields(body, ['name', 'role', 'identity', 'taboo', 'height', 'status', 'scenes', 'refs', 'translations', 'aliases']);
       const item = p[collection].find(item => item.id === parts[4]);
       if (!item) return errorReply(404, 'NOT_FOUND');
       Object.assign(item, clone(body));

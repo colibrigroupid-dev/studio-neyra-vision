@@ -96,8 +96,30 @@ def translations(value):
     return result
 
 
+def aliases(value):
+    return strings(value, "aliases", count=20, length=120, required=True, unique=True)
+
+
+def find_passport(items, name, allow_partial=True):
+    """Паспорт по имени, псевдониму или единственному совпадению по целому слову («ТӨСТІК» → «Ер Төстік»)."""
+    key = name_key(name)
+    for item in items:
+        if name_key(item["name"]) == key:
+            return item
+    for item in items:
+        if any(name_key(a) == key for a in item.get("aliases", [])):
+            return item
+    if not allow_partial:
+        return None
+    words = set(key.split())
+    candidates = [item for item in items
+                  if words and (words <= set(name_key(item["name"]).split()) or set(name_key(item["name"]).split()) <= words)
+                  and name_key(item["name"]) != key]
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def passport_input(body, create=False):
-    fields(body, ("name", "role", "identity", "taboo", "height", "refs", "status", "scenes", "translations"),
+    fields(body, ("name", "role", "identity", "taboo", "height", "refs", "status", "scenes", "translations", "aliases"),
            ("name",) if create else ())
     result = {}
     for key in ("name", "role", "identity", "height"):
@@ -106,7 +128,7 @@ def passport_input(body, create=False):
     if "name" in result:
         result["name"] = result["name"].strip()
     for key, validator in (("taboo", taboo), ("refs", refs), ("scenes", numbers),
-                           ("translations", translations)):
+                           ("translations", translations), ("aliases", aliases)):
         if key in body:
             result[key] = validator(body[key])
     if "status" in body:
@@ -115,7 +137,7 @@ def passport_input(body, create=False):
         result["status"] = body["status"]
     if create:
         defaults = {"role": "", "identity": "", "taboo": [], "height": "", "refs": [],
-                    "status": "draft", "scenes": [], "translations": {}}
+                    "status": "draft", "scenes": [], "translations": {}, "aliases": []}
         result = dict(defaults, **result)
     return result
 
@@ -209,7 +231,6 @@ def import_data(document, scenes, characters, locations, stamp, studio_id):
             manual_scenes.setdefault(name_key(scene["title"]), []).append(scene)
     for collection, items in (("scenes", scenes), ("characters", characters), ("locations", locations)):
         counts = {"created": 0, "updated": 0, "unchanged": 0}
-        by_name = {name_key(item["name"]): item for item in items} if collection != "scenes" else {}
         for row in document[collection]:
             if collection == "scenes":
                 changes = {k: copy.deepcopy(v) for k, v in row.items() if k != "heading"}
@@ -219,8 +240,12 @@ def import_data(document, scenes, characters, locations, stamp, studio_id):
                 if item is None and len(candidates) == 1 and headings.count(name_key(row["heading"])) == 1:
                     item = candidates[0]
             else:
-                item = by_name.get(name_key(row["name"]))
+                item = find_passport(items, row["name"])
                 changes = {k: copy.deepcopy(v) for k, v in row.items() if k != "name"}
+                if item is not None and name_key(item["name"]) != name_key(row["name"]) \
+                        and not any(name_key(a) == name_key(row["name"]) for a in item.get("aliases", [])):
+                    # имя из сценария запоминаем как псевдоним, чтобы следующий разбор сошёлся сразу
+                    changes["aliases"] = list(item.get("aliases", [])) + [row["name"]]
             kind = {"scenes": "scene", "characters": "character", "locations": "location"}[collection]
             if item is None:
                 item = (passport_input({"name": row["name"]}, create=True) if collection != "scenes"

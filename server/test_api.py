@@ -1460,6 +1460,25 @@ class TeamAccessTests(unittest.TestCase):
         self.api("POST", "/api/projects/film/razbor", {}, 402, key=producer["key"])
         self.api("POST", "/api/projects/film/razbor", {"zapolnit": False}, key=producer["key"])
 
+    def test_passport_aliases_merge_script_names_with_existing_heroes(self):
+        # «ТӨСТІК» в сценарии и «Ер Төстік» в паспорте — один герой (псевдонимы, 13.10).
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        self.create()
+        hero = self.api("POST", "/api/projects/film/characters", {"name": "Ер Төстік", "identity": "Художник уже описал"}, 201)["data"]
+        self.assertEqual(hero["aliases"], [])
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — НОЧЬ\n\nТӨСТІК\nМама?\n\nХАН ШЫҒАЙ\nИди.\n\nХАН БОЛАТ\nСтой.\n", "language": "ru"})
+        self.api("POST", "/api/projects/film/razbor", {"zapolnit": False})
+        heroes = self.api("GET", "/api/projects/film/characters")["data"]
+        names = sorted(h["name"] for h in heroes)
+        self.assertEqual(names, ["Ер Төстік", "ХАН БОЛАТ", "ХАН ШЫҒАЙ"])  # дубликата ТӨСТІК нет, ханы не слиты
+        merged = next(h for h in heroes if h["name"] == "Ер Төстік")
+        self.assertEqual(merged["aliases"], ["ТӨСТІК"])
+        self.assertEqual(merged["identity"], "Художник уже описал")
+        self.assertEqual(merged["scenes"], [1])
+        self.api("PATCH", f"/api/projects/film/characters/{merged['id']}", {"aliases": ["ТӨСТІК", "мальчик"]})
+        self.api("PATCH", f"/api/projects/film/characters/{merged['id']}", {"aliases": ["a", "A"]}, 422)
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

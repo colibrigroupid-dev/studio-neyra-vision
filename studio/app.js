@@ -1,12 +1,12 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013i';
-import { frameAt, totalDuration } from './timeline.js?v=20261013i';
-import { StudioServer } from './storage.js?v=20261013i';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013i';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013i';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013i';
-import { renderGeroyWorkshop } from './geroy.js?v=20261013i';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013i';
-import { parseCommand, describeCommand } from './golos.js?v=20261013i';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013j';
+import { frameAt, totalDuration } from './timeline.js?v=20261013j';
+import { StudioServer } from './storage.js?v=20261013j';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013j';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013j';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013j';
+import { renderGeroyWorkshop } from './geroy.js?v=20261013j';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013j';
+import { parseCommand, describeCommand } from './golos.js?v=20261013j';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -568,11 +568,12 @@ function passportPatch(record, data) {
   const taboo = String(data.get('taboo') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   if (taboo.length > 10 || taboo.some(value => value.length > 500)) throw new Error(t('Допустимо до 10 табу-деталей, каждая до 500 символов.', 'Әрқайсысы 500 таңбадан аспайтын 10 тыйым салынған бөлшекке дейін рұқсат етіледі.'));
   const next = { name: String(data.get('name') || '').trim(), role: String(data.get('role') || ''), identity: String(data.get('identity') || ''),
-    taboo, height: String(data.get('height') || ''), status: data.get('status'), scenes: [...new Set(sceneValues.map(Number))] };
+    taboo, height: String(data.get('height') || ''), status: data.get('status'), scenes: [...new Set(sceneValues.map(Number))],
+    aliases: [...new Set(String(data.get('aliases') || '').split(/[,;\n]+/).map(value => value.trim()).filter(Boolean))].slice(0, 20) };
   if (!next.name || !['draft', 'locked'].includes(next.status)) throw new Error(t('Укажите имя и статус паспорта.', 'Паспорт атауы мен мәртебесін көрсетіңіз.'));
   // PATCH only edited base fields; references and both translation objects stay
   // on the server, including fields that this editor does not expose.
-  return Object.fromEntries(Object.entries(next).filter(([field, value]) => JSON.stringify(value) !== JSON.stringify(record[field] ?? (['taboo', 'scenes'].includes(field) ? [] : ''))));
+  return Object.fromEntries(Object.entries(next).filter(([field, value]) => JSON.stringify(value) !== JSON.stringify(record[field] ?? (['taboo', 'scenes', 'aliases'].includes(field) ? [] : ''))));
 }
 function invalidateMap(client, slug) {
   if (mapState.client !== client || mapState.slug !== slug) return;
