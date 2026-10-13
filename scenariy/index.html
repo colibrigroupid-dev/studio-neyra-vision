@@ -15,7 +15,7 @@
 <link rel="icon" href="../assets/favicon-64.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;500;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=57">
+<link rel="stylesheet" href="app.css?v=58">
 </head>
 <body>
 <noscript><div class="nojs">Сценарная работает только с включённым JavaScript.</div></noscript>
@@ -38,12 +38,17 @@
     <aside class="nav" id="nav">
       <div class="nav-b">
         <div class="docs" id="docs">
-          <button type="button" class="doc-i" data-doc="title"><i>▤</i><span data-t="Титульная страница">Титульная страница</span></button>
-          <button type="button" class="doc-i" data-doc="synopsis"><i>≣</i><span data-t="Синопсис">Синопсис</span></button>
-          <button type="button" class="doc-i on" data-doc="script"><i>✎</i><span data-t="Сценарий">Сценарий</span></button>
-          <button type="button" class="doc-i" data-doc="stats"><i>▦</i><span data-t="Статистика">Статистика</span></button>
           <button type="button" class="doc-i" data-doc="chars"><i>☺</i><span data-t="Персонажи">Персонажи</span><small id="charsCount"></small></button>
           <button type="button" class="doc-i" data-doc="locs"><i>⌂</i><span data-t="Локации">Локации</span><small id="locsCount"></small></button>
+          <div class="doc-g"><i>▾</i><span data-t="Сценарий">Сценарий</span></div>
+          <button type="button" class="doc-i sub" data-doc="title"><i>▤</i><span data-t="Титульная страница">Титульная страница</span></button>
+          <button type="button" class="doc-i sub" data-doc="synopsis"><i>≣</i><span data-t="Синопсис">Синопсис</span></button>
+          <button type="button" class="doc-i sub" data-doc="treatment"><i>☷</i><span data-t="Поэпизодник">Поэпизодник</span></button>
+          <button type="button" class="doc-i sub on" data-doc="script"><i>✎</i><span data-t="Сценарий">Сценарий</span></button>
+          <button type="button" class="doc-i sub" data-doc="stats"><i>▦</i><span data-t="Статистика">Статистика</span></button>
+          <div id="userDocs"></div>
+          <button type="button" class="doc-i" data-doc="trash"><i>🗑</i><span data-t="Корзина">Корзина</span><small id="trashCount"></small></button>
+          <button type="button" class="doc-i add" id="addDoc"><i>+</i><span data-t="Добавить документ">Добавить документ</span></button>
         </div>
         <div class="scenes hidden" id="scenesPane">
           <div class="caps" style="padding:.6rem .7rem .2rem" data-t="Сцены">Сцены</div>
@@ -104,6 +109,9 @@
           <label><span data-t="Заметки">Заметки</span><textarea id="f-notes" rows="6" placeholder="решения, вопросы, что отложили"></textarea></label>
         </div>
       </div>
+      <div class="view doc hidden" id="view-treatment"><div class="card" id="treatmentCard"></div></div>
+      <div class="view doc hidden" id="view-trash"><div class="card" id="trashCard"></div></div>
+      <div class="view doc hidden" id="view-userdoc"><div class="card"><input id="ud-title" type="text" class="ud-title" placeholder="Название документа"><textarea id="ud-text" rows="22" placeholder="Текст документа: логлайн, тритмент, заметки…"></textarea><div class="sp-ops"><button type="button" id="ud-del">Удалить документ</button></div></div></div>
       <div class="view doc hidden" id="view-stats"><div class="card" id="statsCard"></div></div>
       <div class="view doc hidden" id="view-chars"><div class="card" id="charsCard"></div></div>
       <div class="view doc hidden" id="view-locs"><div class="card" id="locsCard"></div></div>
@@ -147,8 +155,8 @@
 </div>
 <input type="file" id="fileIn" accept=".fountain,.txt,.md,.fdx,.json,.docx,.pdf" class="hidden">
 <div class="toast" id="toast" role="status"></div>
-<script src="fountain.js?v=57"></script>
-<script src="editor.js?v=57"></script>
-<script src="app.js?v=57"></script>
+<script src="fountain.js?v=58"></script>
+<script src="editor.js?v=58"></script>
+<script src="app.js?v=58"></script>
 </body>
 </html>

@@ -67,6 +67,11 @@ body.focus .main{grid-template-columns:1fr}body.focus .nav,body.focus .neyra,bod
 .doc-i em{margin-left:auto;font-style:normal;color:var(--dim)}
 .doc-i small{margin-left:auto;font-family:var(--mono);font-size:.7rem;color:var(--dim)}
 .doc-i:hover{background:var(--surface);color:var(--text)}
+.doc-i.sub{padding-left:1.9rem}.doc-i.add{color:var(--dim)}
+.doc-g{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem .3rem;color:var(--muted);font-size:.9rem}.doc-g i{font-style:normal;width:1.2em;text-align:center;color:var(--dim)}
+.ud-title{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line-soft);font:500 1.2rem var(--disp);padding:.3em 0;margin-bottom:.8rem}
+.treat{list-style:none;margin:0;padding:0}.treat li{padding:.7rem 0;border-bottom:1px solid var(--line-soft)}.treat .h{display:flex;gap:.6rem;align-items:baseline;font-family:var(--script);text-transform:uppercase;font-size:.9rem}.treat .h .n{color:var(--dim);font-family:var(--mono);font-size:.74rem}.treat textarea{width:100%;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:var(--r);padding:.45em .6em;font-size:.88rem;line-height:1.45;margin-top:.4rem;resize:vertical}
+.trash-i{display:flex;gap:.6rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--line-soft);font-size:.88rem}.trash-i .t{flex:1;min-width:0}.trash-i small{display:block;color:var(--dim);font-size:.74rem}
 .doc-i.on{background:var(--surface-2);color:var(--text)}
 .scenes .back{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--muted);padding:.5rem .7rem;font-size:.86rem;min-height:36px}
 .scene-list{list-style:none;margin:0;padding:0}

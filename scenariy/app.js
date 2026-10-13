@@ -41,7 +41,7 @@
   function setSaveState(t) { $('#saveState').textContent = t; }
   function uid() { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36); }
   function cur() { return projects[currentId]; }
-  function blank(title, text) { return { id: uid(), title: title || T('Без названия', 'Атаусыз'), text: text || '', created: Date.now(), updated: Date.now(), beats: {}, meta: { logline: '', genre: '', synopsis: '', notes: '', credit: '', author: '', date: '', contact: '' }, chat: [], versions: [] }; }
+  function blank(title, text) { return { id: uid(), title: title || T('Без названия', 'Атаусыз'), text: text || '', created: Date.now(), updated: Date.now(), beats: {}, meta: { logline: '', genre: '', synopsis: '', notes: '', credit: '', author: '', date: '', contact: '' }, chat: [], versions: [], docs: [], korzina: [] }; }
   function newProject(title, text) { const p = blank(title, text); projects[p.id] = p; currentId = p.id; save(); return p; }
 
   // ---------- лист ----------
@@ -137,7 +137,7 @@
     if (!projects[id]) return;
     flush();
     currentId = id; try { localStorage.setItem(LS.current, id); } catch (e) { /* */ }
-    const p = cur(); if (!p.versions) p.versions = []; if (!p.meta) p.meta = {}; if (!p.server) serverMode = null;
+    const p = cur(); if (!p.versions) p.versions = []; if (!p.meta) p.meta = {}; if (!p.docs) p.docs = []; if (!p.korzina) p.korzina = []; if (!p.server) serverMode = null; curUserDoc = null;
     $('#title').value = p.title;
     loading = true; try { ed.load(p.text); } finally { loading = false; }
     ['logline', 'synopsis', 'notes'].forEach((k) => { $('#f-' + k).value = p.meta[k] || ''; });
@@ -166,14 +166,48 @@
     $$('.doc-i').forEach((b) => b.classList.toggle('on', b.dataset.doc === doc));
     $('#tb').classList.toggle('hidden', doc !== 'script'); $('#ruler').classList.toggle('hidden', doc !== 'script');
     $('#scenesPane').classList.toggle('hidden', doc !== 'script');
-    if (doc === 'title') renderTitlePreview(); if (doc === 'stats') renderStats(); if (doc === 'chars') renderChars(); if (doc === 'locs') renderLocs();
+    if (doc === 'title') renderTitlePreview(); if (doc === 'stats') renderStats(); if (doc === 'chars') renderChars(); if (doc === 'locs') renderLocs(); if (doc === 'treatment') renderTreatment(); if (doc === 'trash') renderTrash(); if (doc === 'userdoc') renderUserDoc();
+    if (doc !== 'script') document.body.classList.remove('scene-open'); else { let sv = '1'; try { sv = localStorage.getItem('nvs.scene') || '1'; } catch (e) { /* */ } if (sv === '1' && window.innerWidth > 1100 && !document.body.classList.contains('neyra-open')) document.body.classList.add('scene-open'); }
     document.body.classList.remove('show-nav');
     if (doc === 'script') ed.root.focus();
   }
   $('#docs').addEventListener('click', (e) => { const b = e.target.closest('[data-doc]'); if (b) showDoc(b.dataset.doc); });
   $('#mobNav').addEventListener('click', () => document.body.classList.toggle('show-nav'));
 
-  function refreshAll() { renderScenes(); renderRuler(); renderCounts(); renderStoreNote(); markPages(); renderScenePanel(); }
+  function refreshAll() { renderScenes(); renderRuler(); renderCounts(); renderStoreNote(); markPages(); renderScenePanel(); renderUserDocsNav(); }
+  // ---------- поэпизодник: сцены с описаниями (= строки Fountain) ----------
+  function sceneSynopsisText(s) { const out = []; let n = s.el.nextElementSibling; while (n && ed.typeOf(n) === 'synopsis') { const txt = (n.textContent || '').trim(); if (!/^(тон|визуал|ton|visual)\s*:/i.test(txt)) out.push(txt); n = n.nextElementSibling; } return out.join('\n'); }
+  function setSceneSynopsis(s, text) {
+    const old = []; let n = s.el.nextElementSibling; while (n && ed.typeOf(n) === 'synopsis') { const txt = (n.textContent || '').trim(); if (!/^(тон|визуал|ton|visual)\s*:/i.test(txt)) old.push(n); n = n.nextElementSibling; }
+    let anchor = s.el; let m = s.el.nextElementSibling; while (m && ed.typeOf(m) === 'synopsis') { anchor = m; m = m.nextElementSibling; }
+    old.forEach((x) => x.remove()); if (anchor.parentNode !== ed.root) anchor = s.el;
+    const lines = text.split('\n').map((x) => x.trim()).filter(Boolean); let last = anchor; if (!last.parentNode) last = s.el;
+    for (const l of lines) { const p = ed.mk('synopsis', l); last.after(p); last = p; }
+    ed.root.dispatchEvent(new Event('input'));
+  }
+  function renderTreatment() {
+    const sc = ed.scenes(); const box = $('#treatmentCard');
+    box.innerHTML = `<h2>${T('Поэпизодник', 'Эпизодтық жоспар')}</h2><p class="empty" style="padding-top:0">${T('Коротко о каждой сцене: что происходит и что меняется. Описание хранится в сценарии служебной строкой под заголовком и видно Art и Director.', 'Әр көрініс туралы қысқаша.')}</p><ul class="treat">${sc.map((s) => `<li data-i="${s.index}"><div class="h"><span class="n">${s.num}.</span><b>${esc(s.heading)}</b><span class="n" style="margin-left:auto">${fmt(s.seconds)}</span></div><textarea rows="2" data-syn="${s.index}" placeholder="${T('что происходит в сцене', 'көріністе не болады')}">${esc(sceneSynopsisText(s))}</textarea></li>`).join('')}</ul><div class="sp-ops"><button type="button" id="treatAdd">+ ${T('Добавить сцену', 'Көрініс қосу')}</button></div>`;
+    let tm = null;
+    box.querySelectorAll('[data-syn]').forEach((ta) => ta.addEventListener('input', (e) => { clearTimeout(tm); tm = setTimeout(() => { const s = currentSceneByIndex(+e.target.dataset.syn); if (s) setSceneSynopsis(s, e.target.value); }, 500); }));
+    box.querySelector('#treatAdd').addEventListener('click', () => { const hd = prompt(T('Заголовок новой сцены', 'Жаңа көрініс тақырыбы'), 'ИНТ. МЕСТО - ВРЕМЯ'); if (!hd) return; ed.pushUndo(); const p = ed.mk('scene_heading', hd.toUpperCase()); ed.root.appendChild(p); ed.root.dispatchEvent(new Event('input')); renderTreatment(); });
+  }
+  // ---------- корзина ----------
+  function toTrash(kind, title, text) { const p = cur(); if (!p.korzina) p.korzina = []; p.korzina.unshift({ ts: Date.now(), kind, title, text }); if (p.korzina.length > 50) p.korzina = p.korzina.slice(0, 50); save(); renderCounts(); }
+  function renderTrash() {
+    const p = cur(); const box = $('#trashCard'); const items = p.korzina || [];
+    box.innerHTML = `<h2>${T('Корзина', 'Себет')}</h2>` + (items.length ? items.map((it, i) => `<div class="trash-i"><span class="t">${esc(it.title)}<small>${it.kind === 'scene' ? T('сцена', 'көрініс') : T('документ', 'құжат')} · ${new Date(it.ts).toLocaleString('ru')} · ${Fountain.countWords(it.text)} ${T('сл.', 'сөз')}</small></span><button type="button" class="btn btn--sm" data-restore="${i}">${T('Вернуть', 'Қайтару')}</button><button type="button" class="btn btn--sm" data-purge="${i}" title="${T('Удалить навсегда', 'Біржола жою')}">✕</button></div>`).join('') : `<div class="empty">${T('Пусто. Сюда попадают удалённые сцены и документы, их можно вернуть.', 'Бос. Жойылған көріністер мен құжаттар осында.')}</div>`);
+    box.querySelectorAll('[data-restore]').forEach((b) => b.addEventListener('click', () => { const it = p.korzina.splice(+b.dataset.restore, 1)[0]; if (!it) return; if (it.kind === 'scene') { ed.pushUndo(); const tmp = document.createElement('div'); const sub = ScriptEditor.create(tmp, {}); sub.loadExact(it.text); Array.from(tmp.children).forEach((x) => ed.root.appendChild(x)); ed.root.dispatchEvent(new Event('input')); toast(T('Сцена возвращена в конец сценария', 'Көрініс сценарийдің соңына қайтарылды')); } else { p.docs.push({ id: uid(), title: it.title, text: it.text, updated: Date.now() }); toast(T('Документ возвращён', 'Құжат қайтарылды')); } save(); renderTrash(); refreshAll(); }));
+    box.querySelectorAll('[data-purge]').forEach((b) => b.addEventListener('click', () => { if (!confirm(T('Удалить навсегда?', 'Біржола жою керек пе?'))) return; p.korzina.splice(+b.dataset.purge, 1); save(); renderTrash(); renderCounts(); }));
+  }
+  // ---------- документы автора ----------
+  let curUserDoc = null, udTimer = null;
+  function renderUserDocsNav() { const p = cur(); const box = $('#userDocs'); if (!p) return; box.innerHTML = (p.docs || []).map((d) => `<button type="button" class="doc-i sub${curDoc === 'userdoc' && curUserDoc === d.id ? ' on' : ''}" data-ud="${d.id}"><i>▭</i><span>${esc(d.title || T('Документ', 'Құжат'))}</span></button>`).join(''); box.querySelectorAll('[data-ud]').forEach((b) => b.addEventListener('click', () => { curUserDoc = b.dataset.ud; showDoc('userdoc'); renderUserDocsNav(); })); $('#trashCount').textContent = (p.korzina || []).length || ''; }
+  function renderUserDoc() { const d = (cur().docs || []).find((x) => x.id === curUserDoc); if (!d) return showDoc('script'); $('#ud-title').value = d.title || ''; $('#ud-text').value = d.text || ''; }
+  $('#addDoc').addEventListener('click', () => { const title = prompt(T('Название документа (логлайн, тритмент, заметки…)', 'Құжат атауы'), T('Заметки', 'Жазбалар')); if (!title) return; const d = { id: uid(), title: title.trim(), text: '', updated: Date.now() }; cur().docs.push(d); save(); curUserDoc = d.id; showDoc('userdoc'); renderUserDocsNav(); $('#ud-text').focus(); });
+  $('#ud-title').addEventListener('input', (e) => { const d = (cur().docs || []).find((x) => x.id === curUserDoc); if (d) { d.title = e.target.value; d.updated = Date.now(); save(); renderUserDocsNav(); } });
+  $('#ud-text').addEventListener('input', (e) => { clearTimeout(udTimer); udTimer = setTimeout(() => { const d = (cur().docs || []).find((x) => x.id === curUserDoc); if (d) { d.text = e.target.value; d.updated = Date.now(); save(); } }, 300); });
+  $('#ud-del').addEventListener('click', () => { const p = cur(); const i = (p.docs || []).findIndex((x) => x.id === curUserDoc); if (i < 0) return; if (!confirm(T('Удалить документ? Он попадёт в корзину.', 'Құжатты жою керек пе? Ол себетке түседі.'))) return; const d = p.docs.splice(i, 1)[0]; toTrash('doc', d.title, d.text); curUserDoc = null; showDoc('script'); renderUserDocsNav(); });
   function fmt(sec) { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); }
   function renderScenes() {
     const ul = $('#scenes'); const sc = ed.scenes(); const st = ed.stats();
@@ -471,7 +505,7 @@
   function currentSceneByIndex(i) { return ed.scenes().find((x) => x.index === i) || null; }
   function sceneOp(index, op) {
     const sc = ed.scenes(); const s = sc.find((x) => x.index === index); if (!s) return; const blk = sceneBlock(s, sc);
-    if (op === 'del') { if (!confirm(T(`Удалить сцену ${s.num} «${s.heading}»? Её можно вернуть из версий (⌘S сохранит текущее состояние).`, `${s.num} көрінісін жою керек пе?`))) return; snapshot(T('до удаления сцены ', 'көріністі жоюға дейін ') + s.num); ed.pushUndo(); let n = blk.from; const stop = blk.to.nextElementSibling; while (n && n !== stop) { const nx = n.nextElementSibling; n.remove(); n = nx; } ed.root.dispatchEvent(new Event('input')); toast(T('Сцена удалена. Вернуть — ⌘Z или версии', 'Көрініс жойылды')); return; }
+    if (op === 'del') { if (!confirm(T(`Удалить сцену ${s.num} «${s.heading}»? Её можно вернуть из версий (⌘S сохранит текущее состояние).`, `${s.num} көрінісін жою керек пе?`))) return; snapshot(T('до удаления сцены ', 'көріністі жоюға дейін ') + s.num); toTrash('scene', s.num + '. ' + s.heading, ed.textRange(blk.from, blk.to)); ed.pushUndo(); let n = blk.from; const stop = blk.to.nextElementSibling; while (n && n !== stop) { const nx = n.nextElementSibling; n.remove(); n = nx; } ed.root.dispatchEvent(new Event('input')); toast(T('Сцена в корзине. Вернуть — ⌘Z или Корзина', 'Көрініс себетте')); return; }
     const i = sc.indexOf(s); const target = op === 'up' ? sc[i - 1] : sc[i + 1]; if (!target) return;
     moveScene(index, op === 'up' ? target.index : (sc[i + 2] ? sc[i + 2].index : null));
   }
@@ -621,7 +655,7 @@
 
   // ---------- старт ----------
   (function () { let l = new URLSearchParams(location.search).get('lang'); if (!l) { try { l = localStorage.getItem(LS.lang); } catch (e) { /* */ } } lang = l === 'kz' ? 'kz' : 'ru'; })();
-  try { curDoc = localStorage.getItem(LS.doc) || 'script'; } catch (e) { /* */ } if (!/^(script|title|synopsis|stats|chars|locs)$/.test(curDoc)) curDoc = 'script';
+  try { curDoc = localStorage.getItem(LS.doc) || 'script'; } catch (e) { /* */ } if (!/^(script|title|synopsis|stats|chars|locs|treatment|trash)$/.test(curDoc)) curDoc = 'script';
   if (new URLSearchParams(location.search).get('embed') === '1') document.body.classList.add('embed');
   if (!Object.keys(projects).length) newProject(T('Без названия', 'Атаусыз'), '');
   if (!projects[currentId]) currentId = Object.keys(projects)[0];
