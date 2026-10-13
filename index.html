@@ -78,13 +78,11 @@ html[data-lang="kz"] .ru{display:none!important}
 /* header */
 .top{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);background:color-mix(in oklch,var(--bg) 78%,transparent);border-bottom:1px solid var(--line-soft)}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:64px}
-.brand{display:flex;align-items:center;gap:.8rem;text-decoration:none}
-.brand img{width:34px;height:34px}
-.brand b{font:600 1rem/1 var(--disp);letter-spacing:.14em;text-transform:uppercase}
-.brand small{display:block;font:400 .8rem/1 var(--mono);letter-spacing:.2em;color:var(--dim);margin-top:.35em}
+.brand{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;opacity:.92;transition:opacity .2s}
+.brand:hover{opacity:1}
+.brand img{width:36px;height:36px;display:block}
 .nav{display:flex;align-items:center;gap:.9rem}
 .nav a.link{font-size:.9rem;color:var(--muted);text-decoration:none;padding:.4em .2em;white-space:nowrap}
-.brand b,.brand small{white-space:nowrap}
 @media (max-width:1180px){.nav a.link[href="#voprosy"],.nav a.link[href="#put"]{display:none}}
 @media (max-width:980px){.nav a.link{display:none}}
 .nav a.link:hover{color:var(--text)}
@@ -263,9 +261,8 @@ footer .legal{grid-column:1/-1;border-top:1px solid var(--line-soft);padding-top
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./" aria-label="Neyra Vision Studio">
-      <img src="assets/logo-nv-512.png" width="34" height="34" alt="">
-      <span><b>Neyra Vision</b><small>STUDIO · ALMATY</small></span>
+    <a class="brand" href="./" aria-label="Neyra Vision Studio" title="Neyra Vision Studio">
+      <img src="assets/znak-nv.png" width="36" height="36" alt="">
     </a>
     <nav class="nav" aria-label="Разделы">
       <a class="link" href="#put"><span class="ru">Путь проекта</span><span class="kz">Жоба жолы</span></a>

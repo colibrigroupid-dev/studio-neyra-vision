@@ -1407,6 +1407,21 @@ class TeamAccessTests(unittest.TestCase):
                 self.api("PATCH", path, {"role": "producer"}, 403, secret)
                 self.api("DELETE", path, status=403, key=secret)
 
+    def test_any_section_can_be_opened_to_any_role_within_grantor_rights(self):
+        # Роль задаёт набор по умолчанию, но продюсер может открыть сценаристу кадры (13.10).
+        self.create()
+        writer = self.issue("writer", ["overview", "script", "shots"], email="w@example.test")
+        self.assertEqual(set(writer["data"]["sections"]), {"overview", "script", "shots"})
+        session = self.api("GET", "/api/session", key=writer["key"])["data"]
+        self.assertIn("shots", session["sections"])
+        self.api("GET", "/api/projects/film/shots", key=writer["key"])
+        # За пределы собственных прав выдать по-прежнему нельзя, роль viewer читает, не пишет.
+        viewer = self.issue("viewer", ["overview", "script"], email="v@example.test")
+        self.api("PATCH", "/api/projects/film/script", {"text": "x"}, 403, viewer["key"])
+        self.api("POST", "/api/projects/film/members", {
+            "name": "Лишний", "email": "x@example.test", "role": "writer",
+            "sections": ["overview", "nonexistent"]}, 422)
+
     def test_cinema_sections_are_accepted_and_issued_roles_apply_them(self):
         self.create()
         sections = ["overview", "script", "breakdown", "heroes", "locations", "world",

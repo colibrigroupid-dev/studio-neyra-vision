@@ -30,6 +30,8 @@ MAX_BODY = 2 * 1024 * 1024
 SECTIONS = frozenset(("overview", "script", "breakdown", "heroes", "locations", "world",
                       "storyboard", "shots", "continuity", "sound", "edit", "plan", "journal",
                       "animatic", "team", "post"))
+# Роль даёт набор разделов по умолчанию; продюсер может открыть участнику любой раздел
+# в пределах своих прав (authorize_grant). Роль по-прежнему решает, где участник пишет.
 ROLE_SECTIONS = {
     "admin": SECTIONS, "director": SECTIONS - {"plan"}, "producer": SECTIONS,
     "writer": frozenset(("overview", "script", "breakdown", "journal", "team")),
@@ -156,7 +158,7 @@ def load_keys(path):
             for section in sections:
                 enum(section, SECTIONS | {"*"}, "sections")
             scope = ROLE_SECTIONS[role] if "*" in sections else frozenset(sections)
-            result[key_id] = dict(entry, sections=scope & ROLE_SECTIONS[role],
+            result[key_id] = dict(entry, sections=scope,
                                   projects=frozenset(projects))
             secrets.add(secret)
         return result
@@ -381,8 +383,8 @@ def member_input(body, current=None):
     sections = result["sections"]
     if (not isinstance(sections, list) or not sections or len(sections) > len(SECTIONS)
             or any(not isinstance(s, str) or s not in SECTIONS for s in sections)
-            or len(set(sections)) != len(sections) or not set(sections) <= ROLE_SECTIONS[role]):
-        invalid("Разделы участника должны соответствовать роли.")
+            or len(set(sections)) != len(sections)):
+        invalid("Разделы участника: список известных разделов без повторов.")
     if current is None:
         result.update(id=uuid.uuid4().hex, createdAt=timestamp())
         result["keyId"] = "member-" + result["id"]
@@ -393,7 +395,7 @@ def issued_principal(member, slug):
     if not member.get("keyHash") or member.get("revokedAt"):
         return None
     return {"id": member["keyId"], "role": member["role"], "projects": frozenset((slug,)),
-            "sections": frozenset(member["sections"]) & ROLE_SECTIONS[member["role"]], "source": "member"}
+            "sections": frozenset(member["sections"]), "source": "member"}
 
 
 def public_member(member, slug, keys):

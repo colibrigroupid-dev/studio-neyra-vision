@@ -17,8 +17,9 @@ body{font-size:16px;line-height:1.5}
 .workspace :focus{outline:none}.workspace :focus-visible{outline:2px solid #6f6f6f;outline-offset:2px}
 /* шапка */
 .workspace .work-header{min-height:56px;padding:8px 20px;border-bottom:1px solid var(--line-soft);background:var(--bg)}
-.workspace .work-header .brand{display:inline-flex;align-items:center;min-height:36px;font:600 1rem/1 var(--body,Onest);letter-spacing:0;text-transform:none}
-.workspace .work-header .brand span{font-size:1rem;color:var(--muted);font-weight:400}
+.workspace .work-header .brand{display:inline-flex;align-items:center;justify-content:center;min-height:36px;min-width:36px;opacity:.92;transition:opacity .2s}
+.workspace .work-header .brand:hover{opacity:1}
+.workspace .work-header .brand img{width:32px;height:32px;display:block}
 .workspace .storage-label{font:400 13px/1 var(--body,Onest);letter-spacing:0;text-transform:none;color:var(--muted)}
 .workspace .work-controls #project-switch{min-height:36px;font-size:15px;font-weight:500;border-radius:999px;background:var(--surface2);border:0;color:var(--text);padding:0 36px 0 14px;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4.5l4 4 4-4' fill='none' stroke='%23ececec' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 14px center}
 .workspace .langs{border:0;border-radius:999px;background:var(--surface2);padding:3px;gap:2px;display:inline-flex}

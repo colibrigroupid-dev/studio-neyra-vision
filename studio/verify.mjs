@@ -968,7 +968,7 @@ console.log('Participant API client issuance, transient credentials, rights chan
   assert.equal(ui.dialog.open, true);
   ui.dialog.listeners.get('close')?.({});
   assert.equal(ui.issuedMemberKey.value, key, 'A delayed close event from the former form cannot clear an open key dialog');
-  assert.match(ui.dialog.innerHTML, /Передайте ключ лично; письмо на e-mail подключим позже/);
+  assert.match(ui.dialog.innerHTML, /Отправьте ключ участнику лично/);
   for (const persisted of [vm.runInContext('JSON.stringify(state)', ui.context), vm.runInContext('JSON.stringify([...serverClient.known])', ui.context), ...stored.values()]) assert.ok(!persisted.includes(key), 'The issued key is absent from state, client baseline and device storage');
   assert.equal(stored.get(workspaceKey), local);
   await ui.dialogClickData('copy-member-key');
