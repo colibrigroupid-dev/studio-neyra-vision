@@ -1,11 +1,12 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js';
-import { frameAt, totalDuration } from './timeline.js';
-import { StudioServer } from './storage.js';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js';
-import { parseCommand, describeCommand } from './golos.js';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013h';
+import { frameAt, totalDuration } from './timeline.js?v=20261013h';
+import { StudioServer } from './storage.js?v=20261013h';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013h';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013h';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013h';
+import { renderGeroyWorkshop } from './geroy.js?v=20261013h';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013h';
+import { parseCommand, describeCommand } from './golos.js?v=20261013h';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -75,7 +76,7 @@ let mapState = { client: null, slug: '', snapshot: null, loading: false, ready: 
 let mapFilter = 'all';
 let mapCard = null;
 const cinemaPages = ['breakdown', 'heroes', 'locations'];
-let cinemaState = { client: null, slug: '', snapshot: null, loading: false, ready: false, error: '', token: 0 };
+let cinemaState = { client: null, slug: '', passportId: '', snapshot: null, loading: false, ready: false, error: '', token: 0 };
 let passportCard = null;
 let importCard = null;
 const storageLabel = () => connecting ? t('подключение к серверу…', 'серверге қосылу…') : serverClient ? storageError ? t('ошибка сохранения', 'сақтау қатесі') : pendingWrites || draftTimer || busy ? t('сохраняется на сервере…', 'серверде сақталуда…') : t('всё сохранено', 'серверде сақталды') : t('только в этом браузере', 'тек осы браузерде');
@@ -257,6 +258,11 @@ function download(name, value, type = 'text/plain;charset=utf-8') { const url = 
 function demoOpen() { if (!serverClient && state.projects.demo) state.activeId = 'demo'; go('overview'); }
 function go(page) { const hash = `#/studio/${page}`; if (location.hash === hash) render(); else location.hash = hash; }
 function route() { return location.hash.startsWith('#/studio/') ? location.hash.split('/')[2] || 'overview' : 'home'; }
+function heroRouteId() {
+  const match = /^#\/studio\/heroes\/([^/]+)\/?$/.exec(location.hash);
+  if (!match) return '';
+  try { return decodeURIComponent(match[1]); } catch { return match[1]; }
+}
 function stopPlayback() { if (playback) clearInterval(playback); playback = null; }
 
 function landing() {
@@ -461,11 +467,22 @@ async function submitMapApproval(form, data, verdict) {
     showMapCardError(`${reason} ${t('Обновите карточку перед новым решением.', 'Жаңа шешім алдында карточканы жаңартыңыз.')}`, true);
   }
 }
-function cinemaPage(section) {
-  if (cinemaState.client !== serverClient || cinemaState.slug !== state.activeId) {
-    cinemaState = { client: serverClient, slug: state.activeId, snapshot: null, loading: false, ready: false, error: '', token: cinemaState.token + 1 };
+function ensureCinemaState() {
+  const passportId = heroRouteId();
+  if (cinemaState.client !== serverClient || cinemaState.slug !== state.activeId || cinemaState.passportId !== passportId) {
+    cinemaState = { client: serverClient, slug: state.activeId, passportId, snapshot: null, loading: false, ready: false, error: '', token: cinemaState.token + 1 };
     passportCard = null; importCard = null;
   }
+}
+function geroyPage() {
+  ensureCinemaState();
+  return renderGeroyWorkshop({ record: cinemaState.snapshot?.characters?.find(item => item.id === heroRouteId()), t,
+    locale: state.locale, mode: paperMode(), connected: Boolean(serverClient),
+    loading: cinemaState.loading || Boolean(serverClient && !cinemaState.ready && !cinemaState.error), error: cinemaState.error,
+    canEdit: cinemaState.ready && !cinemaState.loading && !cinemaState.error && canWriteBreakdownSection(project(), 'heroes') });
+}
+function cinemaPage(section) {
+  ensureCinemaState();
   const ready = Boolean(serverClient && cinemaState.ready && !cinemaState.loading && !cinemaState.error);
   return renderBreakdownSection({ section, snapshot: cinemaState.snapshot, locale: state.locale, mode: paperMode(),
     connected: Boolean(serverClient), loading: cinemaState.loading || Boolean(serverClient && !cinemaState.ready && !cinemaState.error), error: cinemaState.error,
@@ -479,12 +496,17 @@ function cinemaError(error) {
   if (error.status === 0) return t('Связь прервалась на полпути. Обновите раздел и повторите.', 'Сервер нәтижені растаған жоқ. Әрекетті қайталамас бұрын бөлімді жаңартыңыз.');
   return error.message || t('Раздел не загрузился. Попробуйте обновить.', 'Бөлімді жүктеу мүмкін болмады.');
 }
+function passportError(error) {
+  if (heroRouteId() && error.status === 404) return t('Героя здесь уже нет. Вернитесь в кабинет и откройте список.', 'Кейіпкер мұнда жоқ. Кабинетке оралып, тізімді ашыңыз.');
+  if (heroRouteId() && ![0, 401, 403, 409].includes(error.status)) return t('Не удалось открыть паспорт. Обновите цех и попробуйте ещё раз.', 'Паспортты аша алмадық. Цехты жаңартып, қайталап көріңіз.');
+  return cinemaError(error);
+}
 async function refreshCinema() {
-  const client = serverClient, slug = state.activeId;
+  const client = serverClient, slug = state.activeId, passportId = heroRouteId();
   if (!client || !project() || !cinemaPages.includes(route())) return false;
-  cinemaState.client = client; cinemaState.slug = slug;
+  cinemaState.client = client; cinemaState.slug = slug; cinemaState.passportId = passportId;
   const token = ++cinemaState.token;
-  const current = () => client === serverClient && slug === state.activeId && token === cinemaState.token && cinemaPages.includes(route());
+  const current = () => client === serverClient && slug === state.activeId && token === cinemaState.token && passportId === heroRouteId() && cinemaPages.includes(route());
   cinemaState.loading = true; cinemaState.ready = false; cinemaState.error = ''; passportCard = null; importCard = null;
   render();
   try {
@@ -492,7 +514,10 @@ async function refreshCinema() {
     if (!current()) return false;
     let snapshot, record, isolated;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      snapshot = await new BreakdownApi(client).load(slug);
+      if (passportId) {
+        const result = await new BreakdownApi(client).loadPassport(slug, 'characters', passportId);
+        snapshot = { characters: [result.passport], denied: [], principal: result.principal, revision: result.revision };
+      } else snapshot = await new BreakdownApi(client).load(slug);
       if (!current()) return false;
       record = state.projects[slug];
       if (record?._revision !== snapshot.revision || !client.known.has(slug)
@@ -510,7 +535,8 @@ async function refreshCinema() {
     cinemaState.snapshot = snapshot; cinemaState.ready = true;
     return true;
   } catch (error) {
-    if (current()) { cinemaState.snapshot = null; cinemaState.error = cinemaError(error); }
+    if (typeof console !== 'undefined' && !error?.status) console.error('cinema', error);
+    if (current()) { cinemaState.snapshot = null; cinemaState.error = passportError(error); }
     return false;
   } finally {
     if (current()) { cinemaState.loading = false; render(); }
@@ -524,13 +550,15 @@ function showPassportError(message, disable = false) {
 }
 async function passportDialog(collection, id) {
   const section = collection === 'characters' ? 'heroes' : collection === 'locations' ? 'locations' : '';
+  const hash = location.hash;
   if (!serverClient || !section || route() !== section || !canWriteBreakdownSection(project(), section)) return;
-  if (!await refreshCinema() || !canWriteBreakdownSection(project(), section) || route() !== section) return;
+  if (heroRouteId() && (collection !== 'characters' || heroRouteId() !== id)) return;
+  if (!await refreshCinema() || !canWriteBreakdownSection(project(), section) || location.hash !== hash) return;
   const record = cinemaState.snapshot?.[collection]?.find(item => item.id === id);
   if (!record) return;
   openDialog(`${dialogHead(t('Паспорт', 'Паспорт'))}${renderPassportEditor({ record, collection, locale: state.locale })}`);
   dialog.classList.add('passport-dialog'); dialog.dataset.cinemaMode = paperMode();
-  passportCard = { client: serverClient, slug: state.activeId, section, collection, record: structuredClone(record), revision: cinemaState.snapshot.revision, token: cinemaState.token };
+  passportCard = { client: serverClient, slug: state.activeId, section, hash, collection, record: structuredClone(record), revision: cinemaState.snapshot.revision, token: cinemaState.token };
 }
 function passportPatch(record, data) {
   const sceneValues = String(data.get('scenes') || '').trim().split(/[,;\s]+/).filter(Boolean);
@@ -552,8 +580,8 @@ function invalidateMap(client, slug) {
 }
 async function submitPassport(form, data) {
   const card = passportCard;
-  const current = () => card && passportCard === card && card.client === serverClient && card.slug === state.activeId && card.token === cinemaState.token && route() === card.section;
-  if (!card || card.client !== serverClient || card.slug !== state.activeId || card.token !== cinemaState.token || route() !== card.section
+  const current = () => card && passportCard === card && card.client === serverClient && card.slug === state.activeId && card.token === cinemaState.token && location.hash === card.hash;
+  if (!card || card.client !== serverClient || card.slug !== state.activeId || card.token !== cinemaState.token || location.hash !== card.hash
       || form.dataset.passportId !== card.record.id || form.dataset.passportCollection !== card.collection
       || !canWriteBreakdownSection(project(), card.section)) {
     showPassportError(t('Обновите карточку и проверьте права.', 'Карточканы жаңартып, құқықтарды тексеріңіз.'), true); return;
@@ -570,13 +598,13 @@ async function submitPassport(form, data) {
     if (!current()) return;
     passportCard = null; dialog.close();
     const refreshed = await refreshCinema();
-    toast(refreshed ? t('Паспорт сохранён на сервере.', 'Паспорт серверде сақталды.') : t('Паспорт сохранён. Обновите раздел, чтобы увидеть результат.', 'Паспорт сақталды. Нәтижені көру үшін бөлімді жаңартыңыз.'));
+    toast(refreshed ? t('Паспорт сохранён.', 'Паспорт сақталды.') : t('Паспорт сохранён. Обновите раздел, чтобы увидеть результат.', 'Паспорт сақталды. Нәтижені көру үшін бөлімді жаңартыңыз.'));
   } catch (error) {
     if (!current()) return;
     // Keep the typed form on validation or write failure. Unknown write results
     // require explicit reload, never an automatic PATCH replay.
     const reload = [0, 401, 403, 409, 200].includes(error.status);
-    if (reload) { passportCard = null; cinemaState.ready = false; cinemaState.error = cinemaError(error); }
+    if (reload) { passportCard = null; cinemaState.ready = false; cinemaState.error = passportError(error); }
     showPassportError(cinemaError(error), reload);
   }
 }
@@ -621,12 +649,16 @@ async function submitBreakdownImport(data) {
 }
 function workspace(page) {
   const p = project();
-  const pages = { overview, map: productionMapPage, breakdown: () => cinemaPage('breakdown'), heroes: () => cinemaPage('heroes'), locations: () => cinemaPage('locations'), script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
+  const cex = page === 'heroes' && Boolean(heroRouteId());
+  const pages = { overview, map: productionMapPage, breakdown: () => cinemaPage('breakdown'), heroes: () => heroRouteId() ? geroyPage() : cinemaPage('heroes'), locations: () => cinemaPage('locations'), script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
   if (!pages[page]) page = 'overview';
   const section = ['map', 'heroes', 'locations'].includes(page) ? 'overview' : page === 'breakdown' ? 'script' : ['storyboard', 'shots', 'animatic'].includes(page) ? 'shots' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
   const denied = !cinemaPages.includes(page) && p?._denied?.includes(section);
   const content = !p ? `<div class='empty'><h1>${t('Проектов пока нет', 'Қолжетімді жобалар жоқ')}</h1><p>${t('Создайте проект ключом администратора, режиссёра или продюсера. Для входа в существующий проект попросите руководителя выдать ключ участника.', 'Әкімші, режиссер немесе продюсер кілтімен жоба құрыңыз. Бар жобаға кіру үшін жетекшіден қатысушы кілтін сұраңыз.')}</p>${btn(t('Создать проект', 'Жоба құру'), 'create', true, 'plus')}</div>` : denied ? `<div class='empty'><h1>${t('Нет доступа к разделу', 'Бөлімге қолжетімділік жоқ')}</h1><p>${t('Сервер проверяет роль и разделы участника. Попросите руководителя изменить ваши права в разделе «Команда».', 'Сервер қатысушының рөлі мен бөлімдерін тексереді. Жетекшіден «Команда» бөлімінде құқықтарыңызды өзгертуді сұраңыз.')}</p></div>` : pages[page]();
-  return `<div class='workspace ${page === 'map' ? 'map-workspace' : cinemaPages.includes(page) ? 'cinema-workspace' : ''}'><header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header><div class='work-grid'><aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('Проект команды', 'Жұмыс кеңістігі')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `${navGroupLabel(n.id)}<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}${n.id === 'map' && serverClient && meState.awaiting ? `<span class='n hot' data-nav-awaiting>${e(String(meState.awaiting))}</span>` : ''}</a>`).join('')}${p ? `<span class='glabel'>${t('Выпуск', 'Шығарылым')}</span><a href='../p/${e(state.activeId)}/' target='_blank' rel='noopener' title='${t('Страница проекта по коду: общий взгляд для продюсера и партнёров', 'Жоба беті код арқылы')}'>${icon('globe')}${t('Страница проекта ↗', 'Жоба беті ↗')}</a>` : ''}</nav>${accountMenu(p)}</aside><main class='work-main'>${slate(p, page)}<div class='prototype-note'>${t('Картинки и видео подключим после ваших «да» на кадры.', 'Прототип · сурет пен бейне генерациясы әлі қосылмаған.')}</div><p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}</main></div>${helperStub(p)}${tabbar(page)}</div>`;
+  const header = `<header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header>`;
+  const sidebar = cex ? '' : `<aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('Проект команды', 'Жұмыс кеңістігі')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `${navGroupLabel(n.id)}<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}${n.id === 'map' && serverClient && meState.awaiting ? `<span class='n hot' data-nav-awaiting>${e(String(meState.awaiting))}</span>` : ''}</a>`).join('')}${p ? `<span class='glabel'>${t('Выпуск', 'Шығарылым')}</span><a href='../p/${e(state.activeId)}/' target='_blank' rel='noopener' title='${t('Страница проекта по коду: общий взгляд для продюсера и партнёров', 'Жоба беті код арқылы')}'>${icon('globe')}${t('Страница проекта ↗', 'Жоба беті ↗')}</a>` : ''}</nav>${accountMenu(p)}</aside>`;
+  const preamble = cex ? '' : `${slate(p, page)}<div class='prototype-note'>${t('Картинки и видео подключим после ваших «да» на кадры.', 'Прототип · сурет пен бейне генерациясы әлі қосылмаған.')}</div>`;
+  return `<div class='workspace ${cex ? 'cex' : page === 'map' ? 'map-workspace' : cinemaPages.includes(page) ? 'cinema-workspace' : ''}'>${header}<div class='work-grid'>${sidebar}<main class='work-main'>${preamble}<p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}${cex ? helperStub(p, true) : ''}</main></div>${cex ? '' : `${helperStub(p)}${tabbar(page)}`}</div>`;
 }
 
 const meState = { awaiting: null, at: 0, loading: false, tokeny: null };
@@ -709,11 +741,11 @@ function tabbar(page) {
 }
 const navGroups = () => ({ script: t('Девелопмент', 'Девелопмент'), heroes: t('Препродакшн', 'Препродакшн'), shots: t('Производство', 'Өндіріс'), team: t('Команда', 'Команда') });
 function navGroupLabel(id) { const title = navGroups()[id]; return title ? `<span class='glabel'>${title}</span>` : ''; }
-function helperStub(p) {
+function helperStub(p, cex = false) {
   if (!p) return '';
   const mic = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const micTitle = t('Голос недоступен в этом браузере', 'Бұл браузерде дауыс қолжетімсіз');
-  return `<div class='helper-stub' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'>${assistantThread()}<form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Скажите или напишите: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${t('помощник ответит, как только подключим модель', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
+  return `<div class='helper-stub${cex ? ' geroy-helper' : ''}' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'>${assistantThread()}<form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Скажите или напишите: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${cex ? t('Проверьте ответ и перенесите нужное в паспорт.', 'Жауапты тексеріп, керегін паспортқа көшіріңіз.') : t('помощник ответит, как только подключим модель', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
 }
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Чтобы открыть проект команды, введите свой ключ. Его выдаёт продюсер.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
@@ -832,13 +864,13 @@ function refreshThread() {
   if (current) current.outerHTML = html; else box.insertAdjacentHTML('afterbegin', html);
   const log = box.querySelector('.thread-log'); if (log) log.scrollTop = log.scrollHeight;
 }
-async function askAssistant(question) {
+async function askAssistant(question, section = null) {
   if (!question.trim()) return;
   if (!serverClient || !project()) { toast(t('Сначала подключите проект команды: кнопка «Сервер» и ваш ключ.', 'Көмекші сервердегі жобамен жұмыс істейді: сервер мен кілтті қосыңыз.')); return; }
   assistantHistory.push({ role: 'user', content: question }); assistantCollapsed = false; assistantPending = t('думаю…', 'ойланып тұрмын…'); refreshThread();
   try {
     const page = route();
-    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/assistant`, { question, section: page === 'overview' ? '' : page, history: assistantHistory.slice(0, -1).slice(-10) });
+    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/assistant`, { question, section: section ?? (page === 'overview' ? '' : page), history: assistantHistory.slice(0, -1).slice(-10) });
     const answer = result?.data?.answer || t('Пустой ответ.', 'Бос жауап.');
     if (result?.data?.tokeny) { meState.tokeny = result.data.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
     assistantHistory.push({ role: 'assistant', content: answer });
@@ -906,6 +938,12 @@ app.addEventListener('click', async event => {
   else if (action === 'edit-passport') {
     const control = event.target.closest('[data-action]');
     await runOperation(() => passportDialog(control.dataset.passportCollection, control.dataset.passportId));
+  }
+  else if (action === 'fill-hero-passport') {
+    const record = cinemaState.snapshot?.characters?.find(item => item.id === heroRouteId());
+    if (record && cinemaState.ready && !cinemaState.loading && !cinemaState.error && !assistantPending) {
+      await askAssistant(`Составь паспорт героя ${record.name} по сценарию: роль, характер, внешность (лицо, волосы, телосложение, одежда), табу. Ответь коротко по пунктам`, 'heroes');
+    }
   }
   else if (action === 'demo') demoOpen();
   else if (action === 'create') createDialog();

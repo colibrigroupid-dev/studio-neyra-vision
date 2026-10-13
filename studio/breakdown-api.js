@@ -41,6 +41,15 @@ function revisionOf(response) {
   return revision;
 }
 
+function passportPath(slug, collection, id) {
+  const path = projectPath(slug);
+  if (!['characters', 'locations'].includes(collection)
+      || typeof id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(id)) {
+    throw new StudioServerError('Некорректный паспорт проекта.', 422, 'VALIDATION_ERROR');
+  }
+  return `${path}/${collection}/${encodeURIComponent(id)}`;
+}
+
 function validateRevision(revision) {
   if (!Number.isSafeInteger(revision) || revision < 0) {
     throw new StudioServerError('Сначала загрузите актуальную разбивку проекта.', 409, 'PROJECT_NOT_LOADED');
@@ -112,15 +121,36 @@ export class BreakdownApi {
     }
   }
 
+  async loadPassport(slug, collection, id) {
+    const path = passportPath(slug, collection, id);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const before = await this.client.request('GET', projectPath(slug));
+        const revision = revisionOf(before);
+        const response = await this.client.request('GET', path);
+        checkRevision(response, revision);
+        if (!response.data || response.data.id !== id) {
+          throw new StudioServerError('Сервер не вернул паспорт героя.', 200, 'INVALID_RESPONSE');
+        }
+        const after = await this.client.request('GET', projectPath(slug));
+        checkRevision(after, revision);
+        if (JSON.stringify(before.data?.principal) !== JSON.stringify(after.data?.principal)) {
+          throw new StudioServerError('Права изменились во время загрузки.', 409, 'REVISION_CONFLICT');
+        }
+        return { passport: response.data, revision, principal: before.data?.principal };
+      } catch (error) {
+        if (error.code !== 'REVISION_CONFLICT' || attempt === 2) throw error;
+      }
+    }
+  }
+
   async patchPassport(slug, collection, id, patch, revision) {
-    const path = projectPath(slug);
-    if (!['characters', 'locations'].includes(collection)
-        || typeof id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(id)
-        || !patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    const path = passportPath(slug, collection, id);
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       throw new StudioServerError('Некорректный паспорт проекта.', 422, 'VALIDATION_ERROR');
     }
     validateRevision(revision);
-    const response = await this.client.request('PATCH', `${path}/${collection}/${encodeURIComponent(id)}`, patch, { revision });
+    const response = await this.client.request('PATCH', path, patch, { revision });
     if (!response.data || response.data.id !== id) {
       throw new StudioServerError('Сервер вернул некорректный паспорт.', 200, 'INVALID_RESPONSE');
     }

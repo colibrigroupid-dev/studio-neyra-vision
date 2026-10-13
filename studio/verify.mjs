@@ -5,6 +5,7 @@ import { frameAt, totalDuration } from './timeline.js';
 import { makeDemo, DEFAULT_SERVER_URL } from './data.js';
 import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js';
 import { renderBreakdownSection, renderPassportEditor } from './breakdown.js';
+import { renderGeroyWorkshop } from './geroy.js';
 import { verifyBreakdownModules } from './breakdown-tests.js';
 import { ProductionMapApi, canApproveCell } from './production-map-api.js';
 import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js';
@@ -141,7 +142,11 @@ function nativeApi(slugs = ['film']) {
       Object.assign(p, clone(body));
       data = metadata(p);
     } else if (['characters', 'locations'].includes(collection)) {
-      if (method === 'GET') return reply(200, parts[4] ? { data: clone(p[collection].find(item => item.id === parts[4])) } : paginate(p[collection], url), p.revision);
+      if (method === 'GET') {
+        const item = parts[4] && p[collection].find(item => item.id === parts[4]);
+        if (parts[4] && !item) return errorReply(404, 'NOT_FOUND');
+        return reply(200, parts[4] ? { data: clone(item) } : paginate(p[collection], url), p.revision);
+      }
       assert.equal(method, 'PATCH');
       checkFields(body, ['name', 'role', 'identity', 'taboo', 'height', 'status', 'scenes', 'refs', 'translations']);
       const item = p[collection].find(item => item.id === parts[4]);
@@ -505,7 +510,8 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
     classList: { values: new Set(), add(...names) { names.forEach(name => this.values.add(name)); }, remove(...names) { names.forEach(name => this.values.delete(name)); }, toggle(name, force) { const enabled = force ?? !this.values.has(name); enabled ? this.values.add(name) : this.values.delete(name); return enabled; }, contains(name) { return this.values.has(name); } }, style: {}, isConnected: true,
     addEventListener(type, callback) { this.listeners.set(type, callback); },
     showModal() { this.open = true; }, close() { this.open = false; this.listeners.get('close')?.({}); },
-    focus() {}, select() {}, click() {}, setAttribute() {}, querySelector() { return null; }, querySelectorAll() { return []; }
+    focus() {}, select() {}, click() {}, setAttribute() {}, querySelector() { return null; }, querySelectorAll() { return []; },
+    insertAdjacentHTML(position, html) { this.innerHTML = position === 'afterbegin' ? html + this.innerHTML : this.innerHTML + html; }
   });
   const app = element(), dialog = element(), toast = element(), draft = element(), paperControl = element(), mapControl = element(), mapSurface = element(), mapErrorNode = element(), cinemaControl = element(), cinemaSurface = element(), passportErrorNode = element();
   if (queuedDialogClose) dialog.close = function () { this.open = false; queueMicrotask(() => this.listeners.get('close')?.({})); };
@@ -549,7 +555,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   const scheme = { media: '(prefers-color-scheme: dark)', matches: systemDark, addEventListener(type, handler) { if (type === 'change') schemeListeners.add(handler); } };
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler), matchMedia: () => scheme };
   const context = vm.createContext({
-    makeDemo, DEFAULT_SERVER_URL, BreakdownApi, canWriteBreakdownSection, renderBreakdownSection, renderPassportEditor, frameAt, totalDuration, ProductionMapApi, canApproveCell, renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName,
+    makeDemo, DEFAULT_SERVER_URL, BreakdownApi, canWriteBreakdownSection, renderBreakdownSection, renderPassportEditor, renderGeroyWorkshop, frameAt, totalDuration, ProductionMapApi, canApproveCell, renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName,
     StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
     location: { hash }, crypto: globalThis.crypto, console, navigator: { clipboard: { writeText: async text => { clipboard.push(text); } } }, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
@@ -1496,6 +1502,99 @@ const importFixture = () => ({
   characters: [{ name: ' герой ', age: null, lines: 2, scenes: [1, 7], first_scene: 1 }],
   locations: [{ name: 'КОМНАТА', parent: 'КОМНАТА', types: ['ИНТ'], times: ['НОЧЬ'], scenes: [1] }, { name: 'УЛИЦА', parent: 'УЛИЦА', types: ['НАТ'], times: ['ДЕНЬ'], scenes: [7] }]
 });
+
+// №58.2: five render assertions plus real route/save/assistant behavior.
+{
+  const html = renderGeroyWorkshop({ connected: true, record: { id: 'hero-1', name: 'Герой <имя>', status: 'locked', role: 'Ведёт историю', scenes: [1], refs: [] } });
+  assert.match(html, /<h1>Герой &lt;имя&gt;<\/h1>/, 'Hero name is shown safely');
+  assert.match(html, /href='#\/studio\/heroes'>← В кабинет/, 'Return opens the cabinet list');
+  assert.equal((html.match(/class='geroy-portrait-frame'/g) || []).length, 5, 'Five portrait angles are ready');
+  assert.match(renderGeroyWorkshop({ connected: true, record: { name: 'Герой', role: '', identity: '', taboo: [] } }), /Паспорт пока пустой/, 'Empty passport invites the next step');
+  assert.match(renderGeroyWorkshop({ connected: true, locale: 'kk' }), /Паспорт әзірге бос/, 'Empty state is translated');
+}
+{
+  const api = nativeApi(), p = seedBreakdown(api), questions = [];
+  const fetchImpl = async (url, options) => {
+    if (new URL(url).pathname.endsWith('/assistant')) {
+      questions.push(JSON.parse(options.body));
+      return new Response(JSON.stringify({ data: { answer: 'Роль: ведёт историю. Характер: смелый.' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return api.fetchImpl(url, options);
+  };
+  const ui = await appHarness({ api, fetchImpl, stored: cinemaSettings(), hash: '#/studio/heroes' });
+  assert.match(ui.app.innerHTML, /href='#\/studio\/heroes\/hero-1'>Открыть/);
+  await ui.navigate('heroes/hero-1'); await ui.settle();
+  assert.match(ui.app.innerHTML, /class='workspace cex'/, 'Nested hero route opens the workshop');
+  assert.doesNotMatch(ui.app.innerHTML, /class='sidebar'|class='tabbar'|class='slate'/, 'Workshop uses the whole work-main');
+  assert.match(ui.app.innerHTML, /<h1>ГЕРОЙ<\/h1>/);
+  assert.match(ui.app.innerHTML, /geroy-helper/);
+  assert.match(ui.app.innerHTML, /src='https:\/\/example.test\/hero.jpg'/);
+  assert.ok(api.calls.some(call => call.method === 'GET' && call.path.endsWith('/characters/hero-1')), 'Route reads the individual server passport');
+  const beforeAssistant = JSON.stringify(p.characters);
+  await ui.click('fill-hero-passport');
+  assert.equal(questions[0].section, 'heroes');
+  assert.equal(questions[0].question, 'Составь паспорт героя ГЕРОЙ по сценарию: роль, характер, внешность (лицо, волосы, телосложение, одежда), табу. Ответь коротко по пунктам');
+  assert.match(vm.runInContext('assistantThread()', ui.context), /Характер: смелый/);
+  assert.equal(JSON.stringify(p.characters), beforeAssistant, 'Assistant suggestions do not fill or save passport fields');
+  await ui.clickPassport('characters', 'hero-1');
+  const revision = p.revision;
+  await ui.submit('passport-form', { ...passportFields(p.characters[0]), role: 'Роль после обсуждения', status: 'draft' }, { passportId: 'hero-1', passportCollection: 'characters' });
+  const patch = api.calls.find(call => call.method === 'PATCH' && call.path.endsWith('/characters/hero-1'));
+  assert.equal(patch.ifMatch, `"${revision}"`);
+  assert.match(ui.app.innerHTML, /Роль после обсуждения/);
+  assert.match(ui.app.innerHTML, /замок открыт/);
+  await ui.clickData('lang', 'kk');
+  assert.match(ui.app.innerHTML, /<h1>КЕЙІПКЕР<\/h1>/);
+  assert.match(ui.app.innerHTML, /← Кабинетке/);
+  await ui.navigate('heroes'); await ui.settle();
+  assert.match(ui.app.innerHTML, /class='sidebar'/, 'Return restores the project cabinet');
+}
+console.log('Hero workshop render, nested route, single-passport GET, If-Match save and assistant suggestions: passed.');
+{
+  const api = nativeApi(), p = seedBreakdown(api);
+  p.characters.push({ ...clone(p.characters[0]), id: 'hero-2', name: 'ВТОРОЙ', translations: {} });
+  let release, held = false;
+  const barrier = new Promise(resolve => { release = resolve; });
+  const fetchImpl = async (url, options) => {
+    if (!held && new URL(url).pathname.endsWith('/characters/hero-1') && options.method === 'GET') { held = true; await barrier; }
+    return api.fetchImpl(url, options);
+  };
+  const ui = await appHarness({ api, fetchImpl, stored: cinemaSettings(), hash: '#/studio/heroes' });
+  await ui.navigate('heroes/hero-1');
+  for (let i = 0; i < 100 && !held; i += 1) await Promise.resolve();
+  assert.ok(held, 'First hero read is pending');
+  await ui.navigate('heroes/hero-2'); await ui.settle();
+  release(); for (let i = 0; i < 100; i += 1) await Promise.resolve();
+  assert.match(ui.app.innerHTML, /<h1>ВТОРОЙ<\/h1>/, 'Late passport cannot overwrite another hero');
+  await ui.navigate('heroes/missing'); await ui.settle();
+  assert.match(ui.app.innerHTML, /Героя здесь уже нет/);
+  assert.doesNotMatch(ui.app.innerHTML, /data-action='edit-passport'/);
+}
+{
+  const api = nativeApi(), p = seedBreakdown(api);
+  p.members.push({ id: 'viewer-member', keyId: 'viewer-local', role: 'viewer', sections: ['overview'], accessStatus: 'active' });
+  const ui = await appHarness({ api, stored: cinemaSettings('viewer-secret'), hash: '#/studio/heroes/hero-1' });
+  assert.doesNotMatch(ui.app.innerHTML, /data-action='edit-passport'/);
+  await ui.clickPassport('characters', 'hero-1');
+  assert.equal(ui.dialog.open, false, 'Viewer cannot edit the hero');
+  api.failOnce(call => call.method === 'GET' && call.path.endsWith('/characters/hero-1'), 403, 'FORBIDDEN');
+  await ui.click('refresh-breakdown');
+  assert.match(ui.app.innerHTML, /Спросите у продюсера/);
+  assert.doesNotMatch(ui.app.innerHTML, /Паспорт пока пустой/);
+  assert.ok(api.calls.every(call => call.method === 'GET'));
+}
+{
+  const api = nativeApi(), p = seedBreakdown(api);
+  const ui = await appHarness({ api, stored: cinemaSettings(), hash: '#/studio/heroes/hero-1' });
+  await ui.clickPassport('characters', 'hero-1');
+  p.revision += 1;
+  await ui.submit('passport-form', { ...passportFields(p.characters[0]), identity: 'Нельзя перезаписать' }, { passportId: 'hero-1', passportCollection: 'characters' });
+  assert.match(ui.passportErrorNode.textContent, /Коллега только что внёс правку/);
+  await ui.submit('passport-form', { ...passportFields(p.characters[0]), identity: 'Нельзя повторять' }, { passportId: 'hero-1', passportCollection: 'characters' });
+  assert.equal(api.calls.filter(call => call.method === 'PATCH').length, 1, 'Conflicting save is not replayed');
+  assert.equal(p.characters[0].identity, 'Шрам на левой щеке');
+}
+console.log('Hero workshop late-read isolation, missing/denied passports, viewer rights and conflict without replay: passed.');
 {
   const ui = await appHarness({ hash: '#/studio/breakdown' });
   assert.match(ui.app.innerHTML, /введите свой ключ/);

@@ -405,3 +405,95 @@ html,.workspace *,#dialog,#dialog *{scrollbar-width:thin;scrollbar-color:#494949
   .workspace .work-main .group>header{flex-wrap:wrap;gap:8px}
   .workspace .work-main .group>header .label{margin-left:0}
 }
+
+/* цех героя · №58. Одна рабочая область, тона вместо рамок.
+   Как у остальных цехов, оболочка остаётся графитовой при светлой бумаге сценария. */
+.workspace.cex{padding-bottom:0}
+.workspace.cex .work-grid{display:block;min-height:calc(100dvh - 56px)}
+.workspace.cex :is(.sidebar,.slate,.prototype-note,.tabbar),
+.workspace.cex>.helper-stub{display:none}
+.workspace.cex .work-main{width:100%;max-width:100%;padding:32px 24px calc(240px + env(safe-area-inset-bottom))}
+.geroy-cex{
+  --geroy-bg:var(--bg);--geroy-sheet:var(--surface);--geroy-control:var(--surface2);
+  --geroy-text:var(--text);--geroy-muted:var(--muted);--geroy-field:var(--field);
+  max-width:900px;margin:0 auto;color:var(--geroy-text);font:400 16px/1.5 var(--body);color-scheme:dark;
+}
+.geroy-cex :is(h1,h2,h3,p,dl,figure){margin:0}
+.geroy-cex :is(h1,h2,h3,p,dt,dd,li,figcaption,.geroy-scene span){overflow-wrap:anywhere}
+.geroy-heading{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:32px}
+.geroy-heading>.btn{flex:none}
+.geroy-title{flex:1 1 280px;min-width:0}
+.geroy-title h1{font:500 26px/1.2 var(--disp);letter-spacing:0}
+.geroy-title p{margin-top:8px;color:var(--geroy-muted)}
+.geroy-status{color:var(--geroy-muted);font-size:13px;max-width:100%;overflow-wrap:anywhere}
+.geroy-actions{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.workspace .geroy-cex .btn{max-width:100%;min-height:36px;padding:8px 16px;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
+.geroy-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
+.geroy-section{min-width:0}
+.geroy-wide{grid-column:1/-1}
+.geroy-section>header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin-bottom:16px}
+.geroy-section h2{font:500 17px/1.4 var(--body)}
+.geroy-section h3{font:500 17px/1.4 var(--body);margin:24px 0 16px}
+.geroy-sheet{padding:24px;border:0;border-radius:16px;background:var(--geroy-sheet)}
+.geroy-fields{display:grid;gap:24px;min-width:0}
+.geroy-fields>div{min-width:0}
+.geroy-fields dt{margin:0 0 8px;color:var(--geroy-muted);font-size:13px}
+.geroy-fields dd{margin:0;color:var(--geroy-text);white-space:pre-wrap}
+.geroy-lock{display:flex;align-items:center;gap:8px;color:var(--geroy-muted);font-size:13px}
+.geroy-lock svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.geroy-lock[data-locked='true'] svg{color:var(--geroy-text)}
+.geroy-note,.geroy-empty{color:var(--geroy-muted)}
+.geroy-cex .geroy-note{margin:8px 0 16px}
+.geroy-cex .geroy-empty{margin:0}
+.geroy-taboo{margin:0;padding-left:24px}
+.geroy-taboo li+li{margin-top:8px}
+.geroy-portraits,.geroy-refs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 16px}
+.geroy-portrait{min-width:0}
+.geroy-portrait-frame{position:relative;aspect-ratio:16/9;width:100%;overflow:hidden;border-radius:16px;background:var(--geroy-sheet);color:var(--geroy-muted)}
+.geroy-portrait-frame img{display:block;width:100%;height:100%;object-fit:contain}
+.geroy-portrait-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;height:100%;padding:24px 16px;font-size:13px;text-align:center}
+.geroy-portrait-empty svg{width:32px;height:32px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.geroy-ratio{position:absolute;top:8px;right:12px;font-size:13px;font-variant-numeric:tabular-nums}
+.geroy-portrait figcaption{padding:12px 4px 0;color:var(--geroy-text)}
+.geroy-scenes{display:grid;gap:0;overflow:hidden}
+.geroy-scenes.geroy-sheet{padding:0}
+.geroy-scene{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:16px;min-height:64px;padding:16px 24px;border:0;background:transparent;color:var(--geroy-text);text-decoration:none}
+.geroy-scene+.geroy-scene{border-top:1px solid var(--line-soft)}
+.geroy-scene:hover{background:var(--geroy-control)}
+.geroy-scene-number{color:var(--geroy-muted);font:400 15px/1.5 var(--mono);overflow-wrap:anywhere}
+.geroy-state{padding:24px;border:0;border-radius:16px;background:var(--geroy-sheet);overflow-wrap:anywhere}
+.geroy-cex>.geroy-state{margin-bottom:24px}
+.geroy-state h2{font:500 17px/1.4 var(--body)}
+.geroy-state p{margin:8px 0 16px;color:var(--geroy-muted)}
+
+/* Тот же помощник проекта, встроенный в цех; внешней полосы кабинета нет. */
+.workspace.cex .geroy-helper{left:0;right:0;bottom:0;padding:16px 24px calc(16px + env(safe-area-inset-bottom))}
+.workspace.cex .geroy-helper .box{max-width:900px}
+.workspace.cex .geroy-helper .helper-note{font-size:15px;line-height:1.5;color:var(--muted);margin:0}
+@media(max-width:768px){
+  .workspace.cex .work-main{padding:24px 16px 16px}
+  .workspace.cex .work-header{height:auto;min-height:56px}
+  .workspace.cex .work-header :is(.btn,.langs,.langs button,.brand),
+  .workspace.cex .work-header .work-controls #project-switch{height:44px;min-height:44px}
+  .workspace.cex .work-header .btn.small{width:44px;min-width:44px}
+  .workspace.cex .work-header .langs button{min-width:44px}
+  .geroy-heading{align-items:flex-start;gap:16px;margin-bottom:24px}
+  .geroy-title{flex:1 1 100%;order:2}
+  .geroy-status{margin-left:auto;font-size:16px}
+  .geroy-actions{order:3;width:100%}
+  .geroy-grid{grid-template-columns:minmax(0,1fr);gap:32px}
+  .geroy-sheet{padding:16px}
+  .geroy-fields dt,.geroy-lock{font-size:16px}
+  .geroy-portraits,.geroy-refs{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 16px}
+  .geroy-portrait-empty{padding:16px 8px;font-size:16px;gap:4px}
+  .geroy-portrait-empty svg{width:24px;height:24px}
+  .geroy-ratio{top:4px;right:8px}
+  .geroy-scene{grid-template-columns:40px minmax(0,1fr);gap:8px;padding:16px}
+  .workspace .geroy-cex .btn{min-height:44px;font-size:16px}
+  .workspace.cex .geroy-helper{position:static;inset:auto;padding:16px 0 max(16px,env(safe-area-inset-bottom));background:transparent}
+  .workspace.cex .geroy-helper .box{padding:16px;max-width:100%;max-height:none}
+  .workspace.cex .geroy-helper .chips .chip{min-height:44px;font-size:16px}
+  .workspace.cex .geroy-helper .thread-bar .chip{min-height:44px;font-size:16px}
+  .workspace.cex .geroy-helper :is(.assistant-msg p,.helper-note){font-size:16px}
+  .workspace.cex .geroy-helper .thread-log{max-height:40dvh}
+}
