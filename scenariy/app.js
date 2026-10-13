@@ -32,7 +32,7 @@
   // ---------- состояние ----------
   let projects = load(LS.projects, {});
   let currentId = null; try { currentId = localStorage.getItem(LS.current); } catch (e) { /* */ }
-  let storageOk = true, busy = false, pendingSave = null, curDoc = 'script';
+  let storageOk = true, busy = false, pendingSave = null, curDoc = 'script', loading = false;
   function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
   function save() {
     try { localStorage.setItem(LS.projects, JSON.stringify(projects)); localStorage.setItem(LS.current, currentId); storageOk = true; setSaveState(T('сохранено', 'сақталды')); serverSave(); return true; }
@@ -47,7 +47,7 @@
   // ---------- лист ----------
   const ed = ScriptEditor.create($('#editor'), {});
   function flush() { if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; const p = cur(); if (p) { const t = ed.text(); if (t !== p.text) { p.text = t; p.updated = Date.now(); save(); } } } }
-  ed.onChange = () => { setSaveState(T('пишу…', 'жазып жатырмын…')); clearTimeout(pendingSave); pendingSave = setTimeout(() => { pendingSave = null; const p = cur(); if (!p) return; const t = ed.text(); if (t !== p.text) { p.text = t; p.updated = Date.now(); save(); } refreshAll(); }, 250); updateTypeBox(); };
+  ed.onChange = () => { if (loading) { refreshAll(); updateTypeBox(); return; } setSaveState(T('пишу…', 'жазып жатырмын…')); clearTimeout(pendingSave); pendingSave = setTimeout(() => { pendingSave = null; const p = cur(); if (!p) return; const t = ed.text(); if (t !== p.text) { p.text = t; p.updated = Date.now(); save(); } refreshAll(); }, 250); updateTypeBox(); };
   ed.onCaret = () => { updateTypeBox(); markCurrentScene(); scopeHint(); };
   function updateTypeBox() { const p = ed.curPara(); if (p) $('#ptype').value = ed.typeOf(p); }
   $('#ptype').addEventListener('change', (e) => { ed.setType(e.target.value); ed.root.focus(); });
@@ -136,10 +136,10 @@
     currentId = id; try { localStorage.setItem(LS.current, id); } catch (e) { /* */ }
     const p = cur(); if (!p.versions) p.versions = []; if (!p.meta) p.meta = {}; if (!p.server) serverMode = null;
     $('#title').value = p.title;
-    ed.load(p.text);
+    loading = true; try { ed.load(p.text); } finally { loading = false; }
     ['logline', 'synopsis', 'notes'].forEach((k) => { $('#f-' + k).value = p.meta[k] || ''; });
     const tp = Fountain.parse(p.text).title; const tf = (keys) => { for (const k of keys) if (tp[k]) return tp[k]; return ''; };
-    $('#t-title').value = tf(['Title', 'Название']) || p.title; $('#t-credit').value = tf(['Credit', 'Сценарий']); $('#t-author').value = tf(['Author', 'Authors', 'Автор']); $('#t-date').value = tf(['Draft date', 'Дата']); $('#t-contact').value = tf(['Contact', 'Контакт']);
+    $('#t-title').value = tf(['Title', 'Название']); $('#t-credit').value = tf(['Credit', 'Сценарий']); $('#t-author').value = tf(['Author', 'Authors', 'Автор']); $('#t-date').value = tf(['Draft date', 'Дата']); $('#t-contact').value = tf(['Contact', 'Контакт']);
     renderChat(); refreshAll(); showDoc(curDoc === 'script' ? 'script' : curDoc); checkApi();
     const first = ed.paras()[0]; if (first && curDoc === 'script') ed.focusPara(first, 0);
   }
