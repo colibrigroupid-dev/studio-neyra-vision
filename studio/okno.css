@@ -70,7 +70,7 @@ body{font-size:16px;line-height:1.5}
 /* нижняя панель на телефоне */
 .tabbar{display:none}
 @media(max-width:768px){
-  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;height:60px;background:var(--bg-side);border-top:1px solid var(--line-soft);padding-bottom:env(safe-area-inset-bottom);z-index:4}
+  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;height:60px;background:var(--bg-side);border-top:1px solid var(--line-soft);padding-bottom:env(safe-area-inset-bottom);z-index:29}
   .tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 .65rem/1 var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--dim);min-height:44px}
   .tabbar a[aria-current]{color:var(--text)}.tabbar .icon{width:20px;height:20px}
   .sidebar{position:static;height:auto;overflow:visible}.menu{display:none}
@@ -105,6 +105,9 @@ body{font-size:16px;line-height:1.5}
 .simple-head{padding:12vh 0 28px}
 .simple-head h1{font:500 clamp(1.75rem,1.4rem + 1.6vw,2.4rem)/1.15 var(--disp);letter-spacing:-.015em;margin:0 0 10px}
 .simple-head .lead{color:var(--muted);max-width:52ch;margin:0}
+/* всё, что внутри рабочего поля, остаётся под строкой помощника: карточки с абсолютными подписями не вылезают */
+.work-main{position:relative;z-index:0}
+.work-main .project-hero,.work-main .shot-card,.work-main .cinema-section,.work-main .production-map{isolation:isolate}
 /* рабочее поле */
 .work-main{max-width:940px;padding:36px 24px 160px}
 .prototype-note{font:400 .8125rem/1.4 var(--mono);letter-spacing:.04em;color:var(--dim);margin-bottom:24px}
@@ -120,7 +123,7 @@ dialog{background:var(--surface);border:1px solid var(--line-soft);border-radius
 dialog .eyebrow{font:400 .75rem/1 var(--mono);letter-spacing:.14em;color:var(--dim)}
 dialog input,dialog select,dialog textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:16px;min-height:44px;padding:10px 12px}
 /* помощник внизу: пока заглушка (№46) */
-.helper-stub{position:fixed;left:272px;right:0;bottom:0;z-index:5;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent);pointer-events:none}
+.helper-stub{position:fixed;left:272px;right:0;bottom:0;z-index:30;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent);pointer-events:none}
 .helper-stub .box{pointer-events:auto;max-width:940px;margin:0 auto;background:var(--field);border:1px solid transparent;border-radius:24px;padding:10px 12px 8px;display:grid;gap:6px}.helper-stub .box:focus-within{border-color:var(--line)}
 .helper-stub .q{display:flex;align-items:center;gap:8px;min-height:44px;margin:0}
 .helper-stub .q input{flex:1;min-width:0;min-height:44px;border:0;background:transparent;color:var(--text);font:inherit;font-size:15px;padding:0 6px}
