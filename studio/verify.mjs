@@ -1504,7 +1504,7 @@ const importFixture = () => ({
 {
   const html = renderGeroyWorkshop({ connected: true, record: { id: 'hero-1', name: 'Герой <имя>', status: 'locked', role: 'Ведёт историю', scenes: [1], refs: [] } });
   assert.match(html, /<h1>Герой &lt;имя&gt;<\/h1>/, 'Hero name is shown safely');
-  assert.match(html, /href='#\/studio\/heroes'>← В кабинет/, 'Return opens the cabinet list');
+  assert.match(html, /href='#\/studio\/art\/cex'>← В кабинет/, 'Return opens the cabinet list');
   assert.equal((html.match(/class='geroy-portrait-frame'/g) || []).length, 5, 'Five portrait angles are ready');
   assert.match(renderGeroyWorkshop({ connected: true, record: { name: 'Герой', role: '', identity: '', taboo: [] } }), /Паспорт пока пустой/, 'Empty passport invites the next step');
   assert.match(renderGeroyWorkshop({ connected: true, locale: 'kk' }), /Паспорт әзірге бос/, 'Empty state is translated');
@@ -1543,7 +1543,7 @@ const importFixture = () => ({
   await ui.clickData('lang', 'kk');
   assert.match(ui.app.innerHTML, /<h1>КЕЙІПКЕР<\/h1>/);
   assert.match(ui.app.innerHTML, /← Кабинетке/);
-  await ui.navigate('heroes'); await ui.settle();
+  await ui.navigate('art'); await ui.settle();
   assert.match(ui.app.innerHTML, /class='sidebar'/, 'Return restores the project cabinet');
 }
 console.log('Hero workshop render, nested route, single-passport GET, If-Match save and assistant suggestions: passed.');

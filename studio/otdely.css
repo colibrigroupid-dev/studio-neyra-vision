@@ -43,3 +43,5 @@
 .legacy-editor>summary::-webkit-details-marker{display:none}
 .legacy-editor>summary::before{content:'›';display:inline-block;margin-right:8px;transition:transform .2s}
 .legacy-editor[open]>summary::before{transform:rotate(90deg)}
+.dep-head.app{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin-bottom:16px}
+.workspace.cex .work-main{max-width:1600px}

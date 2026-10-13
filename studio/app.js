@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013m';
-import { frameAt, totalDuration } from './timeline.js?v=20261013m';
-import { StudioServer } from './storage.js?v=20261013m';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013m';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013m';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013m';
-import { renderGeroyWorkshop } from './geroy.js?v=20261013m';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013m';
-import { parseCommand, describeCommand } from './golos.js?v=20261013m';
-import { svgPaths as ikonki } from './ikonki.js?v=20261013m';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013n';
+import { frameAt, totalDuration } from './timeline.js?v=20261013n';
+import { StudioServer } from './storage.js?v=20261013n';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013n';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013n';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013n';
+import { renderGeroyWorkshop } from './geroy.js?v=20261013n';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013n';
+import { parseCommand, describeCommand } from './golos.js?v=20261013n';
+import { svgPaths as ikonki } from './ikonki.js?v=20261013n';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -268,6 +268,8 @@ function download(name, value, type = 'text/plain;charset=utf-8') { const url = 
 function demoOpen() { if (!serverClient && state.projects.demo) state.activeId = 'demo'; go('overview'); }
 function go(page) { const hash = `#/studio/${page}`; if (location.hash === hash) render(); else location.hash = hash; }
 function route() { return location.hash.startsWith('#/studio/') ? location.hash.split('/')[2] || 'overview' : 'home'; }
+const depApp = () => /^#\/studio\/(art|director|production)\/cex\/?$/.exec(location.hash)?.[1] || '';
+const appRoutes = ['heroes', 'locations', 'breakdown', 'storyboard', 'shots', 'animatic'];
 function heroRouteId() {
   const match = /^#\/studio\/heroes\/([^/]+)\/?$/.exec(location.hash);
   if (!match) return '';
@@ -299,22 +301,44 @@ function overview() {
   return `${awaitingSheet()}${pageHeading(t('Обзор проекта', 'Жобаға шолу'), t('Где мы, что ждёт решения, кто чем занят.', 'Оқиғаңыз бен команданың жұмысы — бір кеңістікте.'), `<a class='btn' href='#/studio/map'>${icon('map')}${t('Карта производства', 'Өндіріс картасы')}</a>` + btn(t('К сценарию', 'Сценарийге'), 'script', true, 'arrow'))}<div class='project-hero'><img src='assets/hero.jpg' alt='${t('Визуальный референс проекта', 'Жобаның визуалды референсі')}'><div class='project-hero-copy'><div class='row wrap'>${status(p.scriptStatus)}<span class='badge'>${t('Визуальный референс', 'Визуалды референс')}</span></div><h2>${e(local(p.title))}</h2></div></div><div class='stat-row'><div class='stat'><strong>${p.scenes.length}</strong><small>${t('Сцен в сценарии', 'Сценарийдегі көріністер')}</small></div><div class='stat'><strong>${p.shots.length}</strong><small>${t('Кадров в проекте', 'Жобадағы кадрлар')}</small></div><div class='stat'><strong>${p.members.length}</strong><small>${t('Участников команды', 'Командадағы қатысушылар')}</small></div><div class='stat'><strong>${String(totalDuration(p.shots)).padStart(2, '0')} <small>${t('сек', 'сек')}</small></strong><small>${t('Хронометраж ИИматика', 'ЖИ-аниматик хронометражы')}</small></div></div><div class='two-cols'><section class='panel'><h2>${t('Путь проекта', 'Жобаның кезеңдері')}</h2><ol class='stage-list'>${stages().map((s, i) => `<li><a href='#/studio/${s.id}'><span><span class='num'>0${i + 1}</span>${s.title}</span>${i === 0 ? status(p.scriptStatus) : icon('arrow')}</a></li>`).join('')}</ol></section><div><section class='panel'><h2>${t('История', 'Оқиға')}</h2><p>${e(local(p.synopsis) || t('Добавьте историю через сценарий.', 'Оқиғаны сценарий арқылы жазыңыз.'))}</p><div class='scene-minis'>${p.scenes.slice(0, 3).map((s, i) => `<a class='scene-mini' href='#/studio/script' data-scene='${e(s.id)}'><span class='mono'>0${i + 1}</span>${e(s.title[state.scriptLang])}</a>`).join('')}</div></section><section class='panel' style='margin-top:24px'><div class='row between'><h2>${t('Команда', 'Команда')}</h2><a href='#/studio/team' aria-label='${t('Открыть команду', 'Команданы ашу')}'>${icon('arrow')}</a></div><div class='avatars'>${p.members.map(m => `<span class='avatar' title='${e(m.name)}'>${e(m.name.slice(0, 1))}</span>`).join('')}</div><p>${t('Творческий процесс начинается с общего замысла.', 'Шығармашылық үдеріс ортақ ойдан басталады.')}</p></section></div></div>`;
 }
 const segmented = (name, items, current) => `<div class='seg' role='tablist' aria-label='${e(name)}'>${items.map(([id, title]) => `<button type='button' role='tab' data-dep-tab='${e(id)}' aria-selected='${current === id}' class='${current === id ? 'active' : ''}'>${e(title)}</button>`).join('')}</div>`;
+const canOpen = sections => { const pr = project()?._principal; if (!serverClient) return true; if (!pr || pr.role === 'viewer') return false; const mine = pr.sections || []; return sections.some(sec => mine.includes(sec)) && !sections.every(sec => project()?._denied?.includes(sec)); };
+const appBar = (dep, title, tabs = '') => `<div class='dep-head app'><a class='btn' href='#/studio/${dep}'>${t('← В кабинет', '← Кабинетке')}</a><div class='dep-kicker'>${title}</div>${tabs}</div>`;
+const openBtn = (dep, label, allowed) => allowed ? `<a class='btn primary' href='#/studio/${dep}/cex'>${label}${icon('arrow')}</a>` : `<a class='btn' href='#/studio/${dep}/cex'>${t('Смотреть', 'Қарау')}${icon('arrow')}</a>`;
+function artSummary() {
+  const snap = cinemaState.snapshot || {};
+  const heroes = (snap.characters || []), locations = (snap.locations || []);
+  const locked = items => items.filter(it => it.status === 'locked').length;
+  const drawn = items => items.filter(it => (it.obrazy || []).some(o => o.status === 'approved')).length;
+  const row = (label, value) => `<div class='row'><span>${label}</span><b>${e(String(value))}</b></div>`;
+  const allowed = canOpen(['heroes', 'locations']);
+  return `<div class='dep-head'><div class='dep-kicker'>Neyra Art · ${t('герои и локации', 'кейіпкерлер мен локациялар')}</div></div>${pageHeading(t('Арт', 'Арт'), t('Итог по образам. Рисовать, править и утверждать — в приложении Art.', 'Бейнелер бойынша қорытынды. Салу мен бекіту — Art қосымшасында.'), openBtn('art', t('Открыть Art', 'Art ашу'), allowed))}${serverClient ? `<div class='sheet'>${row(t('Героев', 'Кейіпкер'), heroes.length)}${row(t('С зафиксированной внешностью', 'Келбеті бекітілген'), locked(heroes))}${row(t('С утверждённым портретом', 'Портреті бекітілген'), drawn(heroes))}${row(t('Локаций', 'Локация'), locations.length)}${row(t('С утверждённой пластиной', 'Пластинасы бекітілген'), drawn(locations))}</div>${heroes.length ? `<div class='sheet writer-scenes'>${heroes.slice(0, 40).map(h => `<div class='row'><span>${e(h.name)}${h.role ? ` <small>· ${e(h.role)}</small>` : ''}</span><b class='${h.status === 'locked' ? 'ok' : ''}'>${h.status === 'locked' ? t('зафиксирован', 'бекітілді') : t('черновик', 'жұмыс нұсқасы')}</b></div>`).join('')}</div>` : `<div class='empty'><h2>${t('Героев пока нет.', 'Кейіпкерлер әзірге жоқ.')}</h2><p>${t('Сохраните сценарий в Writer — герои и локации появятся сами. Или откройте Art и скажите: «создай героя: …».', 'Writer-де сценарийді сақтаңыз — кейіпкерлер өздері пайда болады.')}</p></div>`}` : `<div class='empty'><p>${t('Подключите проект команды, чтобы видеть образы.', 'Команда жобасын қосыңыз.')}</p></div>`}`;
+}
 function artPage() {
+  if (!depApp() && !appRoutes.includes(route())) return artSummary();
   const tab = cinemaRoute();
   const tabs = segmented(t('Арт', 'Арт'), [['heroes', t('Герои', 'Кейіпкерлер')], ['locations', t('Локации', 'Локациялар')], ['breakdown', t('Сцены и бриф', 'Көріністер')]], tab);
-  return `<div class='dep-head'><div class='dep-kicker'>Neyra Art · ${t('герои и локации', 'кейіпкерлер мен локациялар')}</div>${tabs}</div>${cinemaPage(tab)}`;
+  return `${appBar('art', 'Neyra Art · ' + t('герои и локации', 'кейіпкерлер мен локациялар'), tabs)}${cinemaPage(tab)}`;
+}
+function directorSummary() {
+  const p = project();
+  const shots = p.shots || [];
+  const approved = shots.filter(sh => sh.status === 'approved').length;
+  const review = shots.filter(sh => sh.needsReview).length;
+  const row = (label, value) => `<div class='row'><span>${label}</span><b>${e(String(value))}</b></div>`;
+  return `<div class='dep-head'><div class='dep-kicker'>Neyra Director · ${t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар')}</div></div>${pageHeading(t('Раскадровка', 'Кадрлық жоспар'), t('Итог по кадрам. Собирать кадры, ставить камеру и утверждать — в приложении Director.', 'Кадрлар бойынша қорытынды. Жинау мен бекіту — Director қосымшасында.'), openBtn('director', t('Открыть Director', 'Director ашу'), canOpen(['shots', 'storyboard'])))}<div class='sheet'>${row(t('Кадров', 'Кадр'), shots.length)}${row(t('Утверждено', 'Бекітілді'), approved)}${row(t('Требуют проверки после правки сценария', 'Сценарий түзетілгеннен кейін тексеру керек'), review)}</div>`;
 }
 function directorPage() {
+  if (!depApp() && !appRoutes.includes(route())) return directorSummary();
   const tab = directorRoute();
   const tabs = segmented(t('Режиссёр', 'Режиссер'), [['storyboard', t('Раскадровка', 'Кадрлық жоспар')], ['shots', t('Кадры', 'Кадрлар')], ['animatic', t('ИИматик', 'ЖИ-аниматик')]], tab);
   const body = tab === 'animatic' ? animaticPage() : shotsPage(tab);
-  return `<div class='dep-head'><div class='dep-kicker'>Neyra Director · ${t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар')}</div>${tabs}</div>${body}`;
+  return `${appBar('director', 'Neyra Director · ' + t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар'), tabs)}${body}`;
 }
 function productionPage() {
   const p = project();
   const approved = p.shots.filter(s => s.status === 'approved');
   const total = p.shots.length;
-  return `<div class='dep-head'><div class='dep-kicker'>Neyra Production · ${t('видео', 'бейне')}</div></div>${pageHeading(t('Видео', 'Бейне'), t('Генерация идёт только по утверждённым кадрам Director: описание действия, камера, образы героев и локаций из Art. Перед запуском вы видите объём и цену.', 'Генерация тек Director бекіткен кадрлар бойынша жүреді.'))}<div class='sheet'><div class='row'><span>${t('Кадров в проекте', 'Жобадағы кадрлар')}</span><b>${e(String(total))}</b></div><div class='row'><span>${t('Утверждено для видео', 'Бейнеге бекітілген')}</span><b>${e(String(approved.length))}</b></div><div class='row'><span>${t('Движок', 'Қозғалтқыш')}</span><b>${t('технология NEYRA · 5 с 720p ≈ 128 токенов', 'NEYRA технологиясы · 5 с 720p ≈ 128 токен')}</b></div></div>${approved.length ? `<div class='post-list'>${approved.map(sh => `<div class='post-task'><label>${e(local(sh.title))}<p>${e(String(sh.duration || 5))} ${t('с', 'с')} · ${t('ждёт вашего «да» на запуск', 'іске қосуға «иә» күтеді')}</p></label></div>`).join('')}</div>` : `<div class='empty'><h2>${t('Пока нечего генерировать.', 'Әзірге генерациялайтын ештеңе жоқ.')}</h2><p>${t('Утвердите последовательность кадров в Director — они появятся здесь списком с ценой.', 'Director-де кадрлар тізбегін бекітіңіз — олар мұнда бағасымен пайда болады.')}</p><a class='btn primary' href='#/studio/director'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`}`;
+  return `${depApp() ? appBar('production', 'Neyra Production · ' + t('видео', 'бейне')) : `<div class='dep-head'><div class='dep-kicker'>Neyra Production · ${t('видео', 'бейне')}</div></div>`}${pageHeading(t('Видео', 'Бейне'), t('Генерация идёт только по утверждённым кадрам Director: описание действия, камера, образы героев и локаций из Art. Перед запуском вы видите объём и цену.', 'Генерация тек Director бекіткен кадрлар бойынша жүреді.'))}<div class='sheet'><div class='row'><span>${t('Кадров в проекте', 'Жобадағы кадрлар')}</span><b>${e(String(total))}</b></div><div class='row'><span>${t('Утверждено для видео', 'Бейнеге бекітілген')}</span><b>${e(String(approved.length))}</b></div><div class='row'><span>${t('Движок', 'Қозғалтқыш')}</span><b>${t('технология NEYRA · 5 с 720p ≈ 128 токенов', 'NEYRA технологиясы · 5 с 720p ≈ 128 токен')}</b></div></div>${approved.length ? `<div class='post-list'>${approved.map(sh => `<div class='post-task'><label>${e(local(sh.title))}<p>${e(String(sh.duration || 5))} ${t('с', 'с')} · ${t('ждёт вашего «да» на запуск', 'іске қосуға «иә» күтеді')}</p></label></div>`).join('')}</div>` : `<div class='empty'><h2>${t('Пока нечего генерировать.', 'Әзірге генерациялайтын ештеңе жоқ.')}</h2><p>${t('Утвердите последовательность кадров в Director — они появятся здесь списком с ценой.', 'Director-де кадрлар тізбегін бекітіңіз — олар мұнда бағасымен пайда болады.')}</p><a class='btn primary' href='#/studio/director'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`}`;
 }
 function writerSummary() {
   // Установка Александра 13.10 13:00: в окне — только итог по сценарию; работа — в Сценарной (Writer) на весь экран.
@@ -692,7 +716,7 @@ async function submitBreakdownImport(data) {
 }
 function workspace(page) {
   const p = project();
-  const cex = page === 'heroes' && Boolean(heroRouteId());
+  const cex = (page === 'heroes' && Boolean(heroRouteId())) || Boolean(depApp()) || appRoutes.includes(page);
   const pages = { overview, map: productionMapPage, art: artPage, heroes: () => heroRouteId() ? geroyPage() : artPage(), locations: artPage, breakdown: artPage, script: scriptPage, director: directorPage, storyboard: directorPage, animatic: directorPage, shots: directorPage, production: productionPage, team: teamPage, post: postPage };
   if (!pages[page]) page = 'overview';
   const section = ['map', 'heroes', 'locations', 'art', 'breakdown'].includes(page) ? 'overview' : ['storyboard', 'shots', 'animatic', 'director'].includes(page) ? 'shots' : page === 'production' ? 'animatic' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
