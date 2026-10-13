@@ -2,24 +2,33 @@
    Одна правда для studio/ (Codex) и страниц проекта (Claude). Менять здесь, не в экранах. */
 @import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Geologica:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 :root{
-  /* графит: тёплый нейтральный, как у рабочих приложений (ChatGPT/Codex), но без синевы */
-  --bg:        #171717;   /* основа (замер ChatGPT app, веб-мастер 13.10) */
+  /* Монохромная классика: чёрный, белый и нейтральные серые. */
+  --bg:        #0f0f0f;   /* основа */
   --bg-side:   #1c1c1c;   /* колонка — светлее основы, без линии-границы */
   --surface:   #212121;   /* лист */
   --surface-2: #2c2c2c;   /* строка при наведении, тихая кнопка */
   --field:     #343434;   /* поле ввода (композер) */
   --line:      #383838;   /* заметная граница (контурная кнопка, фокус) */
   --line-soft: #2e2e2e;   /* еле видные разделители */
-  --text:      #ececec;
+  --text:      #f2f2f2;
   --muted:     #9a9a9a;   /* 15–16px на листе ≥ 4.5 */
   --dim:       #6f6f6f;   /* подписи 13px */
-  --accent:    oklch(0.82 0.11 75);    /* янтарь: одно главное действие на экран, тумблеры «вкл» */
-  --accent-ink:oklch(0.22 0.03 75);
-  /* лампы статуса — как на пульте: приглушённые, не кислотные */
-  --lamp-red:  oklch(0.62 0.17 25);
-  --lamp-amber:oklch(0.78 0.14 80);
-  --lamp-green:oklch(0.72 0.13 150);
-  --lamp-off:  oklch(0.40 0.005 80);
+  --accent:    #f2f2f2;
+  --accent-ink:#111;
+  --focus:     #f2f2f2;
+  --error-text:#ececec;
+  --error-bg:  #2c2c2c;
+  /* Статусы различаются тоном и формой: точка, кольцо, галочка, перечёркнутый контур. */
+  --status-draft:   #6f6f6f;
+  --status-working: #9a9a9a;
+  --status-awaiting:#f2f2f2;
+  --status-approved:#f2f2f2;
+  --status-returned:#9a9a9a;
+  /* Прежние имена оставлены для совместимости экранов. */
+  --lamp-red:  var(--status-returned);
+  --lamp-amber:var(--status-working);
+  --lamp-green:var(--status-approved);
+  --lamp-off:  var(--status-draft);
   /* шрифты: текст Onest, заголовки разделов Geologica, цифры/коды/таймкоды JetBrains Mono (все с казахскими буквами) */
   --body: Onest, system-ui, sans-serif;
   --disp: Geologica, Onest, sans-serif;
@@ -40,5 +49,5 @@
 :root[data-theme="paper"]{
   --bg:#f7f7f7;--bg-side:#ffffff;--surface:#ffffff;--surface-2:#efefef;--field:#efefef;
   --line:#d6d6d6;--line-soft:#e6e6e6;--text:#1f1f1f;--muted:#6b6b6b;--dim:#8a8a8a;
-  --accent:oklch(0.62 0.13 70);--accent-ink:oklch(0.98 0.01 85);--lamp-off:oklch(0.78 0.005 85);color-scheme:light;
+  --accent:#f2f2f2;--accent-ink:#111;color-scheme:light;
 }

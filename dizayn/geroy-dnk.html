@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171717">
+  <meta name="theme-color" content="#0f0f0f">
   <meta name="description" content="Паспорт Ер Төстіка, замок внешности, пять ракурсов и сцены с героем. Кликабельный прототип цеха «Герой».">
   <title>Ер Төстік · Герой · Neyra Vision</title>
   <link rel="icon" href="../assets/favicon-64.png">
@@ -23,7 +23,7 @@
     h2 { font-size:17px; line-height:1.4; font-weight:500; }
     h3 { font-size:17px; font-weight:500; }
     svg { width:20px; height:20px; flex:none; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
-    :focus-visible { outline:2px solid #9a9a9a; outline-offset:4px; }
+    :focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
     ::selection { background:var(--accent); color:var(--accent-ink); }
     [hidden] { display:none!important; }
     .quiet { color:var(--muted); }
@@ -37,7 +37,7 @@
     .brand img { display:block; width:32px; height:32px; border-radius:50%; }
     .hero-name { min-width:0; font-size:17px; font-weight:500; overflow-wrap:anywhere; }
     .status { margin-left:auto; flex:none; font-size:13px; font-weight:400; white-space:nowrap; }
-    .status-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+    .status-dot { width:8px; height:8px; border-radius:50%; background:var(--dim); }
     body[data-status="awaiting"] .status-dot { background:var(--accent); }
     .work { width:min(100% - 48px,900px); margin:0 auto; padding:48px 0 32px; display:grid; gap:32px; }
     .intro { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:16px; }
@@ -82,7 +82,7 @@
     .assistant-message .btn { flex:none; }
     .composer { display:grid; grid-template-columns:36px minmax(0,1fr) 40px; align-items:end; gap:12px; padding:12px 16px; border-radius:var(--r-field); background:var(--field); }
     .composer textarea { display:block; width:100%; min-height:36px; max-height:128px; padding:8px 0; resize:none; border:0; background:transparent; line-height:1.4; }
-    .composer textarea::placeholder { color:#b2b2b2; opacity:1; }
+    .composer textarea::placeholder { color:var(--muted); opacity:1; }
     .composer .mic { background:var(--surface-2); }
     .composer .send { width:40px; min-height:40px; background:var(--accent); color:var(--accent-ink); }
     .composer .send:disabled { background:var(--surface-2); color:var(--muted); }

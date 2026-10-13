@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Окно проекта · прототип дизайна</title>
-<meta name="theme-color" content="#1b1b19">
+<meta name="theme-color" content="#0f0f0f">
 <link rel="stylesheet" href="tokeny.css">
 <style>
 *{box-sizing:border-box}html,body{height:100%}
@@ -39,7 +39,7 @@ a{color:inherit;text-decoration:none}button,input,textarea,select{font:inherit;c
 .slate .cell span{font:400 .6875rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
 .slate .cell b{font:500 .875rem/1.2 var(--mono);margin-top:4px;letter-spacing:.02em}
 .slate .tools{margin-left:auto;display:flex;gap:6px}
-.btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:var(--r-pill);border:1px solid var(--line);background:transparent;color:var(--text);font-size:var(--fs-small);font-weight:500;cursor:pointer;transition:background .15s var(--ease),border-color .15s var(--ease)}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:var(--fs-small);font-weight:500;cursor:pointer;transition:background .15s var(--ease),border-color .15s var(--ease)}
 .btn:hover{background:var(--surface-2)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
@@ -66,14 +66,14 @@ h1{font:500 var(--fs-title)/1.15 var(--disp);letter-spacing:-.015em;margin:0 0 6
 .row .c{grid-column:2;grid-row:1/3;display:flex;align-items:center;gap:10px;justify-content:flex-end}
 .row.action{cursor:pointer}.row.action:hover{background:var(--surface-2)}
 /* лампы статуса — пульт */
-.lamp{width:10px;height:10px;border-radius:50%;background:var(--lamp-off);box-shadow:inset 0 0 0 1px oklch(0 0 0/.3)}
+.lamp{width:10px;height:10px;border-radius:50%;background:var(--lamp-off);box-shadow:inset 0 0 0 1px rgb(0 0 0 / .3)}
 .lamp.r{background:var(--lamp-red)}.lamp.a{background:var(--lamp-amber)}.lamp.g{background:var(--lamp-green)}
 .lamps{display:inline-flex;gap:6px;align-items:center}
 .lamps .mono{font-size:var(--fs-label);color:var(--muted);margin-left:4px}
 .pill{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--line);font:400 var(--fs-label)/1 var(--body);color:var(--muted)}
-.pill.amber{border-color:transparent;background:oklch(from var(--lamp-amber) l c h / .16);color:var(--lamp-amber)}
-.pill.green{border-color:transparent;background:oklch(from var(--lamp-green) l c h / .16);color:var(--lamp-green)}
-.pill.red{border-color:transparent;background:oklch(from var(--lamp-red) l c h / .18);color:var(--lamp-red)}
+.pill.amber{border-color:var(--accent);background:var(--surface-2);color:var(--text)}
+.pill.green{border-color:transparent;background:var(--accent);color:var(--accent-ink)}
+.pill.red{border-color:var(--muted);background:var(--surface-2);color:var(--text)}
 /* переключатель как в настройках Codex */
 .sw{appearance:none;width:44px;height:26px;border-radius:999px;background:var(--lamp-off);position:relative;cursor:pointer;border:0;flex:none}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--text);transition:transform .2s var(--ease)}
