@@ -153,9 +153,12 @@ def parse_input(body):
     result = copy.deepcopy(body)
     scene_fields = ("n", "heading", "type", "location", "time", "act", "chars", "page_from", "page_to")
     for scene in array(result["scenes"], "scenes"):
-        fields(scene, scene_fields + ("line_from", "line_to", "intros", "caps", "lines"), scene_fields)
+        fields(scene, scene_fields + ("line_from", "line_to", "intros", "caps", "lines", "ton", "vizual"), scene_fields)
         for key in ("heading", "type", "location", "time", "act"):
             text(scene[key], key, 8000 if key == "act" else 240, key in ("heading", "location"))
+        for key in ("ton", "vizual"):
+            if key in scene:
+                text(scene[key], key, 2000)
         for key in ("n", "page_from", "page_to", "line_from", "line_to", "lines"):
             if key in scene:
                 integer(scene[key], key)

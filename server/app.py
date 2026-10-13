@@ -1583,6 +1583,47 @@ class Handler(SimpleHTTPRequestHandler):
                 status = 200
             else:
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
+        elif parts[3] == "scenes" and len(parts) == 6 and parts[5] == "utverdit":
+            # ТЗ Ара (Writer → Art): «Утвердить и передать в Art» для одной сцены. Клетка карты (scene, script) → approved,
+            # у сцены status/approvedAt, бриф Art = паспорта героев и локации сцены получают отметку сцены. {"otmena": true} снимает.
+            if method != "POST":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Утверждение сцены — POST.")
+            scene = get_item(project["scenes"], parts[4])
+            body = self.body(allow_empty=True)
+            fields(body, ("kommentariy", "otmena"))
+            otmena = body.get("otmena", False)
+            if not isinstance(otmena, bool):
+                raise ApiError(422, "VALIDATION", "otmena — true или false.")
+            comment = text(body.get("kommentariy", ""), "kommentariy", 8000)
+            obj, now = {"type": "scene", "id": scene["id"]}, timestamp()
+            member = next((m for m in project["members"] if m["keyId"] == principal["id"]), None)
+            cell = map_cell(project, obj, "script")
+            if cell is None:
+                cell = {"id": uuid.uuid4().hex, "project": slug, "object": obj, "stage": "script", "createdAt": now,
+                        "status": "empty", "dueAt": None, "comment": "", "version": None, "variant": None,
+                        "assignee": {"keyId": principal["id"], "name": member["name"] if member else principal["id"]},
+                        "approverRole": "producer"}
+                project["cells"].append(cell)
+            if otmena:
+                cell.update(status="working", comment=comment, updatedAt=now)
+                scene.update(status="draft")
+                for key in ("approvedAt", "approvedBy", "approvedRevision"):
+                    scene.pop(key, None)
+            else:
+                version = "r%s" % project["revision"]
+                cell.update(status="approved", version=version, comment=comment, updatedAt=now)
+                project["approvals"].append({"id": uuid.uuid4().hex, "project": slug, "cellId": cell["id"], "object": obj,
+                                             "stage": "script", "keyId": principal["id"], "createdAt": now, "verdict": "approved",
+                                             "comment": comment, "version": version, "variant": None})
+                scene.update(status="approved", approvedAt=now, approvedBy=principal["id"], approvedRevision=project["revision"])
+                n = scene.get("n")
+                for collection, names in (("characters", scene.get("chars", [])), ("locations", [scene.get("location", "")])):
+                    for nm in names:
+                        passport = breakdown.find_passport(project[collection], nm) if nm else None
+                        if passport is not None and n is not None:
+                            passport["scenesApproved"] = sorted(set(passport.get("scenesApproved", [])) | {n})
+                            passport["updatedAt"] = now
+            data, status = {"scene": scene, "cell": cell}, 200
         elif parts[3] in ("scenes", "shots") and len(parts) in (4, 5):
             collection = parts[3]
             items = project[collection]
@@ -1662,6 +1703,8 @@ class Handler(SimpleHTTPRequestHandler):
                 action = "breakdown.imported"
             if resource == "razbor":
                 action, obj = "breakdown.razbor", {"type": "project", "id": slug}
+            if resource == "scenes" and len(parts) == 6:
+                action, obj = ("scene.unapproved" if data["scene"].get("status") == "draft" else "scene.approved"), {"type": "scene", "id": data["scene"]["id"]}
         for import_action, import_object, import_data in import_events:
             activity(project, principal, import_action, import_object, import_data)
         activity(project, principal, action, obj, data, stage, invalidated)

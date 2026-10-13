@@ -1504,6 +1504,31 @@ class TeamAccessTests(unittest.TestCase):
         self.api("POST", "/api/projects/film/razbor", {"zapolnit": False}, 409)
         self.api("POST", "/api/projects/film/razbor", {"zapolnit": False, "fragment": True})
 
+    def test_scene_approval_hands_brief_to_art_and_parser_keeps_ton_and_vizual(self):
+        # ТЗ Ара: «Утвердить и передать в Art» + заметки автора «= Тон:» / «= Визуал:» как поля сцены, не акт.
+        self.create()
+        script = "= ПРОЛОГ\n\nИНТ. ЮРТА — НОЧЬ\n= Тон: тревога, тишина\n= Визуал: холодный рассвет, длинные тени\n\nТӨСТІК\nМама?\n\nНАТ. СТЕПЬ — ДЕНЬ\n\nМАТЬ\nИди.\n"
+        self.api("PUT", "/api/projects/film/script", {"text": script, "language": "ru"})
+        self.api("POST", "/api/projects/film/versions", {}, 201)
+        scenes = self.api("GET", "/api/projects/film/scenes")["data"]
+        self.assertEqual((scenes[0]["ton"], scenes[0]["vizual"], scenes[0]["act"], scenes[1]["act"]), ("тревога, тишина", "холодный рассвет, длинные тени", "ПРОЛОГ", "ПРОЛОГ"))
+        self.assertNotIn("ton", scenes[1])
+        first = scenes[0]
+        _, _, _, headers = self.request("GET", "/api/projects/film", include_headers=True)
+        rev = headers["ETag"]
+        result = self.api("POST", f"/api/projects/film/scenes/{first['id']}/utverdit", {"kommentariy": "готово"}, headers={"If-Match": rev})["data"]
+        self.assertEqual((result["scene"]["status"], result["cell"]["status"], result["cell"]["stage"]), ("approved", "approved", "script"))
+        self.assertEqual(result["scene"]["approvedBy"], "admin")
+        hero = next(h for h in self.api("GET", "/api/projects/film/characters")["data"] if h["name"] == "ТӨСТІК")
+        self.assertEqual(hero["scenesApproved"], [1])
+        loc = next(l for l in self.api("GET", "/api/projects/film/locations")["data"] if l["name"] == "ЮРТА")
+        self.assertEqual(loc["scenesApproved"], [1])
+        self.assertIn("scene.approved", [a["action"] for a in self.api("GET", "/api/projects/film/activity?limit=200")["data"]])
+        self.api("POST", f"/api/projects/film/scenes/{first['id']}/utverdit", {}, 409, headers={"If-Match": rev})
+        self.api("POST", f"/api/projects/film/scenes/{first['id']}/utverdit", {"otmena": True})
+        self.assertEqual(self.api("GET", f"/api/projects/film/scenes/{first['id']}")["data"]["status"], "draft")
+        self.api("POST", f"/api/projects/film/scenes/{first['id']}/utverdit", {}, 403, key="temporary-viewer")
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

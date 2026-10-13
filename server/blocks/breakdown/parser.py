@@ -47,6 +47,11 @@ def parse(text):
         ln = lines[i].rstrip()
         s = ln.strip()
         if s.startswith("="):
+            mm = re.match(r"^=\s*(тон|ton|визуал|visual|вижуал)\s*:\s*(.+)$", s, re.I)
+            if mm and cur is not None:
+                # «= Тон: тревога» / «= Визуал: холодный рассвет» — заметки автора к сцене (ТЗ Ара, Writer п. 3)
+                cur["ton" if mm.group(1).lower() in ("тон", "ton") else "vizual"] = mm.group(2).strip()[:2000]
+                i += 1; continue
             act = s.lstrip("= ").strip(); i += 1; continue
         m = HEAD.match(s) if s and not s.startswith("!") else None
         if s.startswith("."):  # форсированный заголовок
