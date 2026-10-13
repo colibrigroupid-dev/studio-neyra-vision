@@ -57,7 +57,8 @@
 
   // ---------- сервер команды ----------
   let server = (() => { const s = load(LS.server, null); return s && s.key ? { url: String(s.url || DEFAULT_SERVER).replace(/\/+$/, ''), key: s.key } : null; })();
-  let serverMode = null;
+  let serverMode = null; let sceneStatus = {}; // n → {status, approvedAt}
+  async function loadSceneStatus() { const p = cur(); sceneStatus = {}; if (!server || !p || !p.server) { renderScenes(); return; } try { const list = await serverFetch('/api/projects/' + encodeURIComponent(p.server) + '/scenes'); const arr = (list.data && (list.data.scenes || list.data)) || []; if (Array.isArray(arr)) for (const x of arr) if (x.n != null) sceneStatus[+x.n] = { status: x.status || 'draft', approvedAt: x.approvedAt || '' }; } catch (e) { /* статусы необязательны */ } renderScenes(); renderScenePanel(true); }
   async function serverFetch(path, method, body, extraHeaders) {
     if (!server) throw new Error(T('нет ключа участника', 'қатысушы кілті жоқ'));
     const r = await fetch(server.url + path, { method: method || 'GET', headers: Object.assign({ 'X-Key': server.key, 'content-type': 'application/json' }, extraHeaders || {}), body: body ? JSON.stringify(body) : undefined, credentials: 'omit', cache: 'no-store' });
@@ -75,7 +76,7 @@
     projects[id].title = title; projects[id].text = text; projects[id].server = slug;
     if (meta.data && meta.data.synopsis && !projects[id].meta.synopsis) projects[id].meta.synopsis = meta.data.synopsis;
     serverMode = { slug, lastText: text, timer: null, loaded: true };
-    currentId = id; save(); open(id);
+    currentId = id; save(); open(id); loadSceneStatus();
     setSaveState(T('сценарий с сервера', 'серверден сценарий')); checkApi();
   }
   function serverSave() {
@@ -179,7 +180,8 @@
     ul.innerHTML = sc.length ? '' : `<li class="empty">${T('Сцен пока нет. Первый абзац — заголовок: ИНТ. МЕСТО - ВРЕМЯ, затем Enter.', 'Көріністер әзірге жоқ. Бірінші абзац — тақырып: ІШКІ. ОРЫН - УАҚЫТ, сосын Enter.')}</li>`;
     for (const s of sc) {
       const li = document.createElement('li'); li.dataset.i = s.index; li.draggable = true;
-      li.innerHTML = `<div class="h"><span class="n">${s.num}.</span><b>${esc(s.heading)}</b><span class="d">${fmt(s.seconds)}</span></div>${s.firstAction ? `<div class="a">${esc(s.firstAction)}</div>` : ''}`;
+      const st = sceneStatus[s.index]; if (st && st.status === 'approved') li.classList.add('ok');
+      li.innerHTML = `<div class="h"><span class="n">${s.num}.</span><b>${esc(s.heading)}</b><span class="d">${st && st.status === 'approved' ? '✓ ' : ''}${fmt(s.seconds)}</span></div>${s.firstAction ? `<div class="a">${esc(s.firstAction)}</div>` : ''}`;
       li.addEventListener('click', () => { ed.focusPara(s.el, 0); s.el.scrollIntoView({ block: 'center', behavior: 'smooth' }); document.body.classList.remove('show-nav'); });
       ul.appendChild(li);
     }
@@ -410,7 +412,7 @@
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'F' || e.key === 'f' || e.key === 'А' || e.key === 'а')) { e.preventDefault(); toggleFocus(); return; }
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 's' || e.key === 'ы')) {
       e.preventDefault(); flush();
-      if (serverMode && serverMode.loaded && cur().server) { const stamp = new Date(); const label = 'сценарная · ' + stamp.toLocaleDateString('ru-RU') + ' ' + stamp.toTimeString().slice(0, 5); serverVersion(label).then((extra) => toast(T('Версия зафиксирована на сервере', 'Нұсқа серверде бекітілді') + (extra || '') + (extra ? T('. Режиссёрская уже видит героев', '. Режиссёр беті кейіпкерлерді көреді') : ''))).catch((err) => toast(T('Сервер не принял версию: ', 'Сервер нұсқаны қабылдамады: ') + err.message)); }
+      if (serverMode && serverMode.loaded && cur().server) { const stamp = new Date(); const label = 'сценарная · ' + stamp.toLocaleDateString('ru-RU') + ' ' + stamp.toTimeString().slice(0, 5); serverVersion(label).then((extra) => { loadSceneStatus(); toast(T('Версия зафиксирована на сервере', 'Нұсқа серверде бекітілді') + (extra || '') + (extra ? T('. Art уже видит героев', '. Art кейіпкерлерді көреді') : '')); }).catch((err) => toast(T('Сервер не принял версию: ', 'Сервер нұсқаны қабылдамады: ') + err.message)); }
       else if (!storageOk) toast(T('Хранилище браузера недоступно — скачайте .fountain', 'Браузер қоймасы қолжетімсіз'));
       else toast(snapshot('') ? T('Версия сохранена', 'Нұсқа сақталды') : T('Без изменений с прошлой версии', 'Өзгеріс жоқ'));
     }
@@ -427,13 +429,13 @@
     ed.root.dispatchEvent(new Event('input'));
   }
   let spTimer = null, spSceneIdx = 0;
-  function renderScenePanel() {
+  function renderScenePanel(force) {
     if (!document.body.classList.contains('scene-open')) return;
     const cs = currentScene(); const body = $('#spBody');
     if (!cs) { $('#spTitle').textContent = T('Сцена', 'Көрініс'); body.innerHTML = `<div class="empty">${T('Поставьте курсор в сцену — здесь её участники, локация, время и ваши требования к изображению.', 'Курсорды көрініске қойыңыз.')}</div>`; spSceneIdx = 0; return; }
     const s = cs.scene; const up = s.heading; const m = up.match(/^([A-ZА-ЯЁӘҒҚҢӨҰҮҺІ]+\.(?:\/[A-ZА-ЯЁӘҒҚҢӨҰҮҺІ]+\.)?)\s*(.*?)\s*(?:\s[-–—]\s(.*))?$/);
     const kind = m ? m[1] : '', loc = m ? m[2] : up, time = m && m[3] ? m[3] : '';
-    const sameScene = spSceneIdx === s.index && body.querySelector('[data-f=ton]');
+    const sameScene = !force && spSceneIdx === s.index && body.querySelector('[data-f=ton]');
     $('#spTitle').textContent = `${s.num}. ${s.heading}`;
     if (sameScene) { body.querySelector('[data-chips]').innerHTML = s.characters.map((n) => `<span class="chip">${esc(n)}</span>`).join('') || `<span class="val dim">${T('— пока без реплик', '— репликасыз')}</span>`; body.querySelector('[data-loc]').textContent = (kind ? kind + ' ' : '') + loc; body.querySelector('[data-time]').textContent = time || '—'; body.querySelector('[data-dur]').textContent = fmt(s.seconds); return; }
     spSceneIdx = s.index;
@@ -445,16 +447,16 @@
       <label><span>${T('Эмоциональный тон', 'Эмоциялық реңк')}</span><input data-f="ton" type="text" value="${esc(ton ? ton.text : '')}" placeholder="${T('тревога, нежность, ирония…', 'мазасыздық, нәзіктік…')}"></label>
       <label><span>${T('Требования к изображению', 'Бейнеге талаптар')}</span><textarea data-f="viz" rows="5" placeholder="${T('эпоха, атмосфера, свет, детали, что обязательно в кадре', 'дәуір, атмосфера, жарық, детальдар')}">${esc(viz ? viz.text : '')}</textarea></label>
       <div class="sp-ops"><button type="button" data-op="up">↑ ${T('выше', 'жоғары')}</button><button type="button" data-op="down">↓ ${T('ниже', 'төмен')}</button><button type="button" data-op="del">${T('Удалить сцену', 'Көріністі жою')}</button></div>
-      ${cur().server ? `<div class="sp-ops"><button type="button" class="approve" data-op="approve">${T('Утвердить и передать в Art', 'Бекітіп, Art-қа беру')}</button></div>` : ''}
+      ${cur().server ? (sceneStatus[s.index] && sceneStatus[s.index].status === 'approved' ? `<div class="sp-ops"><span class="val">✓ ${T('Утверждено', 'Бекітілді')}${sceneStatus[s.index].approvedAt ? ' · ' + new Date(sceneStatus[s.index].approvedAt).toLocaleDateString('ru') : ''}</span><button type="button" data-op="unapprove">${T('Снять утверждение', 'Бекітуді алу')}</button></div>` : `<div class="sp-ops"><button type="button" class="approve" data-op="approve">${T('Утвердить и передать в Art', 'Бекітіп, Art-қа беру')}</button></div>`) : ''}
       <p class="empty" style="font-size:.76rem">${T('Тон и требования уходят в бриф для Art вместе с текстом сцены.', 'Реңк пен талаптар Art брифіне кетеді.')}</p>`;
     body.querySelector('[data-f=ton]').addEventListener('input', (e) => { clearTimeout(spTimer); spTimer = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Тон', e.target.value); }, 400); });
     body.querySelector('[data-f=viz]').addEventListener('input', (e) => { clearTimeout(spTimer); spTimer = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Визуал', e.target.value); }, 400); });
-    body.querySelectorAll('[data-op]').forEach((b) => b.addEventListener('click', () => (b.dataset.op === 'approve' ? approveScene(s.index) : sceneOp(s.index, b.dataset.op))));
+    body.querySelectorAll('[data-op]').forEach((b) => b.addEventListener('click', () => (b.dataset.op === 'approve' ? approveScene(s.index) : b.dataset.op === 'unapprove' ? approveScene(s.index, true) : sceneOp(s.index, b.dataset.op))));
   }
-  async function approveScene(index) {
+  async function approveScene(index, otmena) {
     const s = currentSceneByIndex(index); if (!s || !cur().server) return;
-    const missing = []; if (!s.characters.length) missing.push(T('участники (нет реплик)', 'қатысушылар')); if (!sceneSyn(s, 'Тон')) missing.push(T('эмоциональный тон', 'эмоциялық реңк')); if (!sceneSyn(s, 'Визуал')) missing.push(T('требования к изображению', 'бейнеге талаптар'));
-    if (missing.length && !confirm(T('Не заполнено: ', 'Толтырылмаған: ') + missing.join(', ') + T('. Утвердить всё равно?', '. Бәрібір бекіту керек пе?'))) return;
+    const missing = []; if (otmena) missing.length = 0; else { if (!s.characters.length) missing.push(T('участники (нет реплик)', 'қатысушылар')); if (!sceneSyn(s, 'Тон')) missing.push(T('эмоциональный тон', 'эмоциялық реңк')); if (!sceneSyn(s, 'Визуал')) missing.push(T('требования к изображению', 'бейнеге талаптар'));
+    if (missing.length && !confirm(T('Не заполнено: ', 'Толтырылмаған: ') + missing.join(', ') + T('. Утвердить всё равно?', '. Бәрібір бекіту керек пе?'))) return; }
     const slug = cur().server;
     try {
       flush(); if (serverMode && serverMode.loaded) { clearTimeout(serverMode.timer); await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/script', 'PUT', { text: cur().text }); serverMode.lastText = cur().text; }
@@ -462,8 +464,8 @@
       const list = await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes'); const arr = (list.data && (list.data.scenes || list.data)) || [];
       const sv = Array.isArray(arr) ? arr.find((x) => +x.n === s.index) : null;
       if (!sv) throw new Error(T('сцена ещё не в разбивке сервера — нажмите ⌘S и повторите', 'көрініс әлі сервер бөлінісінде жоқ — ⌘S басып, қайталаңыз'));
-      await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes/' + encodeURIComponent(sv.id) + '/utverdit', 'POST', {}, rev ? { 'If-Match': String(rev) } : {});
-      toast(T(`Сцена ${s.num} утверждена и передана в Art`, `${s.num} көрінісі бекітілді`));
+      await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes/' + encodeURIComponent(sv.id) + '/utverdit', 'POST', otmena ? { otmena: true } : {}, rev ? { 'If-Match': String(rev) } : {});
+      toast(otmena ? T(`Утверждение сцены ${s.num} снято`, `${s.num} көрінісінің бекітуі алынды`) : T(`Сцена ${s.num} утверждена и передана в Art`, `${s.num} көрінісі бекітілді`)); loadSceneStatus();
     } catch (e) { toast(T('Не утвердилось: ', 'Бекітілмеді: ') + (/404|не найден/i.test(e.message) ? T('сервер ещё не обновлён до утверждения сцен', 'сервер әлі жаңартылмаған') : e.message)); }
   }
   function currentSceneByIndex(i) { return ed.scenes().find((x) => x.index === i) || null; }

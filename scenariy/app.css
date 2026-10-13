@@ -54,6 +54,7 @@ body.scene-open .scene-panel{display:flex}
 .sp-b .chips{display:flex;flex-wrap:wrap;gap:.3rem}.sp-b .chip{background:var(--surface);border-radius:999px;padding:.2em .6em;font-size:.76rem}
 .sp-ops{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.6rem}.sp-ops button{background:transparent;border:1px solid var(--line);border-radius:999px;padding:.3em .7em;font-size:.76rem;color:var(--muted);min-height:32px}.sp-ops button:hover{color:var(--text);border-color:var(--muted)}
 .sp-ops button.approve{background:var(--text);color:var(--bg);border-color:var(--text);width:100%;justify-content:center;display:inline-flex}.sp-ops button.approve:hover{background:var(--muted);color:var(--bg)}
+.scene-list li.ok .d{color:var(--text)}
 .scene-list li.drag{opacity:.4}.scene-list li.over{box-shadow:0 -2px 0 var(--text)}
 body.focus .main{grid-template-columns:1fr}body.focus .nav,body.focus .neyra,body.focus .ruler,body.focus .tb .save{display:none!important}
 
