@@ -1494,6 +1494,15 @@ class TeamAccessTests(unittest.TestCase):
         again = self.api("POST", "/api/projects/film/versions", {}, 201, key=writer)["data"]
         self.assertNotIn("razbor", again)
         self.assertEqual(len(self.api("GET", "/api/projects/film/scenes")["data"]), 1)
+        # Фрагмент короче разбивки не затирает сцены по номерам (урок 13.10): ни при ⌘S, ни при явном разборе.
+        self.api("POST", "/api/projects/film/versions", {}, 201)
+        self.assertEqual(len(self.api("GET", "/api/projects/film/scenes")["data"]), 2)
+        self.api("PUT", "/api/projects/film/script", {"text": "НАТ. РЕКА — ДЕНЬ\n\nСТАРИК\nЭй.\n", "language": "ru"})
+        short = self.api("POST", "/api/projects/film/versions", {}, 201)["data"]
+        self.assertNotIn("razbor", short)
+        self.assertEqual(self.api("GET", "/api/projects/film/scenes")["data"][0]["title"], "ИНТ. ЮРТА — НОЧЬ")
+        self.api("POST", "/api/projects/film/razbor", {"zapolnit": False}, 409)
+        self.api("POST", "/api/projects/film/razbor", {"zapolnit": False, "fragment": True})
 
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).

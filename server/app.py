@@ -767,7 +767,7 @@ RAZBOR_ROLE = ("Ты — второй режиссёр и художник по 
                "\"taboo\":[\"чего не рисовать\"],\"height\":\"рост словами или см\"}],\"locations\":[{\"name\":\"НАЗВАНИЕ как в заголовке сцены\","
                "\"role\":\"что это место в истории\",\"identity\":\"как выглядит: пространство, свет, фактуры, время года — 2–3 предложения\",\"taboo\":[]}]}. "
                "Имена — ровно те, что переданы в списке; новых не добавляй, если список задан. Факты только из текста; чего нет — опиши правдоподобно для жанра и отметь словом «предположение». "
-               "Язык полей — язык сценария.")
+               "Язык полей — язык сценария; казахские буквы (ә ғ қ ң ө ұ ү һ і) пиши как в сценарии, без латиницы.")
 
 
 def razbor_passports(project, principal, names_chars, names_locs, opisanie="", tier="standard"):
@@ -1363,7 +1363,7 @@ class Handler(SimpleHTTPRequestHandler):
             if method != "POST":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Разбор запускается методом POST.")
             body = self.body(allow_empty=True)
-            fields(body, ("opisanie", "zapolnit", "tier"))
+            fields(body, ("opisanie", "zapolnit", "tier", "fragment"))
             opisanie = text(body.get("opisanie", ""), "opisanie", 4000).strip()
             zapolnit = body.get("zapolnit", True)
             tier = body.get("tier", "standard")
@@ -1380,6 +1380,8 @@ class Handler(SimpleHTTPRequestHandler):
                 document = razbivka.parse(script_text)
                 if not document["scenes"]:
                     raise ApiError(422, "NO_SCENES", "В сценарии пока нет сцен: нужны заголовки вида «ИНТ. ЮРТА — НОЧЬ». Напишите хотя бы одну сцену.")
+                if len(document["scenes"]) < len(project["scenes"]) and not body.get("fragment"):
+                    raise ApiError(409, "SHORTER_SCRIPT", f"В тексте {len(document['scenes'])} сцен, а в проекте уже {len(project['scenes'])}. Похоже, это фрагмент: разбор по номерам сцен перезаписал бы разбивку. Загрузите полный сценарий или пришлите только героев через описание.")
                 document = breakdown.parse_input({k: document[k] for k in ("scenes", "characters", "locations", "title", "pages_est", "caps_mentions")})
                 data, import_events = breakdown.import_data(
                     document, project["scenes"], project["characters"], project["locations"], timestamp(), project["studio_id"])
@@ -1504,7 +1506,8 @@ class Handler(SimpleHTTPRequestHandler):
                 try:
                     authorize(principal, slug, "breakdown", project, write=True)
                     document = razbivka.parse(project["script"].get("text", ""))
-                    if document["scenes"]:
+                    # Защита (урок 13.10 12:35): фрагмент короче существующей разбивки не перезаписывает сцены по номерам.
+                    if document["scenes"] and len(document["scenes"]) >= len(project["scenes"]):
                         document = breakdown.parse_input({k: document[k] for k in ("scenes", "characters", "locations", "title", "pages_est", "caps_mentions")})
                         _, auto_events = breakdown.import_data(document, project["scenes"], project["characters"], project["locations"], timestamp(), project["studio_id"])
                         import_events.extend(auto_events)
