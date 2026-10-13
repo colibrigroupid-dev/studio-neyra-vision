@@ -58,6 +58,8 @@ body.scene-open .scene-panel{display:flex}
 .scene-list li.drag{opacity:.4}.scene-list li.over{box-shadow:0 -2px 0 var(--text)}
 body.focus .main{grid-template-columns:1fr}body.focus .nav,body.focus .neyra,body.focus .ruler,body.focus .tb .save{display:none!important}
 
+body.readonly .tb #btnUndo,body.readonly .tb #btnRedo,body.readonly .tb .wand,body.readonly .ai-list,body.readonly .ask,body.readonly #addDoc{display:none!important}
+body.readonly .sheet{caret-color:transparent}
 /* навигатор */
 .nav{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line-soft);background:var(--bg-2)}
 .nav-b{flex:1;min-height:0;overflow:auto;padding:.6rem .5rem}

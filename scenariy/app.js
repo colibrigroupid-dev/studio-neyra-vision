@@ -74,13 +74,14 @@
     const title = (meta.data && (typeof meta.data.title === 'string' ? meta.data.title : (meta.data.title && meta.data.title.ru))) || slug;
     if (!projects[id]) projects[id] = Object.assign(blank(title, text), { id });
     projects[id].title = title; projects[id].text = text; projects[id].server = slug;
+    const pr = meta.data && meta.data.principal; projects[id].readOnly = !!(pr && (pr.role === 'viewer' || !(Array.isArray(pr.sections) && (pr.sections.includes('script') || pr.sections.includes('*'))))); projects[id].role = pr && pr.role;
     if (meta.data && meta.data.synopsis && !projects[id].meta.synopsis) projects[id].meta.synopsis = meta.data.synopsis;
     serverMode = { slug, lastText: text, timer: null, loaded: true };
     currentId = id; save(); open(id); loadSceneStatus();
     setSaveState(T('сценарий с сервера', 'серверден сценарий')); checkApi();
   }
   function serverSave() {
-    if (!serverMode || !serverMode.loaded || currentId !== 'srv:' + serverMode.slug) return;
+    if (!serverMode || !serverMode.loaded || currentId !== 'srv:' + serverMode.slug || cur().readOnly) return;
     if (cur().text === serverMode.lastText) return;
     clearTimeout(serverMode.timer);
     const slug = serverMode.slug, text = cur().text;
@@ -139,6 +140,7 @@
     currentId = id; try { localStorage.setItem(LS.current, id); } catch (e) { /* */ }
     const p = cur(); if (!p.versions) p.versions = []; if (!p.meta) p.meta = {}; if (!p.docs) p.docs = []; if (!p.korzina) p.korzina = []; if (!p.server) serverMode = null; curUserDoc = null;
     $('#title').value = p.title;
+    const ro = !!p.readOnly; ed.root.contentEditable = ro ? 'false' : 'true'; document.body.classList.toggle('readonly', ro); $('#title').readOnly = ro; $('#ptype').disabled = ro;
     loading = true; try { ed.load(p.text); } finally { loading = false; }
     ['logline', 'synopsis', 'notes'].forEach((k) => { $('#f-' + k).value = p.meta[k] || ''; });
     const tp = Fountain.parse(p.text).title; const tf = (keys) => { for (const k of keys) if (tp[k]) return tp[k]; return ''; };
@@ -303,7 +305,7 @@
   }
   function renderStoreNote() {
     const el = $('#storeNote'); const p = cur(); if (!p) return;
-    el.innerHTML = p.server ? `<b>${T('проект команды', 'команда жобасы')}</b> · ${esc(p.server)}` : `<b>${T('хранится в этом браузере', 'осы браузерде сақталады')}</b> · ${T('скачивайте .fountain или подключите сервер команды (≡)', '.fountain жүктеңіз немесе команда серверін қосыңыз (≡)')}${storageOk ? '' : ' · <span style="color:var(--rec)">' + T('хранилище недоступно!', 'қойма қолжетімсіз!') + '</span>'}`;
+    el.innerHTML = p.server ? `<b>${T('проект команды', 'команда жобасы')}</b> · ${esc(p.server)}${p.readOnly ? ' · ' + T('только чтение', 'тек оқу') + (p.role ? ' (' + esc(p.role) + ')' : '') : ''}` : `<b>${T('хранится в этом браузере', 'осы браузерде сақталады')}</b> · ${T('скачивайте .fountain или подключите сервер команды (≡)', '.fountain жүктеңіз немесе команда серверін қосыңыз (≡)')}${storageOk ? '' : ' · <span style="color:var(--rec)">' + T('хранилище недоступно!', 'қойма қолжетімсіз!') + '</span>'}`;
   }
   function renameCharacter(oldName) {
     const nn = prompt(T('Новое имя для ', 'Жаңа есім: ') + oldName + T(' (заменю во всём тексте)', ' (бүкіл мәтінде ауыстырамын)'), oldName);
@@ -478,10 +480,10 @@
       <label><span>${T('Локация', 'Локация')}</span><div class="val" data-loc>${esc((kind ? kind + ' ' : '') + loc)}</div></label>
       <label><span>${T('Время', 'Уақыт')}</span><div class="val" data-time>${esc(time || '—')}</div></label>
       <label><span>${T('Длительность', 'Ұзақтығы')}</span><div class="val" data-dur>${fmt(s.seconds)}</div></label>
-      <label><span>${T('Эмоциональный тон', 'Эмоциялық реңк')}</span><input data-f="ton" type="text" value="${esc(ton ? ton.text : '')}" placeholder="${T('тревога, нежность, ирония…', 'мазасыздық, нәзіктік…')}"></label>
-      <label><span>${T('Требования к изображению', 'Бейнеге талаптар')}</span><textarea data-f="viz" rows="5" placeholder="${T('эпоха, атмосфера, свет, детали, что обязательно в кадре', 'дәуір, атмосфера, жарық, детальдар')}">${esc(viz ? viz.text : '')}</textarea></label>
-      <div class="sp-ops"><button type="button" data-op="up">↑ ${T('выше', 'жоғары')}</button><button type="button" data-op="down">↓ ${T('ниже', 'төмен')}</button><button type="button" data-op="del">${T('Удалить сцену', 'Көріністі жою')}</button></div>
-      ${cur().server ? (sceneStatus[s.index] && sceneStatus[s.index].status === 'approved' ? `<div class="sp-ops"><span class="val">✓ ${T('Утверждено', 'Бекітілді')}${sceneStatus[s.index].approvedAt ? ' · ' + new Date(sceneStatus[s.index].approvedAt).toLocaleDateString('ru') : ''}</span><button type="button" data-op="unapprove">${T('Снять утверждение', 'Бекітуді алу')}</button></div>` : `<div class="sp-ops"><button type="button" class="approve" data-op="approve">${T('Утвердить и передать в Art', 'Бекітіп, Art-қа беру')}</button></div>`) : ''}
+      <label><span>${T('Эмоциональный тон', 'Эмоциялық реңк')}</span><input data-f="ton" type="text" ${cur().readOnly ? 'readonly' : ''} value="${esc(ton ? ton.text : '')}" placeholder="${T('тревога, нежность, ирония…', 'мазасыздық, нәзіктік…')}"></label>
+      <label><span>${T('Требования к изображению', 'Бейнеге талаптар')}</span><textarea data-f="viz" rows="5" ${cur().readOnly ? 'readonly' : ''} placeholder="${T('эпоха, атмосфера, свет, детали, что обязательно в кадре', 'дәуір, атмосфера, жарық, детальдар')}">${esc(viz ? viz.text : '')}</textarea></label>
+      ${cur().readOnly ? '' : `<div class="sp-ops"><button type="button" data-op="up">↑ ${T('выше', 'жоғары')}</button><button type="button" data-op="down">↓ ${T('ниже', 'төмен')}</button><button type="button" data-op="del">${T('Удалить сцену', 'Көріністі жою')}</button></div>`}
+      ${cur().server && !cur().readOnly ? (sceneStatus[s.index] && sceneStatus[s.index].status === 'approved' ? `<div class="sp-ops"><span class="val">✓ ${T('Утверждено', 'Бекітілді')}${sceneStatus[s.index].approvedAt ? ' · ' + new Date(sceneStatus[s.index].approvedAt).toLocaleDateString('ru') : ''}</span><button type="button" data-op="unapprove">${T('Снять утверждение', 'Бекітуді алу')}</button></div>` : `<div class="sp-ops"><button type="button" class="approve" data-op="approve">${T('Утвердить и передать в Art', 'Бекітіп, Art-қа беру')}</button></div>`) : ''}
       <p class="empty" style="font-size:.76rem">${T('Тон и требования уходят в бриф для Art вместе с текстом сцены.', 'Реңк пен талаптар Art брифіне кетеді.')}</p>`;
     body.querySelector('[data-f=ton]').addEventListener('input', (e) => { clearTimeout(spTimer); spTimer = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Тон', e.target.value); }, 400); });
     body.querySelector('[data-f=viz]').addEventListener('input', (e) => { clearTimeout(spTimer2); spTimer2 = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Визуал', e.target.value); }, 400); });
