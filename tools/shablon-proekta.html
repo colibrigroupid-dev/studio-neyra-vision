@@ -94,6 +94,7 @@ footer{border-top:1px solid var(--line-soft);padding:2rem 0 calc(2rem + env(safe
 @media print{.top,.title-hero__art,.lenta,.grain::after,#smeta,footer{display:none!important}body{background:#fff;color:#111}.title-hero{min-height:auto}.boards{grid-template-columns:repeat(2,1fr)}.doc p,.tbl td{color:#222}}
 .kontakt a{display:inline-flex;align-items:center;min-height:44px}.brand{min-height:44px;display:inline-flex;align-items:center}
 .top nav a.nav-okno{color:var(--accent)}
+.hod__grid{display:grid;gap:1.5rem;grid-template-columns:1fr;margin-top:1.2rem}@media(min-width:760px){.hod__grid{grid-template-columns:1fr 1fr 1fr}}.hod h3{margin:0 0 .5rem;font-size:var(--step-0)}.hod .list{list-style:none;margin:0;padding:0;display:grid;gap:.45rem}.hod .list li{padding:.5rem 0;border-bottom:1px solid var(--line-soft);color:var(--muted)}.hod .list li b{color:var(--text);font-weight:500}.hod .mono{font-family:var(--mono);font-size:.8rem;color:var(--dim);margin-right:.4em}.hod__ai{margin-top:1.6rem;padding:1rem 1.2rem;border:1px solid var(--line-soft);border-left:2px solid var(--accent);border-radius:10px}
 </style>
 </head>
 <body class="grain">
@@ -118,7 +119,35 @@ footer{border-top:1px solid var(--line-soft);padding:2rem 0 calc(2rem + env(safe
   const norm=c=>(c||'').replace(/\s+/g,'').toUpperCase();
   async function open(code){
     code=norm(code); if(!code) return false;
-    try{const html=await dec('payload',code);document.getElementById('app').innerHTML=html;document.getElementById('nav').hidden=false;try{sessionStorage.setItem('nv-code-'+location.pathname,code)}catch(e){};wirePro();if(location.hash){const el=document.querySelector(location.hash);el&&el.scrollIntoView()}return true}catch(e){return false}
+    try{const html=await dec('payload',code);document.getElementById('app').innerHTML=html;document.getElementById('nav').hidden=false;try{sessionStorage.setItem('nv-code-'+location.pathname,code)}catch(e){};wirePro();wireLive();if(location.hash){const el=document.querySelector(location.hash);el&&el.scrollIntoView()}return true}catch(e){return false}
+  }
+  async function wireLive(){
+    const sec=document.querySelector('#hod[data-api]'); if(!sec) return;
+    let api; try{api=JSON.parse(sec.dataset.api)}catch(e){return}
+    const status=sec.querySelector('.hod__status'), grid=sec.querySelector('.hod__grid'), ai=sec.querySelector('.hod__ai');
+    const E=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const get=async(path)=>{const r=await fetch(api.url+path,{headers:{'X-Key':api.key},credentials:'omit',cache:'no-store'});if(!r.ok)throw new Error('сервер '+r.status);return r.json()};
+    const stageRu={script:'Сценарий',breakdown:'Разбивка',heroes:'Герои',locations:'Локации',storyboard:'Раскадровка',shots:'Кадры',video:'Видео',sound:'Звук',edit:'Монтаж'};
+    const typeRu={scene:'Сцена',shot:'Кадр',teaser:'Тизер',episode:'Серия',character:'Герой',location:'Локация',project:'Проект',member:'Участник',version:'Версия',script:'Сценарий',breakdown:'Разбивка',approval:'Решение',cell:'Задача'};
+    const actRu={created:'— создание',updated:'— изменение',deleted:'— удаление',imported:'— импорт',approved:'— принято',returned:'— возврат на доработку',restored:'— восстановление',asked:'— вопрос'};
+    try{
+      const base='/api/projects/'+encodeURIComponent(api.slug);
+      const map=(await get(base+'/map')).data; const scenes={}; (map.objects||[]).forEach(o=>{scenes[o.type+':'+o.id]=o});
+      const name=o=>{const t=typeRu[o.type]||o.type; const id=/^[0-9A-HJKMNP-TV-Z]{26}$/.test(o.id||'')?'':(' '+o.id); return t+id};
+      const cells=map.cells||[]; const awaiting=cells.filter(c=>c.status==='awaiting'), working=cells.filter(c=>c.status==='working');
+      const counts={}; cells.forEach(c=>{counts[c.status]=(counts[c.status]||0)+1});
+      const ruSt={empty:'не начато',working:'в работе',done:'готово',awaiting:'ждёт решения',approved:'принято',returned:'возвращено'};
+      status.textContent='Клеток на карте: '+cells.length+(cells.length?' · '+Object.entries(counts).map(([k,v])=>(ruSt[k]||k)+' '+v).join(' · '):'');
+      const li=(c,extra)=>'<li><b>'+E(name(c.object))+'</b> · '+E(stageRu[c.stage]||c.stage)+(c.version?' · '+E(c.version):'')+(c.assignee&&c.assignee.name?' · '+E(c.assignee.name):'')+(extra||'')+'</li>';
+      sec.querySelector('[data-hod=awaiting]').innerHTML=awaiting.length?awaiting.slice(0,8).map(c=>li(c)).join(''):'<li class="muted">никто не ждёт решения</li>';
+      sec.querySelector('[data-hod=working]').innerHTML=working.length?working.slice(0,8).map(c=>li(c)).join(''):'<li class="muted">в работе ничего не отмечено</li>';
+      let acts=[]; try{const first=(await get(base+'/activity?offset=0&limit=1')); const total=(first.pagination&&first.pagination.total)||0; const off=Math.max(0,total-10); const page=(await get(base+'/activity?offset='+off+'&limit=10')).data; acts=(Array.isArray(page)?page:(page.items||[])).slice().reverse()}catch(e){}
+      sec.querySelector('[data-hod=activity]').innerHTML=acts.length?acts.map(a=>{const [type,verb]=String(a.action||'').split('.');const when=(a.createdAt||'').replace('T',' ').slice(5,16);return '<li><span class="mono">'+E(when)+'</span> '+E(typeRu[type]||type)+' '+E(actRu[verb]||verb||'')+'</li>'}).join(''):'<li class="muted">операций пока нет</li>';
+      grid.hidden=false;
+      ai.hidden=false; const aiEl=sec.querySelector('[data-hod=ai]'); aiEl.textContent='Спрашиваю помощника…';
+      try{const r=await fetch(api.url+base+'/assistant',{method:'POST',headers:{'X-Key':api.key,'content-type':'application/json'},credentials:'omit',body:JSON.stringify({question:'Где сейчас затык и что проседает? Три короткие строки: что ждёт решения дольше всего, какой цех отстаёт, что сделать сегодня.',section:'map'})});
+        const j=await r.json(); aiEl.textContent=r.ok?(j.data&&j.data.answer||'—'):(r.status===503?'ИИ-взгляд появится, когда на сервере будет ключ модели.':'Помощник не ответил: '+((j.error&&j.error.message)||r.status))}catch(e){aiEl.textContent='Помощник недоступен.'}
+    }catch(e){status.textContent='Живые данные недоступны: '+e.message+'. Ниже — состояние из папки проекта.'}
   }
   function wirePro(){const f=document.querySelector('[data-pro]');if(!f)return;f.addEventListener('submit',async ev=>{ev.preventDefault();const c=norm(f.code.value);try{document.getElementById('pro').innerHTML=await dec('payload_pro',c)}catch(e){f.code.value='';f.code.placeholder='Неверный PRO-код'}})}
   const form=document.getElementById('gateform');

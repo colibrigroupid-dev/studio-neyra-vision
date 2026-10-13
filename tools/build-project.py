@@ -300,6 +300,16 @@ def build(slug, proekty, outdir):
         kont = f'<p class="kontakt">Контакт продюсера: <b>{E(k.get("imya",""))}</b> · <a href="{E(k.get("telegram",""))}">Telegram</a> · <a href="mailto:{E(k.get("pochta",""))}">{E(k.get("pochta",""))}</a></p>' if k else ""
         return f'<section id="komanda"><div class="wrap"><p class="caps">Команда</p><h2>Кто делает.</h2><div class="creds">{rows}</div>{kont}</div></section>'
 
+    def hod_html():
+        """Живой блок «Сейчас в работе»: страница сама читает карту, ленту и ИИ-взгляд с сервера команды ключом только на чтение
+        (ключ лежит внутри зашифрованного кодом содержимого, у сервера роль viewer)."""
+        api = cfg.get("api") or {}
+        if not api.get("url") or not api.get("klyuch_prosmotra"): return ""
+        meta = json.dumps({"url": api["url"], "key": api["klyuch_prosmotra"], "slug": cfg["slug"]}, ensure_ascii=False)
+        return ('<section id="hod" class="hod" data-api=\'' + E(meta).replace("'", "&#39;") + '\'><div class="wrap"><p class="caps">Сейчас в работе · живые данные</p><h2>Как движется проект.</h2>'
+                '<p class="muted hod__status">Читаю карту производства…</p><div class="hod__grid" hidden><div><h3>Ждёт решения</h3><ul class="list" data-hod="awaiting"></ul></div><div><h3>В работе</h3><ul class="list" data-hod="working"></ul></div><div><h3>Последние операции</h3><ul class="list" data-hod="activity"></ul></div></div>'
+                '<div class="hod__ai" hidden><p class="caps">ИИ-взгляд · где затык</p><p data-hod="ai" class="muted"></p></div></div></section>')
+
     def nepreryvnost_html():
         """Раздел «Непрерывность»: реестр кадров и канон — какие кадры сделаны под старый канон (RAZBOR/09 п.8)."""
         rp = proj / "03-vizual" / "REESTR-KADROV.json"
@@ -344,6 +354,7 @@ def build(slug, proekty, outdir):
 </header>
 {path_html()}
 {karta_html()}
+{hod_html()}
 {nepreryvnost_html()}
 <section id="zamysel"><div class="wrap grid2">
   <div><p class="caps">Замысел</p><h2>О чём на самом деле.</h2><div class="doc big">{md(o_chyom)}</div>{podzag_html}</div>
