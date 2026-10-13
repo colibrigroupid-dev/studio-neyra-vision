@@ -156,6 +156,9 @@ html[data-paper="graphite"] .sp .pb{border-color:oklch(0.4 0.01 70)}html[data-pa
 .ai-h .dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
 .ai-h .dot.on{background:var(--ok)}
 .ai-h .dot.off{background:var(--rec)}
+.ai-h{flex-wrap:wrap;gap:.4rem}
+.seg.tier button{padding:.45em .7em;min-height:28px}
+.seg.tier button[data-tier=pro][aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .scope{padding:.6rem .8rem;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .scope select{background:var(--bg-2);border:1px solid var(--line-soft);border-radius:var(--r);padding:.3em .5em;font-size:.8rem}
 .scope .what{color:var(--dim);font-size:.76rem;font-family:var(--mono)}

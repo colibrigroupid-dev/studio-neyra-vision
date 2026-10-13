@@ -21,6 +21,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 API_URL = "https://api.anthropic.com/v1/messages"
 MODEL = os.environ.get("NEYRA_MODEL", "claude-sonnet-5-5")
+MODEL_PRO = os.environ.get("NEYRA_MODEL_PRO", "claude-opus-5-5")
 ROLE_FILE = HERE / "NEYRA-SCENARIST.md"
 
 
@@ -92,7 +93,7 @@ class Handler(SimpleHTTPRequestHandler):
         if req.get("system"):
             system = system + "\n\n" + str(req["system"])
         payload = {
-            "model": MODEL,
+            "model": MODEL_PRO if req.get("tier") == "pro" else MODEL,
             "max_tokens": max_tokens,
             "system": system,
             "messages": messages,

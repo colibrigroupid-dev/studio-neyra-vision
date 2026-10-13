@@ -671,6 +671,8 @@ def invalidate_dependencies(project):
 
 ASSISTANT_API = "https://api.anthropic.com/v1/messages"
 ASSISTANT_MODEL = os.environ.get("NEYRA_MODEL", "claude-sonnet-5-5")
+ASSISTANT_MODEL_PRO = os.environ.get("NEYRA_MODEL_PRO", "claude-opus-5-5")
+ASSISTANT_TIERS = {"standard": (ASSISTANT_MODEL, 2500), "pro": (ASSISTANT_MODEL_PRO, 6000)}  # режим → (модель, max_tokens)
 ASSISTANT_ROLE = ("Ты — помощник проекта Neyra Vision Studio: одно окно на все этапы кино, помнишь весь проект. "
                   "Отвечай на языке вопроса (русский или казахский), коротко и по делу, с номерами сцен и именами. "
                   "Фильм пишет человек: предлагай варианты, не переписывай без просьбы. Ничего платного не запускай — "
@@ -730,17 +732,18 @@ def assistant_context(project, principal, section=""):
     return ("\n\n".join(lines))[:60000], mode
 
 
-def assistant_answer(question, context, mode, history):
+def assistant_answer(question, context, mode, history, tier="standard"):
     key = assistant_key()
+    model, max_tokens = ASSISTANT_TIERS.get(tier, ASSISTANT_TIERS["standard"])
     if os.environ.get("NEYRA_ASSISTANT_FAKE") == "1":
-        return {"answer": f"[проба без модели] Контекст {len(context)} знаков. {mode} Вопрос: {question[:120]}", "model": "fake", "usage": {}}
+        return {"answer": f"[проба без модели] Контекст {len(context)} знаков. {mode} Вопрос: {question[:120]}", "model": "fake-" + tier, "usage": {}}
     if not key:
         raise ApiError(503, "ASSISTANT_KEY_MISSING", "Помощник ещё не подключён: на сервере нет ключа модели (~/.config/neyra-studio/key).")
     import urllib.request
     import urllib.error
     messages = [{"role": m["role"], "content": m["content"]} for m in history if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)][-10:]
     messages.append({"role": "user", "content": question})
-    payload = {"model": ASSISTANT_MODEL, "max_tokens": 1500, "system": ASSISTANT_ROLE + ("\n" + mode if mode else "") + "\n\nКОНТЕКСТ ПРОЕКТА:\n" + context,
+    payload = {"model": model, "max_tokens": max_tokens, "system": ASSISTANT_ROLE + ("\n" + mode if mode else "") + "\n\nКОНТЕКСТ ПРОЕКТА:\n" + context,
                "messages": messages}
     req = urllib.request.Request(ASSISTANT_API, data=json.dumps(payload).encode("utf-8"), method="POST",
                                  headers={"content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01"})
@@ -753,7 +756,7 @@ def assistant_answer(question, context, mode, history):
     except (OSError, ValueError) as error:
         raise ApiError(502, "ASSISTANT_UPSTREAM", f"Модель недоступна: {error}") from None
     text_out = "".join(b.get("text", "") for b in out.get("content", []) if b.get("type") == "text")
-    return {"answer": text_out, "model": out.get("model", ASSISTANT_MODEL), "usage": out.get("usage", {})}
+    return {"answer": text_out, "model": out.get("model", model), "usage": out.get("usage", {})}
 
 
 def production_map(project, principal):
@@ -1076,12 +1079,48 @@ class Handler(SimpleHTTPRequestHandler):
         return 201, {"data": {"slug": slug, "title": title, "key": issued_key, "tokeny": tokeny.summary(wallet),
                               "okno": "/studio/?klyuch=" + quote(issued_key, safe="") + "#/studio/overview"}}, None
 
+    def assistant_body(self):
+        """Тело вопроса помощнику: question, section, history и режим tier (standard | pro)."""
+        body = self.body()
+        fields(body, ("question", "section", "history", "tier"), ("question",))
+        question = text(body["question"], "question", 60000, required=True)
+        mode_section = body.get("section", "")
+        if not isinstance(mode_section, str) or len(mode_section) > 40:
+            raise ApiError(422, "VALIDATION", "Поле section — короткая строка.")
+        history = body.get("history", [])
+        if not isinstance(history, list) or len(history) > 20:
+            raise ApiError(422, "VALIDATION", "history — список до 20 реплик.")
+        tier = body.get("tier", "standard")
+        if tier not in ASSISTANT_TIERS:
+            raise ApiError(422, "VALIDATION", "Поле tier — standard или pro.")
+        return question, mode_section, history, tier
+
     def route(self, parts, query, principal, keys):
         method, store = self.command, self.server.store
         if parts == ["api", "session"]:
             if method != "GET":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Сессию можно только читать.")
             return 200, {"data": principal_info(principal)}, None
+        if parts == ["api", "assistant"]:
+            # помощник без проекта: сценарий из браузера автора; память проекта не подключается, токены списываются как за вопрос
+            if method != "POST":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Помощнику можно только задать вопрос (POST).")
+            question, mode_section, history, tier = self.assistant_body()
+            wallets = store.read_tokeny()
+            wallet = tokeny.ensure_wallet(wallets, principal)
+            if not tokeny.can_spend(wallet, "vopros"):
+                store.save_tokeny(wallets)
+                raise ApiError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и помощник продолжит.")
+            context = "ПРОЕКТ НЕ ВЫБРАН: сценарий автора хранится у него в браузере; отвечай только по тексту вопроса."
+            answer = assistant_answer(question, context, ASSISTANT_MODES.get(mode_section, ""), history, tier)
+            answer["context"] = {"chars": 0, "scenes": 0, "characters": 0, "locations": 0}
+            try:
+                wallet, cost = tokeny.spend(wallets, principal, "vopros")
+            except tokeny.TokenyError as error:
+                raise ApiError(error.status, error.code, error.message) from None
+            store.save_tokeny(wallets)
+            answer["tokeny"] = dict(tokeny.summary(wallet), spisano=cost)
+            return 200, {"data": answer}, None
         if parts == ["api", "me"]:
             # №36 кабинет участника: кто я и мои проекты с личными счётчиками (ждёт меня / мои задачи)
             if method != "GET":
@@ -1186,22 +1225,14 @@ class Handler(SimpleHTTPRequestHandler):
             if method != "POST":
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Помощнику можно только задать вопрос (POST).")
             authorize(principal, slug, "overview", project)
-            body = self.body()
-            fields(body, ("question", "section", "history"), ("question",))
-            question = text(body["question"], "question", 60000, required=True)
-            mode_section = body.get("section", "")
-            if not isinstance(mode_section, str) or len(mode_section) > 40:
-                raise ApiError(422, "VALIDATION", "Поле section — короткая строка.")
-            history = body.get("history", [])
-            if not isinstance(history, list) or len(history) > 20:
-                raise ApiError(422, "VALIDATION", "history — список до 20 реплик.")
+            question, mode_section, history, tier = self.assistant_body()
             wallets = store.read_tokeny()
             wallet = tokeny.ensure_wallet(wallets, principal)
             if not tokeny.can_spend(wallet, "vopros"):
                 store.save_tokeny(wallets)
                 raise ApiError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и помощник продолжит.")
             context, mode = assistant_context(project, principal, mode_section)
-            answer = assistant_answer(question, context, mode, history)
+            answer = assistant_answer(question, context, mode, history, tier)
             answer["context"] = {"chars": len(context), "scenes": len(project.get("scenes", [])), "characters": len(project.get("characters", [])), "locations": len(project.get("locations", []))}
             try:
                 wallet, cost = tokeny.spend(wallets, principal, "vopros")

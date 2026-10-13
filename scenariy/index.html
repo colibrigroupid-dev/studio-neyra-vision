@@ -15,7 +15,7 @@
 <link rel="icon" href="../assets/favicon-64.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;500;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=46">
+<link rel="stylesheet" href="app.css?v=47">
 </head>
 <body>
 <noscript><div class="nojs">Редактор работает только с включённым JavaScript. Сценарии хранятся в вашем браузере; без JS открыть их нельзя.</div></noscript>
@@ -90,7 +90,7 @@
     </section>
 
     <aside class="pane right">
-      <div class="pane-h ai-h"><span class="dot" id="aiDot"></span><b style="font-weight:500">NEYRA</b><span class="caps" id="aiState" data-t="проверяю связь">проверяю связь</span><button class="btn btn--sm" id="btnServer" type="button" style="margin-left:auto" data-t="Сервер">Сервер</button></div>
+      <div class="pane-h ai-h"><span class="dot" id="aiDot"></span><b style="font-weight:500">NEYRA</b><span class="caps" id="aiState" data-t="проверяю связь">проверяю связь</span><div class="seg tier" role="group" aria-label="Режим NEYRA" style="margin-left:auto" title="PRO — глубокий разбор всего сценария; на простых действиях со сценой сам переключается на Стандарт"><button type="button" data-tier="standard" aria-pressed="true" data-t="Стандарт">Стандарт</button><button type="button" data-tier="pro" aria-pressed="false">PRO</button></div><button class="btn btn--sm" id="btnServer" type="button" data-t="Сервер">Сервер</button></div>
       <div class="scope">
         <span class="caps" data-t="Работать с">Работать с</span>
         <select id="scope" aria-label="Область">
@@ -125,7 +125,7 @@
 </div>
 <input type="file" id="fileIn" accept=".fountain,.txt,.md,.fdx,.json" class="hidden">
 <div class="toast" id="toast" role="status"></div>
-<script src="fountain.js?v=46"></script>
-<script src="app.js?v=46"></script>
+<script src="fountain.js?v=47"></script>
+<script src="app.js?v=47"></script>
 </body>
 </html>

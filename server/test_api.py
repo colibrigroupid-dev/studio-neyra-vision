@@ -191,6 +191,18 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(answer["context"]["scenes"], 1)
             self.assertGreater(answer["context"]["chars"], 50)
             self.api("POST", "/api/projects/film/assistant", {"question": "x", "history": "нет"}, 422)
+            # режимы: standard по умолчанию, pro — другая модель; чужое значение — 422
+            self.assertEqual(answer["model"], "fake-standard")
+            pro = self.api("POST", "/api/projects/film/assistant", {"question": "Разбери структуру", "tier": "pro"})["data"]
+            self.assertEqual(pro["model"], "fake-pro")
+            self.api("POST", "/api/projects/film/assistant", {"question": "x", "tier": "ultra"}, 422)
+            # помощник без проекта: сценарий из браузера автора, память проекта не подключается
+            free = self.api("POST", "/api/assistant", {"question": "Что не так со сценой?", "section": "script", "tier": "pro"})["data"]
+            self.assertEqual(free["model"], "fake-pro")
+            self.assertEqual(free["context"]["scenes"], 0)
+            self.assertIn("сценарный редактор", free["answer"])
+            self.api("GET", "/api/assistant", None, 405)
+            self.api("POST", "/api/assistant", {"question": ""}, 422)
             self.api("POST", "/api/projects/film/assistant", {"question": "x"}, 403, key="temporary-viewer") if False else None
         finally:
             for k, v in previous.items():

@@ -4,7 +4,7 @@
   'use strict';
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
-  const LS = { projects: 'nvs.projects', current: 'nvs.current', view: 'nvs.view', api: 'nvs.api', lang: 'nv-lang', paper: 'neyra-vision-script-paper-v1', server: 'neyra-vision-server-settings-v1' };
+  const LS = { tier: 'nvs.tier', projects: 'nvs.projects', current: 'nvs.current', view: 'nvs.view', api: 'nvs.api', lang: 'nv-lang', paper: 'neyra-vision-script-paper-v1', server: 'neyra-vision-server-settings-v1' };
   const DEFAULT_SERVER = 'https://api.studio.neyra.vision';
   const IS_LOCAL = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
 
@@ -21,7 +21,7 @@
     'Улучшить сцену': 'Көріністі жақсарту', 'цель · препятствие · перемена': 'мақсат · кедергі · өзгеріс', 'Диалог живее': 'Диалогты жандандыру', 'подтекст, голоса героев': 'астарлы мән, кейіпкер дауыстары',
     'Модернизировать': 'Жаңғырту', 'в наше время и язык': 'бүгінгі заман мен тілге', '3 поворота': '3 бұрылыс', 'варианты для сцены': 'көрініске нұсқалар',
     'Логлайн и синопсис': 'Логлайн және синопсис', 'в карточку «Замысел»': '«Ой» карточкасына', 'На казахский': 'Қазақшаға', 'На русский': 'Орысшаға', 'перевод с форматом': 'форматымен аудару',
-    'Расписать': 'Көріністерге жазу', 'из синопсиса или заметки — сцены': 'синопсис немесе жазбадан — көріністер', 'Сжать': 'Қысқарту', 'входи поздно, выходи рано': 'кеш кір, ерте шық',
+    'Стандарт': 'Стандарт', 'Расписать': 'Көріністерге жазу', 'из синопсиса или заметки — сцены': 'синопсис немесе жазбадан — көріністер', 'Сжать': 'Қысқарту', 'входи поздно, выходи рано': 'кеш кір, ерте шық',
   };
   let lang = 'ru';
   function setLang(l) {
@@ -431,6 +431,13 @@ Draft date: 13.10.2026
   $('#btnServer').addEventListener('click', serverDialog);
   $('#aiState').addEventListener('click', () => { const p = cur(); if (server && p && !p.server) chooseCtx(p); });
 
+  // ---------- режим NEYRA: Стандарт / PRO ----------
+  let tier = 'standard'; try { tier = localStorage.getItem(LS.tier) === 'pro' ? 'pro' : 'standard'; } catch (e) { /* */ }
+  function setTier(v) { tier = v === 'pro' ? 'pro' : 'standard'; try { localStorage.setItem(LS.tier, tier); } catch (e) { /* */ } $$('.seg.tier [data-tier]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.tier === tier)); }
+  $$('.seg.tier [data-tier]').forEach((b) => b.addEventListener('click', () => { setTier(b.dataset.tier); toast(tier === 'pro' ? T('PRO: глубокий разбор всего сценария. На простых действиях со сценой — Стандарт.', 'PRO: бүкіл сценарийді терең талдау. Қарапайым әрекеттерде — Стандарт.') : T('Стандарт', 'Стандарт')); }));
+  setTier(tier);
+  const HEAVY = { coverage: 1, beats: 1, continuity: 1, logline: 1 }; // всё остальное — простые действия со сценой
+  function effectiveTier(info) { if (tier !== 'pro') return 'standard'; if (info.free) return info.scope && info.scope.kind === 'all' ? 'pro' : 'standard'; return HEAVY[info.key] ? 'pro' : 'standard'; }
   // ---------- NEYRA ----------
   function scopeHint() {
     const sel = src.value.slice(src.selectionStart, src.selectionEnd);
@@ -496,25 +503,24 @@ Draft date: 13.10.2026
     if (!server && !IS_LOCAL) { addMsg({ role: 'assistant', label: T('нет связи с NEYRA', 'NEYRA-мен байланыс жоқ'), text: T('Чтобы NEYRA отвечала, подключите сервер команды: кнопка «Сервер» → ключ участника. Ключ выдаёт продюсер проекта.', 'NEYRA жауап беруі үшін команда серверін қосыңыз: «Сервер» түймесі → қатысушы кілті.'), err: true }); return; }
     busy = true;
     const pid = currentId, p = cur();
+    const useTier = effectiveTier(info); if (useTier === 'pro') label += ' · PRO';
     p.chat.push({ role: 'user', label, ts: Date.now() }); renderChat();
     const wait = addMsg({ role: 'assistant', label: T('NEYRA думает', 'NEYRA ойлануда'), text: '', wait: true });
     try {
       const history = p.chat.filter((m) => m.role === 'assistant' && m.text).slice(-2).map((m) => ({ role: 'assistant', content: m.text.slice(0, 3000) }));
       let j;
       if (server) {
-        let slug = p.server || p.ctxSlug;
-        if (!slug) { // локальный проект: пользователь один раз выбирает, память какого проекта команды подключать
-          wait.remove(); busy = false; p.chat.pop(); renderChat();
-          slug = await chooseCtx(p); if (!slug) return;
-          return ask(prompt, label, info);
-        }
-        const r = await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/assistant', 'POST', { question: prompt, section: 'script', history: info.free ? history : [] });
+        const slug = p.server || p.ctxSlug; // сценарий из браузера: без памяти проекта, пока автор сам её не подключит (щелчок по строке состояния)
+        const path = slug ? '/api/projects/' + encodeURIComponent(slug) + '/assistant' : '/api/assistant';
+        let r;
+        try { r = await serverFetch(path, 'POST', { question: prompt, section: 'script', history: info.free ? history : [], tier: useTier }); }
+        catch (e) { if (!slug && /404|не найден/i.test(e.message)) throw new Error(T('Сервер команды ещё не обновлён до режима «без проекта». Подключите память проекта щелчком по строке состояния или обновите сервер.', 'Команда сервері әлі жаңартылмаған. Жоба жадын қосыңыз немесе серверді жаңартыңыз.')); throw e; }
         j = { text: (r.data && r.data.answer) || '' };
       } else {
         const messages = [];
         if (history.length && info.free) { messages.push({ role: 'user', content: 'Напоминание о предыдущих ответах по этому сценарию.' }); messages.push({ role: 'assistant', content: history.map((h) => h.content).join('\n---\n') }); }
         messages.push({ role: 'user', content: prompt });
-        const r = await fetch(apiBase + '/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, max_tokens: info.scope && info.scope.kind === 'all' ? 6000 : 3000 }) });
+        const r = await fetch(apiBase + '/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, max_tokens: info.scope && info.scope.kind === 'all' ? 6000 : 3000, tier: useTier }) });
         j = await r.json().catch(() => ({ error: T('сервер ответил не JSON', 'сервер JSON емес жауап берді') }));
         if (!r.ok || j.error) throw new Error(j.error || (T('ошибка ', 'қате ') + r.status));
       }
@@ -581,15 +587,15 @@ Draft date: 13.10.2026
     if (!Array.isArray(arr) || !arr.length) { toast(T('У ключа нет ни одного проекта на сервере', 'Кілттің серверде бірде-бір жобасы жоқ')); return ''; }
     return new Promise((resolve) => {
       let picked = '';
-      modal(`<h2>${T('Память для NEYRA', 'NEYRA жады')}</h2><p>${T('Этот сценарий хранится в браузере. Выберите проект команды, чьи герои, мир и решения NEYRA будет помнить, отвечая по нему. Для чистого листа подойдёт пустой проект.', 'Бұл сценарий браузерде сақталады. NEYRA жауап бергенде қай команда жобасының кейіпкерлері мен шешімдерін есте сақтайтынын таңдаңыз.')}</p><ul class="keys" style="margin-bottom:.8rem">${arr.map((x) => `<li><button class="btn btn--sm" type="button" data-m="p:${esc(x.slug)}">${esc(typeof x.title === 'string' ? x.title : (x.title && x.title.ru) || x.slug)}</button><span class="caps">${esc(x.slug)}</span></li>`).join('')}</ul><div class="row"><button class="btn" data-m="close" type="button">${T('Отмена', 'Болдырмау')}</button></div>`,
-        async (act) => { if (!act.startsWith('p:')) return false; picked = act.slice(2); p.ctxSlug = picked; save(); checkApi(); return true; });
+      modal(`<h2>${T('Память для NEYRA', 'NEYRA жады')}</h2><p>${T('Этот сценарий хранится в браузере, и NEYRA отвечает только по его тексту. Если это часть проекта команды, подключите его: NEYRA будет помнить героев, мир и решения проекта.', 'Бұл сценарий браузерде сақталады. NEYRA жауап бергенде қай команда жобасының кейіпкерлері мен шешімдерін есте сақтайтынын таңдаңыз.')}</p><ul class="keys" style="margin-bottom:.8rem">${arr.map((x) => `<li><button class="btn btn--sm" type="button" data-m="p:${esc(x.slug)}">${esc(typeof x.title === 'string' ? x.title : (x.title && x.title.ru) || x.slug)}</button><span class="caps">${esc(x.slug)}</span></li>`).join('')}</ul><div class="row"><button class="btn" data-m="none" type="button">${T('Без памяти проекта', 'Жоба жадысыз')}</button><button class="btn" data-m="close" type="button">${T('Отмена', 'Болдырмау')}</button></div>`,
+        async (act) => { if (act === 'none') { p.ctxSlug = ''; save(); checkApi(); return true; } if (!act.startsWith('p:')) return false; picked = act.slice(2); p.ctxSlug = picked; save(); checkApi(); return true; });
       const iv = setInterval(() => { if (!document.querySelector('.modal')) { clearInterval(iv); resolve(picked); } }, 200);
     });
   }
   async function checkApi() {
     const dot = $('#aiDot'), st = $('#aiState');
     if (server) {
-      try { await serverFetch('/api/me'); dot.className = 'dot on'; const p = cur(); st.textContent = T('сервер команды', 'команда сервері') + (p && p.server ? ' · ' + p.server : (p && p.ctxSlug ? ' · ' + T('память', 'жады') + ': ' + p.ctxSlug : '')); st.style.cursor = (p && !p.server) ? 'pointer' : ''; st.title = (p && !p.server) ? T('Сменить проект-память для NEYRA', 'NEYRA жадын ауыстыру') : ''; }
+      try { await serverFetch('/api/me'); dot.className = 'dot on'; const p = cur(); st.textContent = T('сервер команды', 'команда сервері') + (p && p.server ? ' · ' + p.server : (p && p.ctxSlug ? ' · ' + T('память', 'жады') + ': ' + p.ctxSlug : ' · ' + T('без памяти проекта', 'жоба жадысыз'))); st.style.cursor = (p && !p.server) ? 'pointer' : ''; st.title = (p && !p.server) ? T('Сменить проект-память для NEYRA', 'NEYRA жадын ауыстыру') : ''; }
       catch (e) { dot.className = 'dot off'; st.textContent = T('сервер: ', 'сервер: ') + e.message; }
       return;
     }
