@@ -1058,3 +1058,8 @@ UTF-8, `ensure_ascii=False`, `sort_keys=True`, `separators=(',', ':')`.
 Ставит клетку карты `(scene, stage=script)` в `approved` (создаёт её, если не было), у сцены `status: "approved"`, `approvedAt`, `approvedBy`, `approvedRevision`; паспорта героев и локации сцены получают `scenesApproved: [n…]` — это и есть бриф для Art. `otmena: true` возвращает сцену в `draft`, клетку — в `working`. События `scene.approved` / `scene.unapproved`.
 
 Заметки автора в Fountain сразу после заголовка сцены: `= Тон: …` и `= Визуал: …` → поля сцены `ton` и `vizual` (до 2000 знаков); обычная строка `= …` по-прежнему задаёт акт/секцию.
+
+## Документы автора и корзина (дерево STARC, 13.10.2026)
+
+`/api/projects/<slug>/dokumenty[/<id>]` — GET (раздел `overview`), POST/PATCH/DELETE (запись в `script`, `If-Match`). Документ: `{id, tip: titul|sinopsis|poepizodnik|zametka|loglayn|tritment, title (≤240), text (≤1 МБ), deletedAt, createdAt, updatedAt}`.
+Первый DELETE кладёт в корзину (`deletedAt`), повторный — удаляет насовсем; «Вернуть» = `PATCH {deletedAt: null}`. Сцены: `PATCH /scenes/<id> {deletedAt: "<ISO>"|null}` — та же корзина, сцена остаётся в проекте с меткой.

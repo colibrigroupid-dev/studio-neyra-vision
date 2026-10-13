@@ -257,10 +257,34 @@ def script_input(body, current):
     return result
 
 
+DOKUMENT_TIPY = ("titul", "sinopsis", "poepizodnik", "zametka", "loglayn", "tritment")
+
+
+def dokument_input(body, create=False):
+    """Документы автора (ТЗ Ара / дерево STARC): титульная, синопсис, поэпизодник, заметки."""
+    fields(body, ("tip", "title", "text", "deletedAt"), ("tip", "title") if create else ())
+    result = {}
+    if "tip" in body:
+        result["tip"] = enum(body["tip"], DOKUMENT_TIPY, "tip")
+    if "title" in body:
+        result["title"] = text(body["title"], "title", 240, required=True)
+    if "text" in body:
+        result["text"] = text(body["text"], "text", 1000000)
+    if "deletedAt" in body:
+        result["deletedAt"] = date_input(body["deletedAt"])
+    if create:
+        result.setdefault("text", "")
+        result.setdefault("deletedAt", None)
+    return result
+
+
 def scene_input(body, create=False):
-    fields(body, ("id", "title", "text", "translations") if create else ("title", "text", "translations"),
+    fields(body, ("id", "title", "text", "translations") if create else ("title", "text", "translations", "deletedAt"),
            ("title",) if create else ())
     result = {}
+    if "deletedAt" in body:
+        # корзина: сцена остаётся в проекте с меткой, «Вернуть» = deletedAt: null
+        result["deletedAt"] = date_input(body["deletedAt"])
     for name, limit in (("title", 240), ("text", 1000000)):
         if name in body:
             result[name] = text(body[name], name, limit, required=(name == "title"))
@@ -902,7 +926,7 @@ class Store:
                         or any(not isinstance(item, dict) or "id" not in item for item in project[collection])):
                     raise ValueError()
             # Старые проекты читаются без записи на GET; прежнюю историю не выдумываем.
-            for collection in ("cells", "approvals", "activity", "characters", "locations"):
+            for collection in ("cells", "approvals", "activity", "characters", "locations", "dokumenty"):
                 project.setdefault(collection, [])
                 if (not isinstance(project[collection], list)
                         or any(not isinstance(item, dict) or "id" not in item for item in project[collection])):
@@ -1300,7 +1324,7 @@ class Handler(SimpleHTTPRequestHandler):
         resource = parts[3] if len(parts) > 3 else "project"
         section = {"versions": "script", "scenes": "script", "members": "overview" if method == "GET" else "team", "project": "overview",
                    "map": "overview", "cells": "overview", "approvals": "overview",
-                   "activity": "overview", "razbor": "breakdown", "characters": "overview" if method == "GET" else "heroes",
+                   "activity": "overview", "razbor": "breakdown", "dokumenty": "overview" if method == "GET" else "script", "characters": "overview" if method == "GET" else "heroes",
                    "locations": "overview" if method == "GET" else "locations"}.get(resource, resource)
         if resource == "assistant":
             # №46 помощник: читает весь проект (раздел overview), ничего не изменяет, память диалога — у клиента
@@ -1583,6 +1607,30 @@ class Handler(SimpleHTTPRequestHandler):
                 status = 200
             else:
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
+        elif resource == "dokumenty" and len(parts) in (4, 5):
+            items = project.setdefault("dokumenty", [])
+            item = get_item(items, parts[4]) if len(parts) == 5 else None
+            if method == "GET":
+                return 200, ({"data": item} if item is not None else self.listing(items, query)), project["revision"]
+            if method == "POST" and item is None:
+                changes = dokument_input(self.body(), True)
+                date = timestamp()
+                item = dict(changes, id=breakdown.ulid(), createdAt=date, updatedAt=date, studio_id=project["studio_id"])
+                items.append(item)
+                data, status = item, 201
+            elif method == "PATCH" and item is not None:
+                item.update(dokument_input(self.body()), updatedAt=timestamp())
+                data, status = item, 200
+            elif method == "DELETE" and item is not None:
+                if item.get("deletedAt"):
+                    items.remove(item)
+                    data = {"id": item["id"], "deleted": True}
+                else:
+                    item.update(deletedAt=timestamp(), updatedAt=timestamp())
+                    data = item
+                status = 200
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
         elif parts[3] == "scenes" and len(parts) == 6 and parts[5] == "utverdit":
             # ТЗ Ара (Writer → Art): «Утвердить и передать в Art» для одной сцены. Клетка карты (scene, script) → approved,
             # у сцены status/approvedAt, бриф Art = паспорта героев и локации сцены получают отметку сцены. {"otmena": true} снимает.
@@ -1693,7 +1741,7 @@ class Handler(SimpleHTTPRequestHandler):
             action = ("approval." + data["verdict"] if resource == "approvals"
                       else "cell." + ("created" if status == 201 else "updated"))
         else:
-            kind = {"scenes": "scene", "shots": "shot", "members": "member", "versions": "version",
+            kind = {"scenes": "scene", "shots": "shot", "members": "member", "versions": "version", "dokumenty": "dokument",
                     "characters": "character", "locations": "location"}.get(resource, resource)
             obj = {"type": kind, "id": data.get("id", slug)}
             action = kind + "." + ("deleted" if method == "DELETE" else "created" if status == 201 else "updated")

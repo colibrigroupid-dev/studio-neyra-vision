@@ -1529,6 +1529,29 @@ class TeamAccessTests(unittest.TestCase):
         self.assertEqual(self.api("GET", f"/api/projects/film/scenes/{first['id']}")["data"]["status"], "draft")
         self.api("POST", f"/api/projects/film/scenes/{first['id']}/utverdit", {}, 403, key="temporary-viewer")
 
+    def test_author_documents_and_scene_trash(self):
+        # Дерево STARC (Александр 13.10 12:50): документы автора + корзина с «Вернуть».
+        self.create()
+        doc = self.api("POST", "/api/projects/film/dokumenty", {"tip": "sinopsis", "title": "Синопсис", "text": "Мальчик ищет отца."}, 201)["data"]
+        self.assertEqual((doc["tip"], doc["deletedAt"]), ("sinopsis", None))
+        self.api("POST", "/api/projects/film/dokumenty", {"tip": "pismo", "title": "x"}, 422)
+        self.api("PATCH", f"/api/projects/film/dokumenty/{doc['id']}", {"text": "Мальчик ищет отца в степи."})
+        self.assertEqual(self.api("GET", f"/api/projects/film/dokumenty/{doc['id']}")["data"]["text"], "Мальчик ищет отца в степи.")
+        trashed = self.api("DELETE", f"/api/projects/film/dokumenty/{doc['id']}")["data"]
+        self.assertTrue(trashed["deletedAt"])
+        self.assertEqual(len(self.api("GET", "/api/projects/film/dokumenty")["data"]), 1)  # в корзине, не исчез
+        self.api("PATCH", f"/api/projects/film/dokumenty/{doc['id']}", {"deletedAt": None})
+        self.assertIsNone(self.api("GET", f"/api/projects/film/dokumenty/{doc['id']}")["data"]["deletedAt"])
+        self.api("DELETE", f"/api/projects/film/dokumenty/{doc['id']}")
+        self.assertEqual(self.api("DELETE", f"/api/projects/film/dokumenty/{doc['id']}")["data"], {"id": doc["id"], "deleted": True})
+        self.assertEqual(self.api("GET", "/api/projects/film/dokumenty")["data"], [])
+        scene = self.api("POST", "/api/projects/film/scenes", {"title": "ИНТ. ЮРТА — НОЧЬ"}, 201)["data"]
+        self.api("PATCH", f"/api/projects/film/scenes/{scene['id']}", {"deletedAt": "2026-10-13T08:00:00+05:00"})
+        self.assertEqual(self.api("GET", f"/api/projects/film/scenes/{scene['id']}")["data"]["deletedAt"], "2026-10-13T08:00:00+05:00")
+        self.api("PATCH", f"/api/projects/film/scenes/{scene['id']}", {"deletedAt": None})
+        self.assertIsNone(self.api("GET", f"/api/projects/film/scenes/{scene['id']}")["data"]["deletedAt"])
+        self.api("POST", "/api/projects/film/dokumenty", {"tip": "zametka", "title": "Нельзя"}, 403, key="temporary-viewer")
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny
