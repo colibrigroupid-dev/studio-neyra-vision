@@ -498,7 +498,7 @@
       const list = await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes'); const arr = (list.data && (list.data.scenes || list.data)) || [];
       const sv = Array.isArray(arr) ? arr.find((x) => +x.n === s.index) : null;
       if (!sv) throw new Error(T('сцена ещё не в разбивке сервера — нажмите ⌘S и повторите', 'көрініс әлі сервер бөлінісінде жоқ — ⌘S басып, қайталаңыз'));
-      await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes/' + encodeURIComponent(sv.id) + '/utverdit', 'POST', otmena ? { otmena: true } : {}, rev ? { 'If-Match': String(rev) } : {});
+      await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes/' + encodeURIComponent(sv.id) + '/utverdit', 'POST', otmena ? { otmena: true } : {}, rev != null ? { 'If-Match': '"' + String(rev).replace(/^"|"$/g, '') + '"' } : {});
       toast(otmena ? T(`Утверждение сцены ${s.num} снято`, `${s.num} көрінісінің бекітуі алынды`) : T(`Сцена ${s.num} утверждена и передана в Art`, `${s.num} көрінісі бекітілді`)); loadSceneStatus();
     } catch (e) { toast(T('Не утвердилось: ', 'Бекітілмеді: ') + (/404|не найден/i.test(e.message) ? T('сервер ещё не обновлён до утверждения сцен', 'сервер әлі жаңартылмаған') : e.message)); }
   }
