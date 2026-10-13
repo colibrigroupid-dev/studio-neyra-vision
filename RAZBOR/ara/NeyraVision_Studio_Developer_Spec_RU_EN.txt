@@ -1,0 +1,145 @@
+Студия НейроВижн
+Техническое задание для разработчика | Русский
+Версия 1.0 • 13 октября 2026 • Проект к реализации
+Neyra Writer → Neyra Art → Neyra Director → Neyra Production
+1. Назначение и принцип продукта
+Студия НейроВижн (NeyraVision Studio) — приложение для подготовки и создания кино. Работа разделена на четыре самостоятельные страницы: Neyra Writer → Neyra Art → Neyra Director → Neyra Production. Каждый следующий отдел использует утвержденные результаты предыдущих.
+Автор пишет или загружает сценарий, создает визуальный мир фильма, утверждает раскадровку и получает видео либо пакет для традиционной съемки. Работать можно со всем фильмом или с отдельным эпизодом и сценой.
+Главное требование: на каждой странице находятся только инструменты ее отдела. Редактор сценария существует исключительно в Writer. Art отвечает за внешний вид; Director — за постановку кадров; Production — за получение видео.
+Документ задает продуктовые требования и критерии приемки. Дополнительно предложенные механизмы версий, утверждения и очереди генерации нужны для реализации этой иерархии; конкретный технологический стек выбирает разработчик.
+2. Общая структура интерфейса
+В приложении ровно четыре рабочие страницы. Общая навигация показывает название проекта, выбор эпизода или сцены и четыре отдела. Создание и открытие проекта доступны в компактном меню проекта; отдельная пятая рабочая страница не требуется.
+Главная область показывает рабочий материал текущего отдела. Контекстная панель содержит только параметры выбранной сцены, персонажа, локации, кадра или задачи. Пустые и неприменимые инструменты скрыты.
+Материалы предыдущих отделов доступны для просмотра и ссылок, но не для изменения. Команда «Открыть в Writer / Art / Director» переводит к исходному объекту на соответствующей странице.
+Сохранение выполняется автоматически с видимым состоянием: сохранено, сохраняется, ошибка. При ошибке данные остаются в редакторе, доступно повторное сохранение. Статусы, ошибки и затраты показываются рядом с действием, к которому относятся.
+Не добавлять общий чат, рекламные панели, лишние счетчики, дублирующие редакторы, инструменты других отделов и технические отладочные сведения в основной интерфейс. Дополнительные настройки открываются по запросу.
+3. Neyra Writer — сценарий и авторский замысел
+Writer — единственный источник сценарной информации. Здесь автор создает сценарий с нуля, загружает существующий текст и редактирует его. Базовый импорт: DOCX и TXT; PDF допускается при извлекаемом тексте, скан требует отдельного распознавания. После импорта автор проверяет разбиение на сцены.
+Инструменты: редактор сценария, список эпизодов и сцен, импорт, создание и перестановка сцен, история версий, авторские описания и команда «Утвердить и передать в Art». Удаление сцены требует подтверждения и сохраняет возможность восстановления.
+Сцена содержит действие, диалоги, участвующих персонажей, локацию, время суток, эмоциональный тон и авторские требования к изображению. Карточки персонажей и локаций в Writer описывают сюжетные свойства и замысел, а не генерируют изображения.
+Автор фиксирует желаемую внешность персонажа, особенности пространства, эпоху, атмосферу и существенные детали. Пустое описание не блокирует черновую работу, но перед утверждением система показывает недостающие сведения.
+AI-помощь, если реализуется, предлагается только в Writer: текстовые варианты применяются автором явно. Автоматический разбор текста выделяет сцены и сущности, но не меняет авторский текст без согласия.
+Выход: версия сценария или сцены и структурированный бриф для Art. Автор может передать одну готовую сцену, продолжая работать над остальными.
+4. Neyra Art — художник-постановщик
+Вход: утвержденный бриф Writer с описанием сцены, эмоций, персонажей и локаций. Сценарий и исходные требования доступны только для чтения.
+Инструменты: генерация персонажей и локаций, загрузка авторских референсов, варианты изображения, визуальные правки, перегенерация, сравнение и утверждение выбранного варианта. Допускаются дополнительные ракурсы и состояния для сохранения визуальной согласованности.
+Автор выбирает персонажа или локацию, видит связанный бриф и дает художнику визуальную правку. Правка «сделать свет холоднее» относится к Art. Изменение сюжетного факта, например возраста персонажа или места действия, выполняется в Writer.
+Art хранит визуальную библию проекта: утвержденные образы, костюмы, палитру, световую атмосферу и особенности локаций. Общий персонаж или локация имеют один постоянный идентификатор; отдельные сцены ссылаются на нужную версию.
+Новый вариант не перезаписывает утвержденный образ. Автор явно утверждает замену. Изменение общего образа отмечает все использующие его раскадровки как требующие проверки.
+Выход: утвержденные версии персонажей и локаций, связанные с версиями сценарных требований. Они автоматически становятся доступны в Director. В Art отсутствуют редактор сценария, инструменты раскадровки и видеогенерация.
+5. Neyra Director — режиссер, раскадровщик, оператор
+Вход: утвержденная сцена Writer и визуальные материалы Art. Раскадровка обязательно опирается на оба источника, включая эмоциональный тон и замысел автора.
+Инструменты: создание и генерация раскадровки, добавление и перестановка кадров, генерация и замена иллюстрации кадра, выбор утвержденных персонажей и локаций, настройка крупности, ракурса, композиции, движения камеры и предполагаемой длительности.
+Карточка кадра содержит номер, изображение, краткое описание действия, ссылки на сцену и визуальные активы, параметры камеры и относящийся к кадру фрагмент диалога. Диалог отображается из Writer и здесь не редактируется.
+Режиссер может менять способ показа действия, но не изменять сюжет или утвержденную внешность персонажа. Для таких изменений предусмотрен переход к Writer или Art с сохранением контекста выбранного кадра.
+Утверждение выполняется для последовательности кадров сцены. До передачи в Production проверяются наличие изображений, действительность ссылок и отсутствие неразрешенных изменений upstream-материалов.
+Выход: утвержденная версия раскадровки и пакет параметров кадров для Production. Вторая ветка — экспорт PDF и печать для традиционной съемки: кадры, номера сцен и кадров, действия, камера и примечания. Для этой ветки генерировать видео не требуется.
+6. Neyra Production — генерация видео
+Вход: утвержденная раскадровка Director, связанные визуальные материалы Art и сценарные требования Writer. Генерация выполняется по этим источникам, а не по изолированному произвольному промпту.
+Целевой видеодвижок по замыслу заказчика — Seedance 2.5. Интеграцию реализовать через адаптер провайдера. Точное API, доступную версию модели и поддерживаемые режимы разработчик проверяет при подключении; название целевой модели не является подтверждением доступности API.
+Инструменты: выбор утвержденного кадра или последовательности, выбор доступного режима генерации, длительности, формата и качества, запуск, очередь, просмотр, варианты дублей, повторная генерация, утверждение дубля и скачивание.
+Провайдеру передаются описания действия и камеры, утвержденные референсы и необходимые параметры. Ограничения длительности, количества изображений и разрешения показываются по фактическим возможностям адаптера. Неподдерживаемые режимы скрываются.
+Перед запуском показываются объем задачи и известная стоимость либо отметка о недоступности оценки. Автоматическая передача данных между отделами сама по себе не запускает платную генерацию.
+Каждая задача фиксирует версии всех источников и параметры модели. Состояния: в очереди, выполняется, готово, ошибка, отменено при поддержке провайдера. Повторный запрос после сбоя не должен создавать незаметную дублирующую задачу.
+Выход: исходные видеоклипы и выбранные дубли со связью с кадрами. Полноценный монтаж, звук, цветокоррекция и экспорт готового фильма не входят в первую версию без отдельного задания. Production не содержит редакторов сценария, образов или раскадровки.
+7. Передача данных и изменения
+У каждого результата есть статус: черновик, утверждено, требует проверки. Следующий отдел может видеть рабочие черновики, но утверждать свой результат и передавать его дальше можно только на согласованной основе из утвержденных источников.
+Утверждение сценарной сцены автоматически обновляет ее бриф в Art. Утверждение нужных персонажей и локаций делает сцену готовой к раскадровке. Утверждение раскадровки делает ее доступной для видеогенерации и печати.
+Если сценарист изменяет уже переданную сцену, создается новая версия. Затронутые Art-материалы, раскадровки и клипы получают отметку «Исходные данные изменились». Незатронутые сцены и активы сохраняют свои статусы.
+Следующие отделы автоматически получают актуальные требования и список изменений, но утвержденные изображения, раскадровки и клипы сохраняются. Автор принимает существующий результат для новой версии либо создает новый вариант. Проверка идет сверху вниз.
+Пример: Writer меняет действие с дневного на ночное. Art получает требование нового освещения; Director видит затронутые кадры; Production показывает, что готовые дубли основаны на дневной версии. Старые дубли доступны, но не выдаются за результат актуального сценария.
+Результат задачи, запущенной до изменения сценария, привязывается к исходной версии и не становится автоматически актуальным. Отмена согласования и удаление исходного объекта сохраняют историю зависимостей и блокируют новый запуск до исправления.
+Автоматизация означает передачу требований и обновление статусов. Новая генерация и замена утвержденного результата требуют явного действия. Отсутствующая информация не должна заполняться вымышленными сюжетными фактами без согласия автора.
+8. Минимальная модель данных и границы реализации
+Project → Episode → Scene. Сцена ссылается на Character и Location. ArtAsset хранит варианты и утвержденные версии внешнего вида. Storyboard содержит упорядоченные Shot. GenerationJob создает VideoTake для кадра или последовательности.
+Все объекты имеют постоянный ID, версию, дату и статус. Зависимости связывают точные версии, а не только названия. Пример: Shot ссылается на Scene v3, CharacterAsset v2 и LocationAsset v4; VideoTake — на Shot v5 и параметры задачи.
+Права изменения проверяются и интерфейсом, и сервером: сценарные поля изменяет Writer, визуальные активы — Art, кадровые решения — Director, задачи и дубли — Production. Один автор может работать во всех отделах, сохраняя эти границы.
+Сценарии и метаданные сохраняются постоянно; изображения и видео хранятся как файлы с привязкой к проекту. История и утвержденные версии не исчезают после перезагрузки. Ключи внешних API находятся на сервере.
+Минимальные сервисы: проекты и сценарии; визуальные активы; раскадровка; генерационные задачи; зависимости и версии; файловое хранение; экспорт. Согласование версии и ее статуса должно быть атомарным, чтобы следующий отдел не получал частично обновленные данные.
+Первый релиз поддерживает одного автора проекта. Совместная работа, сложные роли, маркетплейс, обучение собственных моделей и полноценный монтаж требуют отдельного согласования объема. Это граница предлагаемого MVP, а не ограничение будущего продукта.
+9. Критерии приемки
+1. Автор создает проект, вводит или импортирует сценарий, проверяет сцены, сохраняет и восстанавливает его после перезагрузки.
+2. В Art, Director и Production отсутствуют средства изменения текста сценария; сервер также отклоняет такую попытку через их операции.
+3. Утвержденная сцена автоматически формирует Art-бриф с действием, эмоциями, персонажами и локацией.
+4. В Art можно создать несколько вариантов, внести визуальную правку и утвердить образ; предыдущий вариант остается доступен.
+5. Director строит кадры из актуальных утвержденных сценарных и визуальных материалов и сохраняет ссылки на их версии.
+6. Раскадровка экспортируется в пригодный для печати PDF с изображениями, номерами, действиями и параметрами камеры.
+7. Production отправляет утвержденные исходные данные видеопровайдеру, показывает задачу и сохраняет полученный клип как дубль.
+8. Изменение одной сцены в Writer отмечает ее зависимые материалы; несвязанные сцены не теряют утверждение. Новая платная генерация не запускается сама.
+9. Изменение общего персонажа в Art отмечает все использующие его кадры и клипы. Статус не снимается без проверки и утверждения.
+10. Завершение старой задачи после изменения источника сохраняет результат у старой версии и не заменяет актуальный утвержденный дубль.
+11. Сбой сохранения или генерации показывает понятную ошибку, сохраняет работу и допускает повтор без скрытого дублирования запроса.
+12. Все четыре страницы содержат только инструменты своего отдела; общий путь Writer → Art → Director → Production проходит без ручного копирования исходных данных.
+
+NeyraVision Studio
+Developer specification | English
+Version 1.0 • 13 October 2026 • Implementation proposal
+Neyra Writer → Neyra Art → Neyra Director → Neyra Production
+1. Purpose and product principle
+NeyraVision Studio is a film preparation and creation application. Work is divided into four separate pages: Neyra Writer → Neyra Art → Neyra Director → Neyra Production. Each department uses approved outputs from the preceding departments.
+The author writes or imports a screenplay, creates the visual world, approves a storyboard, and obtains video or a package for a conventional shoot. Work can cover a film, an episode, or an individual scene.
+The primary requirement is department-specific tooling. The screenplay editor exists only in Writer. Art owns visual appearance; Director owns shot staging; Production owns video generation.
+This document defines product requirements and acceptance criteria. Versioning, approval, and generation queues are proposed mechanisms for implementing the hierarchy; the developer selects the technology stack.
+2. Shared interface structure
+The application has exactly four work pages. Shared navigation contains the project name, episode or scene selection, and the four departments. Project creation and opening use a compact project menu; no fifth work page is required.
+The main area displays the current department’s work. A contextual panel contains only settings for the selected scene, character, location, shot, or job. Empty and irrelevant tools remain hidden.
+Earlier departments’ materials are available for viewing and referencing, but not editing. “Open in Writer / Art / Director” navigates to the source object on its owning page.
+Save automatically with visible saved, saving, and failed states. On failure, retain editor content and allow retry. Show status, errors, and costs beside the action they concern.
+Do not add a general chat, promotional panels, redundant counters or editors, tools from other departments, or debugging details to the main interface. Advanced settings appear on request.
+3. Neyra Writer — screenplay and creative intent
+Writer is the sole source of screenplay information. The author creates, imports, and edits scripts here. Baseline import formats are DOCX and TXT. PDF requires extractable text; scanned documents need separate OCR. The author reviews scene segmentation after import.
+Tools: screenplay editor, episode and scene list, import, scene creation and reordering, version history, creative descriptions, and “Approve and send to Art”. Scene deletion requires confirmation and remains recoverable.
+A scene contains action, dialogue, participating characters, location, time of day, emotional tone, and visual requirements. Writer character and location cards describe narrative properties and intent, rather than generating images.
+The author specifies character appearance, spatial features, period, atmosphere, and essential details. Missing descriptions do not prevent drafting, but are reported before approval.
+If AI writing assistance is implemented, it appears only in Writer. Suggested text is applied explicitly by the author. Automatic parsing identifies scenes and entities without silently changing the screenplay.
+Output: a screenplay or scene revision and a structured Art brief. One completed scene may be handed off while other scenes remain in development.
+4. Neyra Art — production design
+Input: an approved Writer brief describing the scene, emotions, characters, and locations. The screenplay and its source requirements are read-only.
+Tools: character and location generation, author reference uploads, image variations, visual edits, regeneration, comparison, and approval. Additional views and states may be created for visual consistency.
+The author selects a character or location, reviews the linked brief, and requests a visual edit. “Make the light colder” belongs in Art. Changing a narrative fact, such as age or setting, requires Writer.
+Art maintains the project’s visual bible: approved appearances, costumes, palette, lighting atmosphere, and location features. Shared characters and locations have persistent identifiers; scenes reference specific versions.
+New variants do not overwrite approved appearances. The author explicitly approves replacements. Changing a shared asset marks all dependent storyboards for review.
+Output: approved character and location versions linked to screenplay requirement revisions. These automatically become available in Director. Art contains no screenplay editor, storyboard tooling, or video generation.
+5. Neyra Director — direction, storyboarding, camera
+Input: an approved Writer scene and Art visuals. Storyboards must use both sources, including emotional tone and creative intent.
+Tools: storyboard creation and generation, shot insertion and reordering, shot illustration generation and replacement, approved asset selection, shot size, angle, composition, camera movement, and estimated duration.
+Each shot card contains a number, image, action description, scene and asset references, camera settings, and the relevant dialogue excerpt. Dialogue is displayed from Writer and cannot be edited here.
+The director may change how an action is shown, but not its narrative meaning or a character’s approved appearance. Such changes navigate to Writer or Art while retaining shot context.
+Approval applies to a scene’s shot sequence. Handoff to Production checks image availability, reference validity, and unresolved upstream changes.
+Output: an approved storyboard revision and shot parameters for Production. A second branch exports PDF and prints boards for a conventional shoot, including scene and shot numbers, action, camera, and notes. This branch does not require video generation.
+6. Neyra Production — video generation
+Input: an approved Director storyboard, linked Art assets, and Writer requirements. Generation uses these sources rather than an unrelated free-form prompt.
+The customer’s target video engine is Seedance 2.5. Use a provider adapter. The developer verifies the actual API, available model version, and supported modes during integration; the target name does not establish API availability.
+Tools: approved shot or sequence selection, supported generation mode, duration, aspect ratio and quality, launch, queue, preview, takes, regeneration, take approval, and download.
+Supply action and camera descriptions, approved references, and required parameters to the provider. Display duration, image-count, and resolution limits from actual adapter capabilities. Hide unsupported modes.
+Before launch, show the job scope and known cost, or state that an estimate is unavailable. Automatic departmental data handoff does not itself launch paid generation.
+Each job records all source versions and model parameters. States: queued, running, completed, failed, and canceled where supported. Retrying a failed request must not silently create a duplicate job.
+Output: source clips and selected takes linked to shots. Full editing, sound, grading, and finished-film export are outside the first release unless separately commissioned. Production has no screenplay, asset-design, or storyboard editors.
+7. Handoffs and change propagation
+Every output is draft, approved, or needs review. A downstream department may inspect drafts, but may approve and hand off its own output only against a consistent set of approved sources.
+Approving a screenplay scene automatically updates its Art brief. Approving the required characters and locations makes the scene ready for storyboarding. Storyboard approval enables video generation and printing.
+Editing an already handed-off scene creates a new revision. Affected Art assets, boards, and clips are marked “Source data changed”. Unaffected scenes and assets retain their statuses.
+Downstream departments automatically receive updated requirements and changes, while approved images, boards, and clips are preserved. The author accepts an existing output for the new revision or creates a new variant. Review proceeds from upstream to downstream.
+Example: Writer changes daytime action to nighttime. Art receives new lighting requirements; Director identifies affected shots; Production shows that completed takes use the daytime revision. Old takes remain accessible but are not presented as current screenplay results.
+A job started before a screenplay edit remains linked to its original revision and does not automatically become current. Revoking approval or removing a source preserves dependency history and blocks new generation until resolved.
+Automation means requirement handoff and status updates. New generation and approved-output replacement require explicit action. Missing information must not be filled with invented narrative facts without author consent.
+8. Minimum data model and implementation boundaries
+Project → Episode → Scene. Scenes reference Character and Location. ArtAsset stores appearance variants and approved revisions. Storyboard contains ordered Shot objects. GenerationJob creates VideoTake objects for a shot or sequence.
+Every object has a persistent ID, revision, date, and status. Dependencies reference exact revisions rather than names alone. Example: a Shot references Scene v3, CharacterAsset v2, and LocationAsset v4; a VideoTake references Shot v5 and its job parameters.
+Both UI and server enforce ownership: Writer edits narrative fields, Art edits visual assets, Director edits shot decisions, and Production manages jobs and takes. One author can use all departments while retaining these boundaries.
+Persist scripts and metadata; store image and video files linked to the project. History and approved revisions survive reloads. External API keys remain server-side.
+Minimum services: projects and scripts; visual assets; storyboards; generation jobs; dependencies and revisions; file storage; export. Revision approval and status updates must be atomic so downstream departments do not receive partially updated data.
+The first release supports one project author. Collaboration, complex roles, a marketplace, custom model training, and full editing require separately agreed scope. This is the proposed MVP boundary, not a future product limitation.
+9. Acceptance criteria
+1. The author creates a project, writes or imports a script, reviews scenes, saves, and restores the work after reload.
+2. Art, Director, and Production have no screenplay editing controls; the server also rejects narrative mutations through their operations.
+3. An approved scene automatically produces an Art brief containing action, emotions, characters, and location.
+4. Art supports multiple variants, visual edits, and appearance approval while preserving earlier variants.
+5. Director creates shots from current approved narrative and visual sources and records their revisions.
+6. The storyboard exports to a printable PDF containing images, numbers, action, and camera parameters.
+7. Production submits approved inputs to the video provider, displays the job, and stores its clip as a take.
+8. A Writer scene edit marks its dependent outputs without invalidating unrelated scenes. It does not automatically start paid generation.
+9. Changing a shared Art character marks all dependent shots and clips. Review status remains until checked and approved.
+10. An old job completing after a source edit stores its result against the old revision and does not replace the current approved take.
+11. Save or generation failures display a clear error, preserve work, and permit retry without hidden duplicate requests.
+12. Each page contains only its department’s tools. The Writer → Art → Director → Production workflow requires no manual copying of source data.
