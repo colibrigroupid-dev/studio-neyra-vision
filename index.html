@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neyra Vision Studio — от сценария до экрана за дни</title>
 <meta name="description" content="Препродакшн для кино и сериалов в Казахстане: разбор сценария, герои и мир, раскадровка, аниматик, страница проекта для команды, каждый кадр отдельно. На русском и казахском. Права остаются у автора.">
-<meta name="theme-color" content="#121110">
+<meta name="theme-color" content="#171717">
 <meta property="og:title" content="Neyra Vision Studio — от сценария до экрана за дни">
 <meta property="og:description" content="Увидьте весь фильм до съёмок: герои, мир, каждый кадр, аниматик и тизер. Казахстан · RU / KZ · права у автора.">
 <meta property="og:image" content="https://studio.neyra.vision/assets/og.jpg">
@@ -18,14 +18,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;500;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:oklch(0.14 0.008 70);
-  --bg-2:oklch(0.17 0.009 70);
-  --surface:oklch(0.20 0.010 70);
-  --line:oklch(0.30 0.010 70);
-  --line-soft:oklch(0.25 0.010 70);
-  --text:oklch(0.95 0.008 85);
-  --muted:oklch(0.70 0.012 85);
-  --dim:oklch(0.66 0.012 85);
+  /* графит по замерам рабочих приложений — одна система с окном проекта (dizayn/tokeny.css) */
+  --bg:#171717;
+  --bg-2:#1c1c1c;
+  --surface:#212121;
+  --line:#383838;
+  --line-soft:#2e2e2e;
+  --text:#ececec;
+  --muted:#9a9a9a;
+  --dim:#8a8a8a;
   --accent:oklch(0.82 0.13 80);
   --accent-ink:oklch(0.18 0.03 80);
   --ok:oklch(0.78 0.14 150);
@@ -42,7 +43,7 @@
   --gutter:clamp(1rem,4vw,3rem);
   --section:clamp(4.5rem,10vw,9rem);
   --ease-out:cubic-bezier(0.16,1,0.3,1);
-  --r:6px;
+  --r:16px;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -118,7 +119,7 @@ html[data-lang="kz"] .ru{display:none!important}
 @media (min-width:900px){.path .head{grid-template-columns:7fr 5fr}}
 .path .head p{margin-top:.6rem}
 .strip{display:grid;grid-auto-flow:column;grid-auto-columns:min(82vw,420px);gap:1rem;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:1rem;scrollbar-width:thin;scrollbar-color:var(--line) transparent;width:100vw;margin-inline:calc(50% - 50vw);padding-inline:max(var(--gutter),calc(50vw - 620px));scroll-padding-inline:max(var(--gutter),calc(50vw - 620px))}
-.stage{scroll-snap-align:start;display:grid;grid-template-rows:auto auto 1fr auto;gap:.9rem;border:1px solid var(--line-soft);border-radius:10px;padding:1rem;background:var(--bg-2)}
+.stage{scroll-snap-align:start;display:grid;grid-template-rows:auto auto 1fr auto;gap:.9rem;border:1px solid var(--line-soft);border-radius:16px;padding:1rem;background:var(--bg-2)}
 .stage .frame{position:relative;aspect-ratio:16/9;border-radius:6px;overflow:hidden;background:var(--surface);border:1px solid var(--line-soft)}
 .stage .frame img{width:100%;height:100%;object-fit:cover;filter:saturate(.85)}
 .stage .frame .tc{position:absolute;left:.6rem;top:.6rem;font:500 .8rem/1 var(--mono);letter-spacing:.14em;color:oklch(0.92 0.01 85);background:rgb(0 0 0/.5);padding:.45em .6em;border-radius:3px;text-transform:uppercase}
@@ -160,7 +161,7 @@ html[data-lang="kz"] .ru{display:none!important}
 .receive ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.6rem 1.5rem}
 .receive li{padding:.75rem 0;border-top:1px solid var(--line-soft);font-size:var(--step-0)}
 .receive li .caps{display:block;margin-bottom:.25rem;font-size:.8rem}
-.panel{margin-top:1.5rem;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.panel{margin-top:1.5rem;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--bg)}
 .panel .bar{display:flex;gap:1rem;align-items:center;justify-content:space-between;padding:.8rem 1rem;border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 .panel .rows{display:grid;grid-template-columns:1fr}
 .panel .row{display:grid;grid-template-columns:5.5rem 1fr auto;gap:1rem;align-items:center;padding:.8rem 1rem;border-bottom:1px solid var(--line-soft);font-size:var(--step-0)}
@@ -172,7 +173,7 @@ html[data-lang="kz"] .ru{display:none!important}
 /* why */
 .why .cols{display:grid;gap:1rem;grid-template-columns:1fr}
 @media (min-width:860px){.why .cols{grid-template-columns:1fr 1fr;gap:1.5rem}}
-.why .col{border:1px solid var(--line-soft);border-radius:10px;padding:1.4rem;background:var(--bg-2)}
+.why .col{border:1px solid var(--line-soft);border-radius:16px;padding:1.4rem;background:var(--bg-2)}
 .why .col.one{border-color:color-mix(in oklch,var(--accent) 45%,var(--line))}
 .why .col .caps{display:flex;justify-content:space-between;margin-bottom:1rem}
 .why ol{margin:0;padding:0;list-style:none;display:grid;gap:.4rem;font-size:var(--step-0);color:var(--muted)}
@@ -194,12 +195,12 @@ html[data-lang="kz"] .ru{display:none!important}
 .crew .rule p{font-size:var(--step-0);color:var(--muted)}
 .crew .rule b{display:block;color:var(--text);font-weight:500;margin-bottom:.2rem}
 /* packages */
-.pilot{display:grid;gap:1rem;grid-template-columns:1fr;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:1.4rem;margin:2.5rem 0 1rem}
+.pilot{display:grid;gap:1rem;grid-template-columns:1fr;align-items:center;border:1px dashed var(--line);border-radius:16px;padding:1.4rem;margin:2.5rem 0 1rem}
 @media (min-width:860px){.pilot{grid-template-columns:1fr auto}}
 .pilot p{color:var(--muted);font-size:var(--step-0);margin-top:.3rem}
 .pack{display:grid;gap:1rem;grid-template-columns:1fr}
 @media (min-width:860px){.pack{grid-template-columns:1fr 1.15fr 1fr;align-items:stretch}}
-.card{border:1px solid var(--line-soft);border-radius:10px;padding:1.4rem;background:var(--bg-2);display:grid;grid-template-rows:auto auto auto 1fr auto;gap:.6rem}
+.card{border:1px solid var(--line-soft);border-radius:16px;padding:1.4rem;background:var(--bg-2);display:grid;grid-template-rows:auto auto auto 1fr auto;gap:.6rem}
 .card.main{border-color:color-mix(in oklch,var(--accent) 55%,var(--line));background:color-mix(in oklch,var(--accent) 6%,var(--bg-2))}
 .card .tag{font-family:var(--mono);font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 .card .price{font-family:var(--disp);font-size:var(--step-2);font-weight:500;letter-spacing:-.02em}
