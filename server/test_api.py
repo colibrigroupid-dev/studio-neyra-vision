@@ -1479,6 +1479,22 @@ class TeamAccessTests(unittest.TestCase):
         self.api("PATCH", f"/api/projects/film/characters/{merged['id']}", {"aliases": ["ТӨСТІК", "мальчик"]})
         self.api("PATCH", f"/api/projects/film/characters/{merged['id']}", {"aliases": ["a", "A"]}, 422)
 
+    def test_saving_a_version_refreshes_scenes_and_passports_from_text(self):
+        # ⌘S в Сценарной = контрольная точка: сцены/герои/локации подтягиваются парсером без модели и без токенов.
+        self.create()
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — НОЧЬ\n\nТӨСТІК\nМама?\n", "language": "ru"})
+        saved = self.api("POST", "/api/projects/film/versions", {"label": "первая"}, 201)["data"]
+        self.assertEqual(saved["razbor"], {"scenes": 1, "characters": 1, "locations": 1})
+        self.assertEqual([s["n"] for s in self.api("GET", "/api/projects/film/scenes")["data"]], [1])
+        self.assertEqual([h["name"] for h in self.api("GET", "/api/projects/film/characters")["data"]], ["ТӨСТІК"])
+        self.assertEqual([h["identity"] for h in self.api("GET", "/api/projects/film/characters")["data"]], [""])
+        # Сценарист с правом только на сценарий сохраняет версию без разбора — и без ошибки.
+        writer = self.issue("writer", ["overview", "script", "breakdown"], email="w@example.test")["key"]
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — НОЧЬ\n\nТӨСТІК\nМама?\n\nНАТ. СТЕПЬ — ДЕНЬ\n\nМАТЬ\nИди.\n", "language": "ru"}, key=writer)
+        again = self.api("POST", "/api/projects/film/versions", {}, 201, key=writer)["data"]
+        self.assertNotIn("razbor", again)
+        self.assertEqual(len(self.api("GET", "/api/projects/film/scenes")["data"]), 1)
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

@@ -1499,6 +1499,21 @@ class Handler(SimpleHTTPRequestHandler):
                 body = self.body()
                 fields(body, ("label",))
                 data = snapshot(project, principal, "saved", text(body.get("label", ""), "label", 240))
+                # Версия = контрольная точка: сцены, герои и локации подтягиваются из текста сами (парсер, без модели).
+                # Паспорта и замки не трогаются; если у ключа нет записи в breakdown — просто пропускаем.
+                try:
+                    authorize(principal, slug, "breakdown", project, write=True)
+                    document = razbivka.parse(project["script"].get("text", ""))
+                    if document["scenes"]:
+                        document = breakdown.parse_input({k: document[k] for k in ("scenes", "characters", "locations", "title", "pages_est", "caps_mentions")})
+                        _, auto_events = breakdown.import_data(document, project["scenes"], project["characters"], project["locations"], timestamp(), project["studio_id"])
+                        import_events.extend(auto_events)
+                        data = dict(data, razbor={"scenes": len(document["scenes"]), "characters": len(document["characters"]), "locations": len(document["locations"])})
+                except ApiError as error:
+                    if error.status != 403:
+                        raise
+                except breakdown.ValidationError:
+                    pass
             elif method == "POST" and len(parts) == 6 and parts[5] == "restore":
                 fields(self.body(allow_empty=True), ())
                 source = get_item(project["versions"], parts[4])
