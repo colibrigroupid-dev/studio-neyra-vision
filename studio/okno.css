@@ -120,7 +120,7 @@ dialog{background:var(--surface);border:1px solid var(--line-soft);border-radius
 dialog .eyebrow{font:400 .75rem/1 var(--mono);letter-spacing:.14em;color:var(--dim)}
 dialog input,dialog select,dialog textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:16px;min-height:44px;padding:10px 12px}
 /* помощник внизу: пока заглушка (№46) */
-.helper-stub{position:fixed;left:272px;right:0;bottom:0;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent);pointer-events:none}
+.helper-stub{position:fixed;left:272px;right:0;bottom:0;z-index:5;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent);pointer-events:none}
 .helper-stub .box{pointer-events:auto;max-width:940px;margin:0 auto;background:var(--field);border:1px solid transparent;border-radius:24px;padding:10px 12px 8px;display:grid;gap:6px}.helper-stub .box:focus-within{border-color:var(--line)}
 .helper-stub .q{display:flex;align-items:center;gap:8px;min-height:44px;margin:0}
 .helper-stub .q input{flex:1;min-width:0;min-height:44px;border:0;background:transparent;color:var(--text);font:inherit;font-size:15px;padding:0 6px}
