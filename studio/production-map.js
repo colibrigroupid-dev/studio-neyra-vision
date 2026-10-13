@@ -26,15 +26,19 @@ export const productionStageName = (stage, locale = 'ru') => named(stageNames, s
 const objectTypeName = (type, locale) => named({
   scene: ['Сцена', 'Көрініс'], shot: ['Кадр', 'Кадр'], teaser: ['Тизер', 'Тизер'],
   episode: ['Серия', 'Серия'], project: ['Проект', 'Жоба'], member: ['Участник', 'Қатысушы'],
-  version: ['Версия', 'Нұсқа'], script: ['Сценарий', 'Сценарий'], post: ['Постпродакшен', 'Постпродакшн']
+  version: ['Версия', 'Нұсқа'], script: ['Сценарий', 'Сценарий'], post: ['Постпродакшен', 'Постпродакшн'],
+  character: ['Герой', 'Кейіпкер'], location: ['Локация', 'Локация'], breakdown: ['Разбивка', 'Талдау'], assistant: ['Помощник', 'Көмекші']
 }, type, locale);
 function objectRecord(object, project) {
-  const collection = object?.type === 'scene' ? project?.scenes : object?.type === 'shot' ? project?.shots : [];
+  const collection = object?.type === 'scene' ? project?.scenes : object?.type === 'shot' ? project?.shots : object?.type === 'character' ? project?.characters : object?.type === 'location' ? project?.locations : [];
   return list(collection).find(item => item.id === object?.id);
 }
 export function productionObjectLabel(object, project, locale = 'ru') {
-  const title = translated(objectRecord(object, project)?.title, locale);
-  return `${objectTypeName(object?.type, locale)} · ${title || object?.id || '—'}`;
+  const record = objectRecord(object, project);
+  const title = translated(record?.title, locale) || (typeof record?.name === 'string' ? record.name : '');
+  // технический ULID не показываем: человеку нужны тип и имя
+  const isUlid = /^[0-9A-HJKMNP-TV-Z]{26}$/.test(String(object?.id || ''));
+  return `${objectTypeName(object?.type, locale)}${title ? ` · ${title}` : (object?.id && !isUlid ? ` · ${object.id}` : '')}`;
 }
 function dateLabel(value, locale, dateOnly = false) {
   if (!value) return '—';
