@@ -462,7 +462,7 @@
     else { const p = ed.mk('synopsis', key + ': ' + text.trim()); let anchor = s.el; while (anchor.nextElementSibling && ed.typeOf(anchor.nextElementSibling) === 'synopsis') anchor = anchor.nextElementSibling; anchor.after(p); }
     ed.root.dispatchEvent(new Event('input'));
   }
-  let spTimer = null, spSceneIdx = 0;
+  let spTimer = null, spTimer2 = null, spSceneIdx = 0;
   function renderScenePanel(force) {
     if (!document.body.classList.contains('scene-open')) return;
     const cs = currentScene(); const body = $('#spBody');
@@ -484,7 +484,7 @@
       ${cur().server ? (sceneStatus[s.index] && sceneStatus[s.index].status === 'approved' ? `<div class="sp-ops"><span class="val">✓ ${T('Утверждено', 'Бекітілді')}${sceneStatus[s.index].approvedAt ? ' · ' + new Date(sceneStatus[s.index].approvedAt).toLocaleDateString('ru') : ''}</span><button type="button" data-op="unapprove">${T('Снять утверждение', 'Бекітуді алу')}</button></div>` : `<div class="sp-ops"><button type="button" class="approve" data-op="approve">${T('Утвердить и передать в Art', 'Бекітіп, Art-қа беру')}</button></div>`) : ''}
       <p class="empty" style="font-size:.76rem">${T('Тон и требования уходят в бриф для Art вместе с текстом сцены.', 'Реңк пен талаптар Art брифіне кетеді.')}</p>`;
     body.querySelector('[data-f=ton]').addEventListener('input', (e) => { clearTimeout(spTimer); spTimer = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Тон', e.target.value); }, 400); });
-    body.querySelector('[data-f=viz]').addEventListener('input', (e) => { clearTimeout(spTimer); spTimer = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Визуал', e.target.value); }, 400); });
+    body.querySelector('[data-f=viz]').addEventListener('input', (e) => { clearTimeout(spTimer2); spTimer2 = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Визуал', e.target.value); }, 400); });
     body.querySelectorAll('[data-op]').forEach((b) => b.addEventListener('click', () => (b.dataset.op === 'approve' ? approveScene(s.index) : b.dataset.op === 'unapprove' ? approveScene(s.index, true) : sceneOp(s.index, b.dataset.op))));
   }
   async function approveScene(index, otmena) {
