@@ -310,7 +310,7 @@
     root.addEventListener('blur', () => setTimeout(hideHint, 150));
 
     // ---------- сцены и хронометраж ----------
-    function linesOf(p) { const type = typeOf(p); const txt = textOf(p).trim(); if (type === 'page_break') return 0; const cols = COLS[type] || 58; return (BEFORE[type] ? 1 : 0) + Math.max(1, Math.ceil(txt.length / cols)); }
+    function linesOf(p) { const type = typeOf(p); const txt = textOf(p).trim(); if (type === 'page_break' || type === 'synopsis' || type === 'inline_note') return 0; const cols = COLS[type] || 58; return (BEFORE[type] ? 1 : 0) + Math.max(1, Math.ceil(txt.length / cols)); }
     function scenes() {
       const out = []; let cur = null; let line = 0; let idx = 0;
       for (const p of paras()) {
@@ -324,7 +324,7 @@
     }
     function stats() {
       let lines = 0, words = 0, dwords = 0, chars = 0; const ps = paras(); const sc = scenes(); const names = {};
-      for (const p of ps) { const type = typeOf(p); const txt = textOf(p).trim(); lines += linesOf(p); const w = Fountain.countWords(txt); words += w; chars += txt.length; if (type === 'dialogue' || type === 'lyrics') dwords += w; if (type === 'character') { const n = txt.toUpperCase().replace(/\s*\(.*$/, '').trim(); if (n) names[n] = (names[n] || 0) + 1; } }
+      for (const p of ps) { const type = typeOf(p); const txt = textOf(p).trim(); if (type === 'synopsis' || type === 'inline_note') continue; lines += linesOf(p); const w = Fountain.countWords(txt); words += w; chars += txt.length; if (type === 'dialogue' || type === 'lyrics') dwords += w; if (type === 'character') { const n = txt.toUpperCase().replace(/\s*\(.*$/, '').trim(); if (n) names[n] = (names[n] || 0) + 1; } }
       const pages = Math.max(ps.some((p) => textOf(p).trim()) ? 1 : 0, Math.round(lines / LINES_PER_PAGE * 10) / 10);
       return { pages, seconds: Math.round(lines / LINES_PER_PAGE * SEC_PER_PAGE * 1.01), words, dialogueWords: dwords, chars, scenes: sc.length, characters: Object.keys(names).length, lines, dialogueShare: words ? Math.round(dwords / words * 100) : 0 };
     }
@@ -334,7 +334,7 @@
       return marks;
     }
 
-    Object.assign(api, { load: loadExact, loadExact, text: serialize, paras, setType, typeOf, curPara, focusPara: (p, off) => { placeCaret(p, off); root.focus(); api.onCaret && api.onCaret(); }, undo, redo, scenes, stats, pageMarks, root, hintUpdate, insertAfterCurrent: (type, text) => { const p = curPara() || root.lastElementChild; const np = mk(type, text); (p || root).after ? p.after(np) : root.appendChild(np); placeCaret(np); changed(); }, replaceParas: (fromEl, toEl, text) => { const tmp = document.createElement('div'); const sub = create(tmp, {}); sub.loadExact(text); const items = Array.from(tmp.children); pushUndo(); let n = fromEl; const stop = toEl.nextElementSibling; while (n && n !== stop) { const nx = n.nextElementSibling; n.remove(); n = nx; } let anchor = stop; if (anchor) { for (const it of items) anchor.before(it); } else for (const it of items) root.appendChild(it); if (items[0]) placeCaret(items[0], 0); changed(); }, textRange: (fromEl, toEl) => { const tmp = []; let n = fromEl; const stop = toEl.nextElementSibling; while (n && n !== stop) { tmp.push(n.cloneNode(true)); n = n.nextElementSibling; } const d = document.createElement('div'); tmp.forEach((x) => d.appendChild(x)); const sub = create(d, {}); return sub.text(); }, TYPES: T, DICT });
+    Object.assign(api, { mk, pushUndo, load: loadExact, loadExact, text: serialize, paras, setType, typeOf, curPara, focusPara: (p, off) => { placeCaret(p, off); root.focus(); api.onCaret && api.onCaret(); }, undo, redo, scenes, stats, pageMarks, root, hintUpdate, insertAfterCurrent: (type, text) => { const p = curPara() || root.lastElementChild; const np = mk(type, text); (p || root).after ? p.after(np) : root.appendChild(np); placeCaret(np); changed(); }, replaceParas: (fromEl, toEl, text) => { const tmp = document.createElement('div'); const sub = create(tmp, {}); sub.loadExact(text); const items = Array.from(tmp.children); pushUndo(); let n = fromEl; const stop = toEl.nextElementSibling; while (n && n !== stop) { const nx = n.nextElementSibling; n.remove(); n = nx; } let anchor = stop; if (anchor) { for (const it of items) anchor.before(it); } else for (const it of items) root.appendChild(it); if (items[0]) placeCaret(items[0], 0); changed(); }, textRange: (fromEl, toEl) => { const tmp = []; let n = fromEl; const stop = toEl.nextElementSibling; while (n && n !== stop) { tmp.push(n.cloneNode(true)); n = n.nextElementSibling; } const d = document.createElement('div'); tmp.forEach((x) => d.appendChild(x)); const sub = create(d, {}); return sub.text(); }, TYPES: T, DICT });
     normalize();
     return api;
   }

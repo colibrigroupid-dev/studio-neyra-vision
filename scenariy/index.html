@@ -2,7 +2,7 @@
 <html lang="ru" data-lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Сценарная · Neyra Vision Studio</title>
+<title>Neyra Writer · Neyra Vision Studio</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Сценарная Neyra Vision Studio: лист сценария как в профессиональных программах, Tab и Enter переключают абзацы, сцены и хронометраж, помощник NEYRA.">
 <meta name="theme-color" content="#1c1a16">
@@ -15,7 +15,7 @@
 <link rel="icon" href="../assets/favicon-64.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;500;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=54">
+<link rel="stylesheet" href="app.css?v=56">
 </head>
 <body>
 <noscript><div class="nojs">Сценарная работает только с включённым JavaScript.</div></noscript>
@@ -24,10 +24,12 @@
     <button class="ic" id="btnMenu" type="button" aria-label="Меню" title="Меню: проекты, импорт, экспорт, сервер">≡</button>
     <a class="brand" href="../" title="На главную studio.neyra.vision"><img src="../assets/logo-nv-512.png" alt="" width="26" height="26"><b>Neyra Vision</b></a>
     <input class="title-in" id="title" type="text" placeholder="Название проекта" data-tp="Жоба атауы" aria-label="Название проекта" spellcheck="false">
-    <div class="pages" role="group" aria-label="Страницы">
-      <span class="pg on" data-t="Сценарная">Сценарная</span>
-      <a class="pg" id="lnkDirector" href="../studio/" data-t="Режиссёрская">Режиссёрская</a>
-    </div>
+    <nav class="pages" aria-label="Отделы">
+      <span class="pg on">Writer</span>
+      <a class="pg" id="lnkArt" href="../studio/">Art</a>
+      <a class="pg" id="lnkDirector" href="../studio/">Director</a>
+      <a class="pg" id="lnkProduction" href="../studio/">Production</a>
+    </nav>
     <span class="state" id="aiState" title=""><span class="dot" id="aiDot"></span><span id="aiStateText" data-t="проверяю связь">проверяю связь</span></span>
     <button class="ic mob" id="mobNav" type="button" aria-label="Навигатор">☰</button>
   </header>
@@ -77,6 +79,7 @@
         <button type="button" class="ic" id="btnFocus" title="Только лист (⌘⇧F)">⛶</button>
         <button type="button" class="ic" id="btnPaper" title="Бумага: светлая / графит">◐</button>
         <button type="button" class="ic wand" id="btnNeyra" title="NEYRA — помощник">✦</button>
+        <button type="button" class="ic" id="btnScene" title="Параметры сцены">☰</button>
         <button type="button" class="ic" id="btnHelp" title="Клавиши">?</button>
         <span class="save" id="saveState" data-t="сохранено">сохранено</span>
       </div>
@@ -107,6 +110,10 @@
       <div class="ruler" id="ruler"></div>
     </section>
 
+    <aside class="scene-panel" id="scenePanel">
+      <div class="sp-h"><b id="spTitle" data-t="Сцена">Сцена</b><button type="button" class="ic" id="spClose" aria-label="Скрыть">×</button></div>
+      <div class="sp-b" id="spBody"></div>
+    </aside>
     <aside class="neyra hidden" id="neyra">
       <div class="neyra-h"><b>NEYRA</b>
         <div class="seg tier" role="group"><button type="button" data-tier="standard" aria-pressed="true" data-t="Стандарт">Стандарт</button><button type="button" data-tier="pro" aria-pressed="false">PRO</button></div>
@@ -138,10 +145,10 @@
     </aside>
   </div>
 </div>
-<input type="file" id="fileIn" accept=".fountain,.txt,.md,.fdx,.json" class="hidden">
+<input type="file" id="fileIn" accept=".fountain,.txt,.md,.fdx,.json,.docx,.pdf" class="hidden">
 <div class="toast" id="toast" role="status"></div>
-<script src="fountain.js?v=54"></script>
-<script src="editor.js?v=54"></script>
-<script src="app.js?v=54"></script>
+<script src="fountain.js?v=56"></script>
+<script src="editor.js?v=56"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>

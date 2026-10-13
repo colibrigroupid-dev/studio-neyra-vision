@@ -48,7 +48,7 @@
   const ed = ScriptEditor.create($('#editor'), {});
   function flush() { if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; const p = cur(); if (p) { const t = ed.text(); if (t !== p.text) { p.text = t; p.updated = Date.now(); save(); } } } }
   ed.onChange = () => { if (loading) { refreshAll(); updateTypeBox(); return; } setSaveState(T('пишу…', 'жазып жатырмын…')); clearTimeout(pendingSave); pendingSave = setTimeout(() => { pendingSave = null; const p = cur(); if (!p) return; const t = ed.text(); if (t !== p.text) { p.text = t; p.updated = Date.now(); save(); } refreshAll(); }, 250); updateTypeBox(); };
-  ed.onCaret = () => { updateTypeBox(); markCurrentScene(); scopeHint(); };
+  ed.onCaret = () => { updateTypeBox(); markCurrentScene(); scopeHint(); renderScenePanel(); };
   function updateTypeBox() { const p = ed.curPara(); if (p) $('#ptype').value = ed.typeOf(p); }
   $('#ptype').addEventListener('change', (e) => { ed.setType(e.target.value); ed.root.focus(); });
   $('#btnUndo').addEventListener('click', () => { ed.undo(); ed.root.focus(); });
@@ -58,9 +58,9 @@
   // ---------- сервер команды ----------
   let server = (() => { const s = load(LS.server, null); return s && s.key ? { url: String(s.url || DEFAULT_SERVER).replace(/\/+$/, ''), key: s.key } : null; })();
   let serverMode = null;
-  async function serverFetch(path, method, body) {
+  async function serverFetch(path, method, body, extraHeaders) {
     if (!server) throw new Error(T('нет ключа участника', 'қатысушы кілті жоқ'));
-    const r = await fetch(server.url + path, { method: method || 'GET', headers: { 'X-Key': server.key, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, credentials: 'omit', cache: 'no-store' });
+    const r = await fetch(server.url + path, { method: method || 'GET', headers: Object.assign({ 'X-Key': server.key, 'content-type': 'application/json' }, extraHeaders || {}), body: body ? JSON.stringify(body) : undefined, credentials: 'omit', cache: 'no-store' });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error((j.error && j.error.message) || (T('ошибка ', 'қате ') + r.status));
     return j;
@@ -121,7 +121,7 @@
   function showTokens(tk) { const el = $('#tokenInfo'); if (!tk) { el.textContent = ''; return; } if (tk.unlimited) el.textContent = T('токены без лимита', 'токендер шексіз'); else if (!tk.balance) el.textContent = T('Нет доступных токенов', 'Қолжетімді токендер жоқ'); else el.textContent = T('Токенов: ', 'Токендер: ') + tk.balance + (tk.cena_voprosa ? ' · ' + T('вопрос от ', 'сұрақ ') + tk.cena_voprosa : ''); }
   async function checkApi() {
     const dot = $('#aiDot'), st = $('#aiStateText'), p = cur();
-    $('#lnkDirector').href = STUDIO + (p && p.server ? '?proekt=' + encodeURIComponent(p.server) + '#/studio/heroes' : '');
+    const q = p && p.server ? '?proekt=' + encodeURIComponent(p.server) : ''; $('#lnkArt').href = STUDIO + q + '#/studio/art'; $('#lnkDirector').href = STUDIO + q + '#/studio/director'; $('#lnkProduction').href = STUDIO + q + '#/studio/production';
     if (server) {
       try { const me = await serverFetch('/api/me'); showTokens(me.data && (me.data.tokeny || me.data.wallet)); dot.className = 'dot on'; st.textContent = (p && p.server) ? T('сервер команды · ', 'команда сервері · ') + p.server : T('сервер команды · этот сценарий в браузере', 'команда сервері · бұл сценарий браузерде'); }
       catch (e) { dot.className = 'dot off'; st.textContent = T('сервер: ', 'сервер: ') + e.message; }
@@ -172,13 +172,13 @@
   $('#docs').addEventListener('click', (e) => { const b = e.target.closest('[data-doc]'); if (b) showDoc(b.dataset.doc); });
   $('#mobNav').addEventListener('click', () => document.body.classList.toggle('show-nav'));
 
-  function refreshAll() { renderScenes(); renderRuler(); renderCounts(); renderStoreNote(); markPages(); }
+  function refreshAll() { renderScenes(); renderRuler(); renderCounts(); renderStoreNote(); markPages(); renderScenePanel(); }
   function fmt(sec) { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); }
   function renderScenes() {
     const ul = $('#scenes'); const sc = ed.scenes(); const st = ed.stats();
     ul.innerHTML = sc.length ? '' : `<li class="empty">${T('Сцен пока нет. Первый абзац — заголовок: ИНТ. МЕСТО - ВРЕМЯ, затем Enter.', 'Көріністер әзірге жоқ. Бірінші абзац — тақырып: ІШКІ. ОРЫН - УАҚЫТ, сосын Enter.')}</li>`;
     for (const s of sc) {
-      const li = document.createElement('li'); li.dataset.i = s.index;
+      const li = document.createElement('li'); li.dataset.i = s.index; li.draggable = true;
       li.innerHTML = `<div class="h"><span class="n">${s.num}.</span><b>${esc(s.heading)}</b><span class="d">${fmt(s.seconds)}</span></div>${s.firstAction ? `<div class="a">${esc(s.firstAction)}</div>` : ''}`;
       li.addEventListener('click', () => { ed.focusPara(s.el, 0); s.el.scrollIntoView({ block: 'center', behavior: 'smooth' }); document.body.classList.remove('show-nav'); });
       ul.appendChild(li);
@@ -317,6 +317,7 @@
     menu(e.currentTarget, [
       { cap: T('Проект', 'Жоба') },
       { label: '+ ' + T('Новый сценарий', 'Жаңа сценарий'), run: () => { flush(); newProject(T('Без названия', 'Атаусыз'), ''); serverMode = null; open(currentId); $('#title').focus(); } },
+      { label: '↑ ' + T('Импорт', 'Импорт'), meta: 'docx txt pdf fdx fountain', run: () => $('#fileIn').click() },
       { label: '↑ ' + T('Импорт', 'Импорт'), meta: '.fountain .fdx .txt', run: () => $('#fileIn').click() },
       { label: '☁ ' + T('Проекты команды…', 'Команда жобалары…'), meta: server ? '' : T('нужен ключ', 'кілт керек'), run: serverProjects },
       { label: '⏱ ' + T('Версии…', 'Нұсқалар…'), meta: '⌘S', run: versionsDialog },
@@ -338,14 +339,51 @@
     clearTimeout(pendingSave); pendingSave = null; delete projects[p.id]; serverMode = null;
     const ids = Object.keys(projects); if (!ids.length) newProject(T('Без названия', 'Атаусыз'), ''); else currentId = ids[0]; save(); open(currentId);
   }
+  function loadScript(src) { return new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('не загрузилась библиотека')); document.head.appendChild(s); }); }
+  async function docxToLines(file) {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    const zip = await window.JSZip.loadAsync(await file.arrayBuffer()); const xml = await zip.file('word/document.xml').async('string');
+    const doc = new DOMParser().parseFromString(xml, 'application/xml'); const out = [];
+    doc.querySelectorAll('p').forEach((p) => { let line = ''; p.childNodes.forEach(function walk(n) { if (n.nodeType === 1) { const tag = n.localName; if (tag === 't') line += n.textContent; else if (tag === 'tab') line += ' '; else if (tag === 'br') line += '\n'; else n.childNodes.forEach(walk); } }); out.push(...line.split('\n')); });
+    return out;
+  }
+  async function pdfToLines(file) {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise; const out = [];
+    for (let i = 1; i <= pdf.numPages; i++) { const page = await pdf.getPage(i); const tc = await page.getTextContent(); const rows = new Map(); for (const it of tc.items) { if (!it.str) continue; const y = Math.round(it.transform[5]); const key = [...rows.keys()].find((k) => Math.abs(k - y) <= 2); const kk = key === undefined ? y : key; rows.set(kk, (rows.get(kk) || []).concat([{ x: it.transform[4], s: it.str }])); } const ys = [...rows.keys()].sort((a, b) => b - a); for (const y of ys) out.push(rows.get(y).sort((a, b) => a.x - b.x).map((r) => r.s).join('')); out.push(''); }
+    if (!out.some((l) => l.trim())) throw new Error(T('в PDF нет текстового слоя (скан) — нужен отдельный распознаватель', 'PDF-те мәтін қабаты жоқ'));
+    return out;
+  }
+  function linesToFountain(lines) { // текст из Word/PDF → Fountain: заголовки, персонажи над репликами, действие
+    const out = []; const isCaps = (s) => /[A-ZА-ЯЁӘҒҚҢӨҰҮҺІ]/.test(s) && s === s.toUpperCase(); const head = (s) => /^(ИНТ|НАТ|ЭКСТ|ІШКІ|СЫРТҚЫ|INT|EXT|EST|I\/E)[\.\s\-–—/]/i.test(s);
+    const ls = lines.map((l) => l.replace(/\s+$/, '').replace(/^\s+/, ''));
+    for (let i = 0; i < ls.length; i++) {
+      const l = ls[i]; if (!l) { if (out.length && out[out.length - 1] !== '') out.push(''); continue; }
+      const next = (ls[i + 1] || '').trim(); const prevBlank = !out.length || out[out.length - 1] === '';
+      if (head(l)) { if (!prevBlank) out.push(''); out.push(l.toUpperCase(), ''); continue; }
+      if (isCaps(l) && l.length < 40 && next && !isCaps(next) && !head(next)) { if (!prevBlank) out.push(''); out.push(l); continue; } // персонаж над репликой
+      if (/^\(.*\)$/.test(l) && !prevBlank) { out.push(l); continue; }
+      if (!prevBlank && out.length && isCaps(out[out.length - 1]) && !head(out[out.length - 1])) { out.push(l); continue; } // реплика под персонажем
+      if (!prevBlank && out.length && /^\(.*\)$/.test(out[out.length - 1])) { out.push(l); continue; }
+      if (!prevBlank && out.length && !isCaps(out[out.length - 1])) { out[out.length - 1] += ' ' + l; continue; } // продолжение абзаца
+      if (!prevBlank) out.push('');
+      out.push(l);
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  }
   $('#fileIn').addEventListener('change', async (e) => {
-    const f = e.target.files[0]; if (!f) return; const txt = await f.text(); const name = f.name.replace(/\.[^.]+$/, '');
+    const f = e.target.files[0]; if (!f) return; const name = f.name.replace(/\.[^.]+$/, '');
     try {
       flush();
+      if (/\.docx$/i.test(f.name)) { toast(T('Читаю DOCX…', 'DOCX оқып жатырмын…')); newProject(name, linesToFountain(await docxToLines(f))); }
+      else if (/\.pdf$/i.test(f.name)) { toast(T('Читаю PDF…', 'PDF оқып жатырмын…')); newProject(name, linesToFountain(await pdfToLines(f))); }
+      else { const txt = await f.text();
       if (/\.fdx$/i.test(f.name)) newProject(name, Fountain.fromFDX(txt));
       else if (/\.json$/i.test(f.name)) { const j = JSON.parse(txt); if (!j || typeof j !== 'object' || typeof j.text !== 'string') throw new Error(T('это не резервная копия проекта', 'бұл жоба көшірмесі емес')); const p = newProject(typeof j.title === 'string' ? j.title : name, j.text); p.meta = Object.assign(p.meta, (j.meta && typeof j.meta === 'object') ? j.meta : {}); p.chat = Array.isArray(j.chat) ? j.chat : []; p.versions = Array.isArray(j.versions) ? j.versions : []; save(); }
-      else newProject(name, txt);
-      serverMode = null; open(currentId); toast(T('Импортировано: ', 'Импортталды: ') + f.name);
+      else if (/\.(fountain|md)$/i.test(f.name)) newProject(name, txt);
+      else newProject(name, /\n\s*\n/.test(txt) ? txt : linesToFountain(txt.split('\n'))); }
+      serverMode = null; open(currentId); toast(T('Импортировано: ', 'Импортталды: ') + f.name + T('. Проверьте разбиение на сцены', '. Көріністерге бөлінуін тексеріңіз'));
     } catch (err) { toast(T('Не прочитал файл: ', 'Файл оқылмады: ') + err.message); }
     e.target.value = '';
   });
@@ -378,8 +416,87 @@
     }
   });
 
+  // ---------- панель сцены (контекст: участники, локация, время, тон, визуал) ----------
+  function sceneBlock(s, sc) { const idx = sc.indexOf(s); let last = s.el; let n = s.el.nextElementSibling; const stop = idx + 1 < sc.length ? sc[idx + 1].el : null; while (n && n !== stop) { last = n; n = n.nextElementSibling; } return { from: s.el, to: last }; }
+  function sceneSyn(s, key) { let n = s.el.nextElementSibling; while (n && ed.typeOf(n) === 'synopsis') { const m = (n.textContent || '').match(/^\s*([^:]+):\s*(.*)$/); if (m && m[1].trim().toLowerCase() === key.toLowerCase()) return { el: n, text: m[2].trim() }; n = n.nextElementSibling; } return null; }
+  function setSceneSyn(s, key, text) {
+    const cur = sceneSyn(s, key);
+    if (!text.trim()) { if (cur) { cur.el.remove(); ed.root.dispatchEvent(new Event('input')); } return; }
+    if (cur) { cur.el.textContent = key + ': ' + text.trim(); }
+    else { const p = ed.mk('synopsis', key + ': ' + text.trim()); let anchor = s.el; while (anchor.nextElementSibling && ed.typeOf(anchor.nextElementSibling) === 'synopsis') anchor = anchor.nextElementSibling; anchor.after(p); }
+    ed.root.dispatchEvent(new Event('input'));
+  }
+  let spTimer = null, spSceneIdx = 0;
+  function renderScenePanel() {
+    if (!document.body.classList.contains('scene-open')) return;
+    const cs = currentScene(); const body = $('#spBody');
+    if (!cs) { $('#spTitle').textContent = T('Сцена', 'Көрініс'); body.innerHTML = `<div class="empty">${T('Поставьте курсор в сцену — здесь её участники, локация, время и ваши требования к изображению.', 'Курсорды көрініске қойыңыз.')}</div>`; spSceneIdx = 0; return; }
+    const s = cs.scene; const up = s.heading; const m = up.match(/^([A-ZА-ЯЁӘҒҚҢӨҰҮҺІ]+\.(?:\/[A-ZА-ЯЁӘҒҚҢӨҰҮҺІ]+\.)?)\s*(.*?)\s*(?:\s[-–—]\s(.*))?$/);
+    const kind = m ? m[1] : '', loc = m ? m[2] : up, time = m && m[3] ? m[3] : '';
+    const sameScene = spSceneIdx === s.index && body.querySelector('[data-f=ton]');
+    $('#spTitle').textContent = `${s.num}. ${s.heading}`;
+    if (sameScene) { body.querySelector('[data-chips]').innerHTML = s.characters.map((n) => `<span class="chip">${esc(n)}</span>`).join('') || `<span class="val dim">${T('— пока без реплик', '— репликасыз')}</span>`; body.querySelector('[data-loc]').textContent = (kind ? kind + ' ' : '') + loc; body.querySelector('[data-time]').textContent = time || '—'; body.querySelector('[data-dur]').textContent = fmt(s.seconds); return; }
+    spSceneIdx = s.index;
+    const ton = sceneSyn(s, 'Тон'), viz = sceneSyn(s, 'Визуал');
+    body.innerHTML = `<label><span>${T('Участники', 'Қатысушылар')}</span><div class="chips" data-chips>${s.characters.map((n) => `<span class="chip">${esc(n)}</span>`).join('') || `<span class="val dim">${T('— пока без реплик', '— репликасыз')}</span>`}</div></label>
+      <label><span>${T('Локация', 'Локация')}</span><div class="val" data-loc>${esc((kind ? kind + ' ' : '') + loc)}</div></label>
+      <label><span>${T('Время', 'Уақыт')}</span><div class="val" data-time>${esc(time || '—')}</div></label>
+      <label><span>${T('Длительность', 'Ұзақтығы')}</span><div class="val" data-dur>${fmt(s.seconds)}</div></label>
+      <label><span>${T('Эмоциональный тон', 'Эмоциялық реңк')}</span><input data-f="ton" type="text" value="${esc(ton ? ton.text : '')}" placeholder="${T('тревога, нежность, ирония…', 'мазасыздық, нәзіктік…')}"></label>
+      <label><span>${T('Требования к изображению', 'Бейнеге талаптар')}</span><textarea data-f="viz" rows="5" placeholder="${T('эпоха, атмосфера, свет, детали, что обязательно в кадре', 'дәуір, атмосфера, жарық, детальдар')}">${esc(viz ? viz.text : '')}</textarea></label>
+      <div class="sp-ops"><button type="button" data-op="up">↑ ${T('выше', 'жоғары')}</button><button type="button" data-op="down">↓ ${T('ниже', 'төмен')}</button><button type="button" data-op="del">${T('Удалить сцену', 'Көріністі жою')}</button></div>
+      ${cur().server ? `<div class="sp-ops"><button type="button" class="approve" data-op="approve">${T('Утвердить и передать в Art', 'Бекітіп, Art-қа беру')}</button></div>` : ''}
+      <p class="empty" style="font-size:.76rem">${T('Тон и требования уходят в бриф для Art вместе с текстом сцены.', 'Реңк пен талаптар Art брифіне кетеді.')}</p>`;
+    body.querySelector('[data-f=ton]').addEventListener('input', (e) => { clearTimeout(spTimer); spTimer = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Тон', e.target.value); }, 400); });
+    body.querySelector('[data-f=viz]').addEventListener('input', (e) => { clearTimeout(spTimer); spTimer = setTimeout(() => { const c = currentSceneByIndex(s.index); if (c) setSceneSyn(c, 'Визуал', e.target.value); }, 400); });
+    body.querySelectorAll('[data-op]').forEach((b) => b.addEventListener('click', () => (b.dataset.op === 'approve' ? approveScene(s.index) : sceneOp(s.index, b.dataset.op))));
+  }
+  async function approveScene(index) {
+    const s = currentSceneByIndex(index); if (!s || !cur().server) return;
+    const missing = []; if (!s.characters.length) missing.push(T('участники (нет реплик)', 'қатысушылар')); if (!sceneSyn(s, 'Тон')) missing.push(T('эмоциональный тон', 'эмоциялық реңк')); if (!sceneSyn(s, 'Визуал')) missing.push(T('требования к изображению', 'бейнеге талаптар'));
+    if (missing.length && !confirm(T('Не заполнено: ', 'Толтырылмаған: ') + missing.join(', ') + T('. Утвердить всё равно?', '. Бәрібір бекіту керек пе?'))) return;
+    const slug = cur().server;
+    try {
+      flush(); if (serverMode && serverMode.loaded) { clearTimeout(serverMode.timer); await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/script', 'PUT', { text: cur().text }); serverMode.lastText = cur().text; }
+      const meta = await serverFetch('/api/projects/' + encodeURIComponent(slug)); const rev = meta.data && meta.data.revision;
+      const list = await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes'); const arr = (list.data && (list.data.scenes || list.data)) || [];
+      const sv = Array.isArray(arr) ? arr.find((x) => +x.n === s.index) : null;
+      if (!sv) throw new Error(T('сцена ещё не в разбивке сервера — нажмите ⌘S и повторите', 'көрініс әлі сервер бөлінісінде жоқ — ⌘S басып, қайталаңыз'));
+      await serverFetch('/api/projects/' + encodeURIComponent(slug) + '/scenes/' + encodeURIComponent(sv.id) + '/utverdit', 'POST', {}, rev ? { 'If-Match': String(rev) } : {});
+      toast(T(`Сцена ${s.num} утверждена и передана в Art`, `${s.num} көрінісі бекітілді`));
+    } catch (e) { toast(T('Не утвердилось: ', 'Бекітілмеді: ') + (/404|не найден/i.test(e.message) ? T('сервер ещё не обновлён до утверждения сцен', 'сервер әлі жаңартылмаған') : e.message)); }
+  }
+  function currentSceneByIndex(i) { return ed.scenes().find((x) => x.index === i) || null; }
+  function sceneOp(index, op) {
+    const sc = ed.scenes(); const s = sc.find((x) => x.index === index); if (!s) return; const blk = sceneBlock(s, sc);
+    if (op === 'del') { if (!confirm(T(`Удалить сцену ${s.num} «${s.heading}»? Её можно вернуть из версий (⌘S сохранит текущее состояние).`, `${s.num} көрінісін жою керек пе?`))) return; snapshot(T('до удаления сцены ', 'көріністі жоюға дейін ') + s.num); ed.pushUndo(); let n = blk.from; const stop = blk.to.nextElementSibling; while (n && n !== stop) { const nx = n.nextElementSibling; n.remove(); n = nx; } ed.root.dispatchEvent(new Event('input')); toast(T('Сцена удалена. Вернуть — ⌘Z или версии', 'Көрініс жойылды')); return; }
+    const i = sc.indexOf(s); const target = op === 'up' ? sc[i - 1] : sc[i + 1]; if (!target) return;
+    moveScene(index, op === 'up' ? target.index : (sc[i + 2] ? sc[i + 2].index : null));
+  }
+  function moveScene(index, beforeIndex) { // переставить сцену index перед сценой beforeIndex (null — в конец)
+    const sc = ed.scenes(); const s = sc.find((x) => x.index === index); if (!s || index === beforeIndex) return;
+    const blk = sceneBlock(s, sc); const nodes = []; let n = blk.from; const stop = blk.to.nextElementSibling; while (n && n !== stop) { nodes.push(n); n = n.nextElementSibling; }
+    ed.pushUndo();
+    const before = beforeIndex ? sc.find((x) => x.index === beforeIndex) : null;
+    if (before) { for (const x of nodes) before.el.before(x); } else { for (const x of nodes) ed.root.appendChild(x); }
+    ed.focusPara(nodes[0], 0); ed.root.dispatchEvent(new Event('input')); nodes[0].scrollIntoView({ block: 'center' });
+  }
+  function toggleScenePanel(v) { document.body.classList.toggle('scene-open', v); try { localStorage.setItem('nvs.scene', v ? '1' : '0'); } catch (e) { /* */ } if (v) { document.body.classList.remove('neyra-open'); $('#neyra').classList.add('hidden'); renderScenePanel(); } }
+  $('#btnScene').addEventListener('click', () => toggleScenePanel(!document.body.classList.contains('scene-open')));
+  $('#spClose').addEventListener('click', () => toggleScenePanel(false));
+  (function () { let v = '1'; try { v = localStorage.getItem('nvs.scene') || '1'; } catch (e) { /* */ } if (v === '1' && window.innerWidth > 1100) document.body.classList.add('scene-open'); })();
+  // перетаскивание сцен в списке
+  (function () {
+    const ul = $('#scenes'); let dragIdx = null;
+    ul.addEventListener('dragstart', (e) => { const li = e.target.closest('li[data-i]'); if (!li) return; dragIdx = +li.dataset.i; li.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; });
+    ul.addEventListener('dragover', (e) => { const li = e.target.closest('li[data-i]'); if (!li || dragIdx === null) return; e.preventDefault(); ul.querySelectorAll('li.over').forEach((x) => x.classList.remove('over')); li.classList.add('over'); });
+    ul.addEventListener('dragleave', (e) => { const li = e.target.closest('li[data-i]'); if (li) li.classList.remove('over'); });
+    ul.addEventListener('drop', (e) => { const li = e.target.closest('li[data-i]'); ul.querySelectorAll('li.over,li.drag').forEach((x) => x.classList.remove('over', 'drag')); if (!li || dragIdx === null) return; e.preventDefault(); const to = +li.dataset.i; if (to !== dragIdx) moveScene(dragIdx, to); dragIdx = null; });
+    ul.addEventListener('dragend', () => { ul.querySelectorAll('li.over,li.drag').forEach((x) => x.classList.remove('over', 'drag')); dragIdx = null; });
+  })();
+
   // ---------- NEYRA ----------
-  function openNeyra(v) { document.body.classList.toggle('neyra-open', v); $('#neyra').classList.toggle('hidden', !v); if (v) scopeHint(); }
+  function openNeyra(v) { document.body.classList.toggle('neyra-open', v); $('#neyra').classList.toggle('hidden', !v); if (v) { document.body.classList.remove('scene-open'); scopeHint(); } else { let sv = '1'; try { sv = localStorage.getItem('nvs.scene') || '1'; } catch (e) { /* */ } if (sv === '1' && window.innerWidth > 1100) { document.body.classList.add('scene-open'); renderScenePanel(); } } }
   $('#btnNeyra').addEventListener('click', () => openNeyra(!document.body.classList.contains('neyra-open')));
   $('#btnNeyraClose').addEventListener('click', () => openNeyra(false));
   let tier = 'standard'; try { tier = localStorage.getItem(LS.tier) === 'pro' ? 'pro' : 'standard'; } catch (e) { /* */ }
