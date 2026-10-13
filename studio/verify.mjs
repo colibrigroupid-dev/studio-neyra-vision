@@ -6,6 +6,7 @@ import { makeDemo, DEFAULT_SERVER_URL } from './data.js';
 import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js';
 import { renderBreakdownSection, renderPassportEditor } from './breakdown.js';
 import { renderGeroyWorkshop } from './geroy.js';
+import { svgPaths as ikonki } from './ikonki.js';
 import { verifyBreakdownModules } from './breakdown-tests.js';
 import { ProductionMapApi, canApproveCell } from './production-map-api.js';
 import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js';
@@ -555,7 +556,7 @@ async function appHarness({ stored = new Map(), api, fetchImpl, useDefaultFetch 
   const scheme = { media: '(prefers-color-scheme: dark)', matches: systemDark, addEventListener(type, handler) { if (type === 'change') schemeListeners.add(handler); } };
   const window = { scrollY: 0, scrollTo() {}, addEventListener: (name, handler) => handlers.set(name, handler), matchMedia: () => scheme };
   const context = vm.createContext({
-    makeDemo, DEFAULT_SERVER_URL, BreakdownApi, canWriteBreakdownSection, renderBreakdownSection, renderPassportEditor, renderGeroyWorkshop, frameAt, totalDuration, ProductionMapApi, canApproveCell, renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName,
+    makeDemo, DEFAULT_SERVER_URL, BreakdownApi, canWriteBreakdownSection, renderBreakdownSection, renderPassportEditor, renderGeroyWorkshop, ikonki, frameAt, totalDuration, ProductionMapApi, canApproveCell, renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName,
     StudioServer: useDefaultFetch ? StudioServer : TestServer, structuredClone, localStorage, document, window,
     location: { hash }, crypto: globalThis.crypto, console, navigator: { clipboard: { writeText: async text => { clipboard.push(text); } } }, URL: class extends URL { static createObjectURL(blob) { downloads.push(blob); return 'blob:test-download'; } static revokeObjectURL() {} }, Blob, performance,
     FormData: class { constructor(form) { this.fields = form.fields; } get(name) { return this.fields[name] ?? null; } getAll(name) { const v = this.fields[name]; return Array.isArray(v) ? v : v == null ? [] : [v]; } },
@@ -1609,8 +1610,8 @@ console.log('Hero workshop late-read isolation, missing/denied passports, viewer
   assert.doesNotMatch(server.app.innerHTML, /class='participant-hint'/);
   assert.match(server.app.innerHTML, /data-scene-id='scene-1'/);
   assert.match(server.app.innerHTML, /1–3/);
-  assert.match(server.app.innerHTML, /#\/studio\/heroes/);
-  assert.match(server.app.innerHTML, /#\/studio\/locations/);
+  assert.match(server.app.innerHTML, /data-dep-tab='heroes'/, 'Art tabs: heroes');
+  assert.match(server.app.innerHTML, /data-dep-tab='locations'/, 'Art tabs: locations');
   await server.navigate('heroes'); await server.settle();
   assert.match(server.app.innerHTML, /Шрам на левой щеке/);
   assert.match(server.app.innerHTML, /locked/);
@@ -1800,12 +1801,16 @@ await verifyBreakdownModules();
   p.cells.push({ id: 'cell-wait', object: { type: 'scene', id: 'scene-1' }, stage: 'script', status: 'awaiting', assignee: { keyId: null, name: 'Лена <b>x</b>' }, approverRole: 'producer', dueAt: null, version: 'draft-01', variant: null, comment: '', createdAt: date, updatedAt: date });
   const ui = await appHarness({ api, stored: cinemaSettings(), hash: '#/studio/overview' }); await ui.settle();
   assert.match(ui.app.innerHTML, /class='slate'/, 'Slate header is rendered');
-  assert.match(ui.app.innerHTML, /class='glabel'>Девелопмент</, 'Sidebar groups film departments');
+  for (const dep of ['Writer', 'Art', 'Director', 'Production']) assert.match(ui.app.innerHTML, new RegExp(`class='dep-name'>${dep}<`), `Sidebar lists department ${dep}`);
+  assert.equal((ui.app.innerHTML.match(/class='dep /g) || []).length, 5, 'Sidebar nav is exactly Проект + four departments');
   assert.match(ui.app.innerHTML, /class='menu'/, 'Account menu lives in the sidebar');
-  assert.match(ui.app.innerHTML, /data-cmd='кто тормозит'/, 'Command chips are offered');
+  assert.match(ui.app.innerHTML, /data-helper-toggle/, 'Helper is collapsed to one line by default');
+  assert.doesNotMatch(ui.app.innerHTML, /data-cmd='кто тормозит'/, 'Chips hidden while helper is collapsed');
+  await ui.clickData('helper-toggle', ''); await ui.settle();
+  assert.match(ui.app.innerHTML, /data-cmd='кто тормозит'/, 'Command chips are offered once the helper is open');
   assert.match(ui.app.innerHTML, /data-open-cell='cell-wait'/, 'Awaiting cell is listed on the overview');
   assert.match(ui.app.innerHTML, /Лена &lt;b&gt;x&lt;\/b&gt;/, 'Assignee name is escaped');
   assert.match(ui.app.innerHTML, /class='tabbar'/, 'Mobile tab bar is rendered');
   assert.ok(api.calls.some(c => c.path.endsWith('/map')), 'Overview loads the production map for the waiting list');
 }
-console.log('Actual app new shell: slate, department groups, account menu, command chips and overview waiting list: passed.');
+console.log('Actual app new shell: slate, four departments, account menu, collapsible helper and overview waiting list: passed.');

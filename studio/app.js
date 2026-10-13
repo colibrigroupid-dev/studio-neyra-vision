@@ -1,12 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013j';
-import { frameAt, totalDuration } from './timeline.js?v=20261013j';
-import { StudioServer } from './storage.js?v=20261013j';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013j';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013j';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013j';
-import { renderGeroyWorkshop } from './geroy.js?v=20261013j';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013j';
-import { parseCommand, describeCommand } from './golos.js?v=20261013j';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013k';
+import { frameAt, totalDuration } from './timeline.js?v=20261013k';
+import { StudioServer } from './storage.js?v=20261013k';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013k';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013k';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013k';
+import { renderGeroyWorkshop } from './geroy.js?v=20261013k';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013k';
+import { parseCommand, describeCommand } from './golos.js?v=20261013k';
+import { svgPaths as ikonki } from './ikonki.js?v=20261013k';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -38,6 +39,13 @@ paperScheme?.addEventListener?.('change', () => { if (!paperPreference) applyPap
 let selectedScene = null;
 let processStep = 0;
 let sceneFilter = 'all';
+// Четыре отдела (ТЗ Ара Аруш 13.10): Writer → Art → Director → Production. Вкладки внутри отдела и свёрнутый помощник помнятся на устройстве.
+let artTab = 'heroes';
+let directorTab = 'storyboard';
+let helperOpen = false;
+try { artTab = ['heroes', 'locations', 'breakdown'].includes(localStorage.getItem('nv-art-tab')) ? localStorage.getItem('nv-art-tab') : 'heroes'; directorTab = ['storyboard', 'shots', 'animatic'].includes(localStorage.getItem('nv-director-tab')) ? localStorage.getItem('nv-director-tab') : 'storyboard'; helperOpen = localStorage.getItem('nv-helper-open') === '1'; } catch { /* optional */ }
+const cinemaRoute = () => (route() === 'art' ? artTab : route());
+const directorRoute = () => (['storyboard', 'shots', 'animatic'].includes(route()) ? route() : directorTab);
 let playback = null;
 let playTime = 0;
 let toastTimer;
@@ -202,7 +210,8 @@ async function connectServer() {
     toast(storageError);
   } finally { connecting = false; render(); }
 }
-const svgPaths = { map: 'M2 4h16v12H2zM2 8h16M2 12h16M7 4v12M13 4v12', breakdown: 'M3 3h14v14H3zM3 8h14M8 8v9', heroes: 'M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 17a5 5 0 0 1 10 0M14 10a2.5 2.5 0 1 0 0-5M18 17a4 4 0 0 0-5-3.9', locations: 'M10 18s-5-5.2-5-9a5 5 0 0 1 10 0c0 3.8-5 9-5 9zM10 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z', globe: 'M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 10h16M10 2c3 3 3 13 0 16M10 2c-3 3-3 13 0 16', arrow: 'M4 10h12M11 4l6 6-6 6', plus: 'M10 3v14M3 10h14', close: 'M4 4l12 12M16 4L4 16', check: 'M3 10l5 5L17 5', overview: 'M3 3h6v6H3zM12 3h5v6h-5zM3 12h6v5H3zM12 12h5v5h-5z', script: 'M5 2h8l3 3v13H5zM8 8h5M8 11h5M8 14h3', storyboard: 'M2 4h16v12H2zM7 4v12M13 4v12', animatic: 'M7 4l9 6-9 6z', shots: 'M2 5h16v12H2zM2 5l3-3h13v3M5 2l3 3M10 2l3 3', team: 'M7 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 18v-2a5 5 0 0 1 10 0v2M13 5a3 3 0 0 1 0 6M16 18v-2a5 5 0 0 0-2-4', post: 'M3 5h14M3 10h14M3 15h14M7 2v6M13 7v6M8 12v6', download: 'M10 2v10M6 8l4 4 4-4M3 14v4h14v-4', save: 'M3 3h12l2 2v12H3zM6 3v5h7V3M6 17v-6h8v6', back: 'M16 10H4M9 4l-6 6 6 6', pause: 'M6 4v12M14 4v12', upload: 'M10 13V3M6 7l4-4 4 4M3 13v4h14v-4' };
+const localPaths = { map: 'M2 4h16v12H2zM2 8h16M2 12h16M7 4v12M13 4v12', breakdown: 'M3 3h14v14H3zM3 8h14M8 8v9', heroes: 'M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 17a5 5 0 0 1 10 0M14 10a2.5 2.5 0 1 0 0-5M18 17a4 4 0 0 0-5-3.9', locations: 'M10 18s-5-5.2-5-9a5 5 0 0 1 10 0c0 3.8-5 9-5 9zM10 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z', globe: 'M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 10h16M10 2c3 3 3 13 0 16M10 2c-3 3-3 13 0 16', arrow: 'M4 10h12M11 4l6 6-6 6', plus: 'M10 3v14M3 10h14', close: 'M4 4l12 12M16 4L4 16', check: 'M3 10l5 5L17 5', overview: 'M3 3h6v6H3zM12 3h5v6h-5zM3 12h6v5H3zM12 12h5v5h-5z', script: 'M5 2h8l3 3v13H5zM8 8h5M8 11h5M8 14h3', storyboard: 'M2 4h16v12H2zM7 4v12M13 4v12', animatic: 'M7 4l9 6-9 6z', shots: 'M2 5h16v12H2zM2 5l3-3h13v3M5 2l3 3M10 2l3 3', team: 'M7 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 18v-2a5 5 0 0 1 10 0v2M13 5a3 3 0 0 1 0 6M16 18v-2a5 5 0 0 0-2-4', post: 'M3 5h14M3 10h14M3 15h14M7 2v6M13 7v6M8 12v6', download: 'M10 2v10M6 8l4 4 4-4M3 14v4h14v-4', save: 'M3 3h12l2 2v12H3zM6 3v5h7V3M6 17v-6h8v6', back: 'M16 10H4M9 4l-6 6 6 6', pause: 'M6 4v12M14 4v12', upload: 'M10 13V3M6 7l4-4 4 4M3 13v4h14v-4' };
+const svgPaths = { ...localPaths, ...ikonki, art: ikonki.heroes || localPaths.heroes, director: ikonki.storyboard || localPaths.storyboard, production: ikonki.play || localPaths.animatic, writer: ikonki.script || localPaths.script };
 const icon = name => `<svg class='icon' viewBox='0 0 20 20' aria-hidden='true'><path d='${svgPaths[name] || svgPaths.arrow}' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
 const btn = (label, action, primary = false, ico = '') => `<button class='btn ${primary ? 'primary' : ''}' data-action='${action}'>${e(label)}${ico ? icon(ico) : ''}</button>`;
 const brand = () => `<a class='brand' href='#/' aria-label='Neyra Vision Studio' title='Neyra Vision Studio'><img src='../assets/znak-nv.png' alt='' width='32' height='32'></a>`;
@@ -252,7 +261,8 @@ const stages = () => [
   { id: 'team', title: t('Команда', 'Команда'), short: t('Один проект для всех', 'Бәріне ортақ бір жоба'), description: t('Режиссёр, сценарист, художник и продюсер работают в разделах одного проекта. У каждого понятная роль и зона ответственности.', 'Режиссер, сценарист, суретші мен продюсер бір жобаның бөлімдерінде жұмыс істейді. Әркімнің рөлі мен міндеті айқын.'), result: t('Участники · роли · доступ к разделам', 'Қатысушылар · рөлдер · бөлімдерге қолжетімділік') },
   { id: 'post', title: t('Постпродакшен', 'Постпродакшн'), short: t('Фильм становится целым', 'Фильм біртұтас туындыға айналады'), description: t('Планируйте монтаж, цвет, звук и VFX. Соберите работу отделов в один процесс завершения фильма.', 'Монтажды, түсті, дыбысты және VFX жұмыстарын жоспарлаңыз. Бөлімдердің жұмысын фильмді аяқтаудың ортақ үдерісіне біріктіріңіз.'), result: t('Монтаж · звук · цвет · VFX', 'Монтаж · дыбыс · түс · VFX') }
 ];
-const navItems = () => [{ id: 'overview', title: t('Обзор проекта', 'Жобаға шолу') }, { id: 'map', title: t('Карта производства', 'Өндіріс картасы') }, ...stages().flatMap(stage => stage.id === 'script' ? [stage, ...cinemaPages.map(id => ({ id, title: ({ breakdown: t('Разбивка', 'Сценарийді талдау'), heroes: t('Герои', 'Кейіпкерлер'), locations: t('Локации', 'Локациялар') })[id] }))] : [stage])];
+const navItems = () => [{ id: 'overview', title: t('Проект', 'Жоба'), sub: t('обзор и решения', 'шолу мен шешімдер') }, { id: 'script', title: 'Writer', sub: t('сценарий', 'сценарий') }, { id: 'art', title: 'Art', sub: t('герои и локации', 'кейіпкерлер мен локациялар') }, { id: 'director', title: 'Director', sub: t('раскадровка и кадры', 'кадрлық жоспар') }, { id: 'production', title: 'Production', sub: t('видео', 'бейне') }];
+const departmentOf = page => ({ heroes: 'art', locations: 'art', breakdown: 'art', storyboard: 'director', shots: 'director', animatic: 'director' })[page] || page;
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 4000); }
 function download(name, value, type = 'text/plain;charset=utf-8') { const url = URL.createObjectURL(new Blob(['\uFEFF', value], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function demoOpen() { if (!serverClient && state.projects.demo) state.activeId = 'demo'; go('overview'); }
@@ -286,7 +296,25 @@ const simpleOverview = () => /(?:^|[?&])prostoy=1(?:&|$)/.test(String(location.s
 function overview() {
   const p = project();
   if (simpleOverview()) return `<div class='simple-head'><h1>${t('Что снимаем сегодня?', 'Бүгін не түсіреміз?')}</h1><p class='lead'>${t('Скажите помощнику внизу или откройте раздел слева. Всё, что ждёт вашего решения, — здесь.', 'Төмендегі көмекшіге айтыңыз немесе сол жақтан бөлімді ашыңыз. Шешіміңізді күткеннің бәрі — осында.')}</p></div>${awaitingSheet()}`;
-  return `${awaitingSheet()}${pageHeading(t('Обзор проекта', 'Жобаға шолу'), t('Где мы, что ждёт решения, кто чем занят.', 'Оқиғаңыз бен команданың жұмысы — бір кеңістікте.'), btn(t('К сценарию', 'Сценарийге'), 'script', true, 'arrow'))}<div class='project-hero'><img src='assets/hero.jpg' alt='${t('Визуальный референс проекта', 'Жобаның визуалды референсі')}'><div class='project-hero-copy'><div class='row wrap'>${status(p.scriptStatus)}<span class='badge'>${t('Визуальный референс', 'Визуалды референс')}</span></div><h2>${e(local(p.title))}</h2></div></div><div class='stat-row'><div class='stat'><strong>${p.scenes.length}</strong><small>${t('Сцен в сценарии', 'Сценарийдегі көріністер')}</small></div><div class='stat'><strong>${p.shots.length}</strong><small>${t('Кадров в проекте', 'Жобадағы кадрлар')}</small></div><div class='stat'><strong>${p.members.length}</strong><small>${t('Участников команды', 'Командадағы қатысушылар')}</small></div><div class='stat'><strong>${String(totalDuration(p.shots)).padStart(2, '0')} <small>${t('сек', 'сек')}</small></strong><small>${t('Хронометраж ИИматика', 'ЖИ-аниматик хронометражы')}</small></div></div><div class='two-cols'><section class='panel'><h2>${t('Путь проекта', 'Жобаның кезеңдері')}</h2><ol class='stage-list'>${stages().map((s, i) => `<li><a href='#/studio/${s.id}'><span><span class='num'>0${i + 1}</span>${s.title}</span>${i === 0 ? status(p.scriptStatus) : icon('arrow')}</a></li>`).join('')}</ol></section><div><section class='panel'><h2>${t('История', 'Оқиға')}</h2><p>${e(local(p.synopsis) || t('Добавьте историю через сценарий.', 'Оқиғаны сценарий арқылы жазыңыз.'))}</p><div class='scene-minis'>${p.scenes.slice(0, 3).map((s, i) => `<a class='scene-mini' href='#/studio/script' data-scene='${e(s.id)}'><span class='mono'>0${i + 1}</span>${e(s.title[state.scriptLang])}</a>`).join('')}</div></section><section class='panel' style='margin-top:24px'><div class='row between'><h2>${t('Команда', 'Команда')}</h2><a href='#/studio/team' aria-label='${t('Открыть команду', 'Команданы ашу')}'>${icon('arrow')}</a></div><div class='avatars'>${p.members.map(m => `<span class='avatar' title='${e(m.name)}'>${e(m.name.slice(0, 1))}</span>`).join('')}</div><p>${t('Творческий процесс начинается с общего замысла.', 'Шығармашылық үдеріс ортақ ойдан басталады.')}</p></section></div></div>`;
+  return `${awaitingSheet()}${pageHeading(t('Обзор проекта', 'Жобаға шолу'), t('Где мы, что ждёт решения, кто чем занят.', 'Оқиғаңыз бен команданың жұмысы — бір кеңістікте.'), `<a class='btn' href='#/studio/map'>${icon('map')}${t('Карта производства', 'Өндіріс картасы')}</a>` + btn(t('К сценарию', 'Сценарийге'), 'script', true, 'arrow'))}<div class='project-hero'><img src='assets/hero.jpg' alt='${t('Визуальный референс проекта', 'Жобаның визуалды референсі')}'><div class='project-hero-copy'><div class='row wrap'>${status(p.scriptStatus)}<span class='badge'>${t('Визуальный референс', 'Визуалды референс')}</span></div><h2>${e(local(p.title))}</h2></div></div><div class='stat-row'><div class='stat'><strong>${p.scenes.length}</strong><small>${t('Сцен в сценарии', 'Сценарийдегі көріністер')}</small></div><div class='stat'><strong>${p.shots.length}</strong><small>${t('Кадров в проекте', 'Жобадағы кадрлар')}</small></div><div class='stat'><strong>${p.members.length}</strong><small>${t('Участников команды', 'Командадағы қатысушылар')}</small></div><div class='stat'><strong>${String(totalDuration(p.shots)).padStart(2, '0')} <small>${t('сек', 'сек')}</small></strong><small>${t('Хронометраж ИИматика', 'ЖИ-аниматик хронометражы')}</small></div></div><div class='two-cols'><section class='panel'><h2>${t('Путь проекта', 'Жобаның кезеңдері')}</h2><ol class='stage-list'>${stages().map((s, i) => `<li><a href='#/studio/${s.id}'><span><span class='num'>0${i + 1}</span>${s.title}</span>${i === 0 ? status(p.scriptStatus) : icon('arrow')}</a></li>`).join('')}</ol></section><div><section class='panel'><h2>${t('История', 'Оқиға')}</h2><p>${e(local(p.synopsis) || t('Добавьте историю через сценарий.', 'Оқиғаны сценарий арқылы жазыңыз.'))}</p><div class='scene-minis'>${p.scenes.slice(0, 3).map((s, i) => `<a class='scene-mini' href='#/studio/script' data-scene='${e(s.id)}'><span class='mono'>0${i + 1}</span>${e(s.title[state.scriptLang])}</a>`).join('')}</div></section><section class='panel' style='margin-top:24px'><div class='row between'><h2>${t('Команда', 'Команда')}</h2><a href='#/studio/team' aria-label='${t('Открыть команду', 'Команданы ашу')}'>${icon('arrow')}</a></div><div class='avatars'>${p.members.map(m => `<span class='avatar' title='${e(m.name)}'>${e(m.name.slice(0, 1))}</span>`).join('')}</div><p>${t('Творческий процесс начинается с общего замысла.', 'Шығармашылық үдеріс ортақ ойдан басталады.')}</p></section></div></div>`;
+}
+const segmented = (name, items, current) => `<div class='seg' role='tablist' aria-label='${e(name)}'>${items.map(([id, title]) => `<button type='button' role='tab' data-dep-tab='${e(id)}' aria-selected='${current === id}' class='${current === id ? 'active' : ''}'>${e(title)}</button>`).join('')}</div>`;
+function artPage() {
+  const tab = cinemaRoute();
+  const tabs = segmented(t('Арт', 'Арт'), [['heroes', t('Герои', 'Кейіпкерлер')], ['locations', t('Локации', 'Локациялар')], ['breakdown', t('Сцены и бриф', 'Көріністер')]], tab);
+  return `<div class='dep-head'><div class='dep-kicker'>Neyra Art · ${t('герои и локации', 'кейіпкерлер мен локациялар')}</div>${tabs}</div>${cinemaPage(tab)}`;
+}
+function directorPage() {
+  const tab = directorRoute();
+  const tabs = segmented(t('Режиссёр', 'Режиссер'), [['storyboard', t('Раскадровка', 'Кадрлық жоспар')], ['shots', t('Кадры', 'Кадрлар')], ['animatic', t('ИИматик', 'ЖИ-аниматик')]], tab);
+  const body = tab === 'animatic' ? animaticPage() : shotsPage(tab);
+  return `<div class='dep-head'><div class='dep-kicker'>Neyra Director · ${t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар')}</div>${tabs}</div>${body}`;
+}
+function productionPage() {
+  const p = project();
+  const approved = p.shots.filter(s => s.status === 'approved');
+  const total = p.shots.length;
+  return `<div class='dep-head'><div class='dep-kicker'>Neyra Production · ${t('видео', 'бейне')}</div></div>${pageHeading(t('Видео', 'Бейне'), t('Генерация идёт только по утверждённым кадрам Director: описание действия, камера, образы героев и локаций из Art. Перед запуском вы видите объём и цену.', 'Генерация тек Director бекіткен кадрлар бойынша жүреді.'))}<div class='sheet'><div class='row'><span>${t('Кадров в проекте', 'Жобадағы кадрлар')}</span><b>${e(String(total))}</b></div><div class='row'><span>${t('Утверждено для видео', 'Бейнеге бекітілген')}</span><b>${e(String(approved.length))}</b></div><div class='row'><span>${t('Движок', 'Қозғалтқыш')}</span><b>${t('технология NEYRA · 5 с 720p ≈ 128 токенов', 'NEYRA технологиясы · 5 с 720p ≈ 128 токен')}</b></div></div>${approved.length ? `<div class='post-list'>${approved.map(sh => `<div class='post-task'><label>${e(local(sh.title))}<p>${e(String(sh.duration || 5))} ${t('с', 'с')} · ${t('ждёт вашего «да» на запуск', 'іске қосуға «иә» күтеді')}</p></label></div>`).join('')}</div>` : `<div class='empty'><h2>${t('Пока нечего генерировать.', 'Әзірге генерациялайтын ештеңе жоқ.')}</h2><p>${t('Утвердите последовательность кадров в Director — они появятся здесь списком с ценой.', 'Director-де кадрлар тізбегін бекітіңіз — олар мұнда бағасымен пайда болады.')}</p><a class='btn primary' href='#/studio/director'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`}`;
 }
 function scriptPage() {
   const p = project();
@@ -503,10 +531,10 @@ function passportError(error) {
 }
 async function refreshCinema() {
   const client = serverClient, slug = state.activeId, passportId = heroRouteId();
-  if (!client || !project() || !cinemaPages.includes(route())) return false;
+  if (!client || !project() || !cinemaPages.includes(cinemaRoute())) return false;
   cinemaState.client = client; cinemaState.slug = slug; cinemaState.passportId = passportId;
   const token = ++cinemaState.token;
-  const current = () => client === serverClient && slug === state.activeId && token === cinemaState.token && passportId === heroRouteId() && cinemaPages.includes(route());
+  const current = () => client === serverClient && slug === state.activeId && token === cinemaState.token && passportId === heroRouteId() && cinemaPages.includes(cinemaRoute());
   cinemaState.loading = true; cinemaState.ready = false; cinemaState.error = ''; passportCard = null; importCard = null;
   render();
   try {
@@ -610,7 +638,7 @@ async function submitPassport(form, data) {
   }
 }
 async function breakdownImportDialog() {
-  if (!serverClient || !canWriteBreakdownSection(project(), 'breakdown') || !cinemaPages.includes(route())) return;
+  if (!serverClient || !canWriteBreakdownSection(project(), 'breakdown') || !cinemaPages.includes(cinemaRoute())) return;
   if (!await refreshCinema() || !canWriteBreakdownSection(project(), 'breakdown')) return;
   openDialog(`${dialogHead(t('Разобрать сценарий на сцены', 'Сценарий талдауын импорттау'))}<form id='breakdown-import-form'><label for='breakdown-file'>${t('Выберите файл разбивки (razbivka.json)', 'Талдау файлын таңдаңыз (razbivka.json)')}</label><input id='breakdown-file' name='file' type='file' accept='.json,application/json' required><p>${t('Выберите razbivka.json. Сцены и паспорта будут обновлены; заполненные замки и авторский текст сохранятся.', 'razbivka.json файлын таңдаңыз. Көріністер мен паспорттар жаңартылады; толтырылған бекітілген сипаттамалар мен автор мәтіні сақталады.')}</p><p data-passport-error role='alert' hidden></p>${dialogActions(t('Импортировать', 'Импорттау'))}</form>`);
   dialog.classList.add('passport-dialog'); dialog.dataset.cinemaMode = paperMode();
@@ -651,15 +679,15 @@ async function submitBreakdownImport(data) {
 function workspace(page) {
   const p = project();
   const cex = page === 'heroes' && Boolean(heroRouteId());
-  const pages = { overview, map: productionMapPage, breakdown: () => cinemaPage('breakdown'), heroes: () => heroRouteId() ? geroyPage() : cinemaPage('heroes'), locations: () => cinemaPage('locations'), script: scriptPage, storyboard: () => shotsPage('storyboard'), animatic: animaticPage, shots: () => shotsPage('shots'), team: teamPage, post: postPage };
+  const pages = { overview, map: productionMapPage, art: artPage, heroes: () => heroRouteId() ? geroyPage() : artPage(), locations: artPage, breakdown: artPage, script: scriptPage, director: directorPage, storyboard: directorPage, animatic: directorPage, shots: directorPage, production: productionPage, team: teamPage, post: postPage };
   if (!pages[page]) page = 'overview';
-  const section = ['map', 'heroes', 'locations'].includes(page) ? 'overview' : page === 'breakdown' ? 'script' : ['storyboard', 'shots', 'animatic'].includes(page) ? 'shots' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
-  const denied = !cinemaPages.includes(page) && p?._denied?.includes(section);
+  const section = ['map', 'heroes', 'locations', 'art', 'breakdown'].includes(page) ? 'overview' : ['storyboard', 'shots', 'animatic', 'director'].includes(page) ? 'shots' : page === 'production' ? 'animatic' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
+  const denied = !cinemaPages.includes(page) && page !== 'art' && p?._denied?.includes(section);
   const content = !p ? `<div class='empty'><h1>${t('Проектов пока нет', 'Қолжетімді жобалар жоқ')}</h1><p>${t('Создайте проект ключом администратора, режиссёра или продюсера. Для входа в существующий проект попросите руководителя выдать ключ участника.', 'Әкімші, режиссер немесе продюсер кілтімен жоба құрыңыз. Бар жобаға кіру үшін жетекшіден қатысушы кілтін сұраңыз.')}</p>${btn(t('Создать проект', 'Жоба құру'), 'create', true, 'plus')}</div>` : denied ? `<div class='empty'><h1>${t('Нет доступа к разделу', 'Бөлімге қолжетімділік жоқ')}</h1><p>${t('Сервер проверяет роль и разделы участника. Попросите руководителя изменить ваши права в разделе «Команда».', 'Сервер қатысушының рөлі мен бөлімдерін тексереді. Жетекшіден «Команда» бөлімінде құқықтарыңызды өзгертуді сұраңыз.')}</p></div>` : pages[page]();
   const header = `<header class='work-header'><div class='row wrap'>${brand()}<span class='storage-label' data-storage-label role='status'>${e(storageLabel())}</span></div><div class='row work-controls'><select id='project-switch' aria-label='${t('Выбрать проект', 'Жобаны таңдау')}'>${Object.entries(state.projects).map(([id, record]) => `<option value='${e(id)}' ${id === state.activeId ? 'selected' : ''}>${e(local(record.title))}</option>`).join('')}</select>${langs()}${btn(t('Сервер', 'Сервер'), 'server')}<button class='btn small' data-action='create' aria-label='${t('Создать проект', 'Жоба құру')}'>${icon('plus')}</button></div></header>`;
-  const sidebar = cex ? '' : `<aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('Проект команды', 'Жұмыс кеңістігі')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `${navGroupLabel(n.id)}<a href='#/studio/${n.id}' class='${page === n.id ? 'active' : ''}' ${page === n.id ? `aria-current='page'` : ''}>${icon(n.id)}${n.title}${n.id === 'map' && serverClient && meState.awaiting ? `<span class='n hot' data-nav-awaiting>${e(String(meState.awaiting))}</span>` : ''}</a>`).join('')}${p ? `<span class='glabel'>${t('Выпуск', 'Шығарылым')}</span><a href='../p/${e(state.activeId)}/' target='_blank' rel='noopener' title='${t('Страница проекта по коду: общий взгляд для продюсера и партнёров', 'Жоба беті код арқылы')}'>${icon('globe')}${t('Страница проекта ↗', 'Жоба беті ↗')}</a>` : ''}</nav>${accountMenu(p)}</aside>`;
+  const sidebar = cex ? '' : `<aside class='sidebar'><div class='project-name'>${e(p ? local(p.title) : t('Проекты', 'Жобалар'))}<small>${t('Проект команды', 'Жұмыс кеңістігі')}</small></div><nav class='side-nav' aria-label='${t('Разделы проекта', 'Жоба бөлімдері')}'>${navItems().map(n => `<a href='#/studio/${n.id}' class='dep ${departmentOf(page) === n.id ? 'active' : ''}' ${departmentOf(page) === n.id ? `aria-current='page'` : ''}>${icon(n.id)}<span class='dep-name'>${e(n.title)}<small>${e(n.sub)}</small></span>${n.id === 'overview' && serverClient && meState.awaiting ? `<span class='n hot' data-nav-awaiting>${e(String(meState.awaiting))}</span>` : ''}</a>`).join('')}${p ? `<span class='glabel'>${t('Выпуск', 'Шығарылым')}</span><a href='../p/${e(state.activeId)}/' target='_blank' rel='noopener' title='${t('Страница проекта по коду: общий взгляд для продюсера и партнёров', 'Жоба беті код арқылы')}'>${icon('globe')}${t('Страница проекта ↗', 'Жоба беті ↗')}</a>` : ''}</nav>${accountMenu(p)}</aside>`;
   const preamble = cex ? '' : `${slate(p, page)}<div class='prototype-note'>${t('Картинки и видео подключим после ваших «да» на кадры.', 'Прототип · сурет пен бейне генерациясы әлі қосылмаған.')}</div>`;
-  return `<div class='workspace ${cex ? 'cex' : page === 'map' ? 'map-workspace' : cinemaPages.includes(page) ? 'cinema-workspace' : ''}'>${header}<div class='work-grid'>${sidebar}<main class='work-main'>${preamble}<p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}${cex ? helperStub(p, true) : ''}</main></div>${cex ? '' : `${helperStub(p)}${tabbar(page)}`}</div>`;
+  return `<div class='workspace ${cex ? 'cex' : page === 'map' ? 'map-workspace' : cinemaPages.includes(page) || page === 'art' ? 'cinema-workspace' : ''}'>${header}<div class='work-grid'>${sidebar}<main class='work-main'>${preamble}<p class='storage-error' data-storage-error role='alert' ${storageError ? '' : 'hidden'}>${e(storageError)}</p>${participantHint()}${content}${cex ? helperStub(p, true) : ''}</main></div>${cex ? '' : `${helperStub(p)}${tabbar(page)}`}</div>`;
 }
 
 const meState = { awaiting: null, at: 0, loading: false, tokeny: null };
@@ -731,22 +759,24 @@ function accountMenu(p) {
     ${Object.keys(state.projects).length > 1 ? `<div class='menu-group'>${t('Мои проекты', 'Менің жобаларым')}</div>${Object.entries(state.projects).slice(0, 6).map(([id, record]) => `<button type='button' role='menuitem' data-project='${e(id)}' ${id === state.activeId ? `aria-current='true'` : ''}>${icon('overview')}${e(local(record.title) || id)}</button>`).join('')}<hr>` : ''}
     <a href='../pomoshch/' role='menuitem'>${icon('script')}${t('Как это работает', 'Бұл қалай жұмыс істейді')}</a>
     ${serverClient ? `<button type='button' role='menuitem' data-action='tokeny'>${icon('post')}<span>${t('Токены и пополнение', 'Токендер мен толтыру')}<small class='sub' data-tokeny>${e(tokenyLabel())}</small></span></button>` : ''}
+    <a href='#/studio/map' role='menuitem'>${icon('map')}${t('Карта производства', 'Өндіріс картасы')}${serverClient && meState.awaiting ? `<small class='sub' data-nav-awaiting>${t('ждёт меня', 'мені күтеді')}: ${e(String(meState.awaiting))}</small>` : ''}</a>
+    <a href='#/studio/team' role='menuitem'>${icon('team')}${t('Команда и права', 'Команда мен құқықтар')}</a>
     <button type='button' role='menuitem' data-action='server'>${icon('team')}${t('Сервер и ключ', 'Сервер мен кілт')}</button>
     <button type='button' role='menuitem' data-action='create'>${icon('plus')}${t('Новый проект', 'Жаңа жоба')}</button>
     <a href='../' role='menuitem'>${icon('overview')}${t('На главную', 'Басты бетке')}</a>
   </div><div class='side-foot'>studio.neyra.vision</div></details>`;
 }
 function tabbar(page) {
-  const items = [['overview', t('Обзор', 'Шолу')], ['script', t('Сценарий', 'Сценарий')], ['storyboard', t('Борды', 'Бордтар')], ['map', t('Карта', 'Карта')], ['team', t('Команда', 'Команда')]];
-  return `<nav class='tabbar' aria-label='${t('Разделы', 'Бөлімдер')}'>${items.map(([id, title]) => `<a href='#/studio/${id}' ${page === id ? `aria-current='page'` : ''}>${icon(id)}<span>${title}</span></a>`).join('')}</nav>`;
+  const items = [['overview', t('Проект', 'Жоба')], ['script', 'Writer'], ['art', 'Art'], ['director', 'Director'], ['production', 'Production']];
+  return `<nav class='tabbar' aria-label='${t('Отделы', 'Бөлімдер')}'>${items.map(([id, title]) => `<a href='#/studio/${id}' ${departmentOf(page) === id ? `aria-current='page'` : ''}>${icon(id)}<span>${title}</span></a>`).join('')}</nav>`;
 }
-const navGroups = () => ({ script: t('Девелопмент', 'Девелопмент'), heroes: t('Препродакшн', 'Препродакшн'), shots: t('Производство', 'Өндіріс'), team: t('Команда', 'Команда') });
-function navGroupLabel(id) { const title = navGroups()[id]; return title ? `<span class='glabel'>${title}</span>` : ''; }
+
 function helperStub(p, cex = false) {
   if (!p) return '';
   const mic = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const micTitle = t('Голос недоступен в этом браузере', 'Бұл браузерде дауыс қолжетімсіз');
-  return `<div class='helper-stub${cex ? ' geroy-helper' : ''}' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'>${assistantThread()}<form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Скажите или напишите: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')], [t('создай героя: …', 'кейіпкер жаса: …'), t('создай героя: ', 'кейіпкер жаса: ')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><span data-voice-status>${cex ? t('Проверьте ответ и перенесите нужное в паспорт.', 'Жауапты тексеріп, керегін паспортқа көшіріңіз.') : t('помощник ответит, как только подключим модель', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
+  if (!helperOpen) return `<div class='helper-stub collapsed${cex ? ' geroy-helper' : ''}' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><button type='button' class='helper-bar' data-helper-toggle>${icon('team')}<span>${t('Помощник: скажите, что сделать', 'Көмекші: не істеу керектігін айтыңыз')}</span>${assistantHistory.length ? `<small>${e(String(assistantHistory.length))}</small>` : ''}<span class='helper-open'>${t('открыть', 'ашу')}</span></button></div>`;
+  return `<div class='helper-stub${cex ? ' geroy-helper' : ''}' aria-label='${t('Помощник проекта', 'Жоба көмекшісі')}'><div class='box'>${assistantThread()}<form id='voice-form' class='q' autocomplete='off'><button type='button' class='mic' data-action='voice' aria-label='${t('Сказать команду', 'Команда айту')}' ${mic ? '' : `disabled title='${micTitle}'`}>${icon('team')}</button><input name='q' id='voice-input' placeholder='${t('Скажите или напишите: «открой карту», «кто тормозит», «вернуть 12.2, свет не совпадает»', 'Команда немесе сұрақ: «картаны аш», «кім кешіктіреді»')}' aria-label='${t('Команда или вопрос', 'Команда немесе сұрақ')}'><button type='submit' class='send' aria-label='${t('Отправить', 'Жіберу')}'>${icon('arrow')}</button></form><div class='chips'>${[[t('кто тормозит', 'кім кешіктіреді'), t('кто тормозит', 'кім кешіктіреді')], [t('открой разбивку', 'талдауды аш'), t('открой разбивку', 'талдауды аш')], [t('покажи героев', 'кейіпкерлерді көрсет'), t('покажи героев', 'кейіпкерлерді көрсет')], [t('создай героя: …', 'кейіпкер жаса: …'), t('создай героя: ', 'кейіпкер жаса: ')]].map(([label, cmd]) => `<button type='button' class='chip' data-cmd='${e(cmd)}'>${e(label)}</button>`).join('')}</div><div class='tc'><span>${e(local(p.title)).toUpperCase()} · v${e(String(p.version ?? ''))}</span><button type='button' class='chip' data-helper-toggle>${t('свернуть', 'жию')}</button><span data-voice-status>${cex ? t('Проверьте ответ и перенесите нужное в паспорт.', 'Жауапты тексеріп, керегін паспортқа көшіріңіз.') : t('помощник ответит, как только подключим модель', 'көмекші модель кілтінен кейін қосылады')}</span></div></div></div>`;
 }
 function participantHint() {
   return !settings.key && !serverClient ? `<div class='participant-hint' role='note'><p>${t('Чтобы открыть проект команды, введите свой ключ. Его выдаёт продюсер.', 'Команда жобасын ашу үшін қатысушы кілтін енгізіңіз.')}</p>${btn(t('Ввести ключ', 'Қатысушы кілтін енгізу'), 'server')}</div>` : '';
@@ -853,7 +883,7 @@ async function runRazbor(opisanie = '') {
     const spent = d.tokeny?.spisano ? t(` · списано ${d.tokeny.spisano}`, ` · ${d.tokeny.spisano} алынды`) : '';
     assistantHistory.push({ role: 'assistant', content: (parts.length ? t('Готово: ', 'Дайын: ') + parts.join(', ') : t('Ничего нового: всё уже заполнено.', 'Жаңа ештеңе жоқ.')) + spent + ' ' + t('Проверьте паспорта в разделах «Герои» и «Локации» и зафиксируйте, что верно.', '«Кейіпкерлер» мен «Локациялар» бөлімдерін тексеріңіз.') });
     serverClient.known.delete(slug);
-    if (cinemaPages.includes(route())) await refreshCinema(); else render();
+    if (cinemaPages.includes(cinemaRoute())) await refreshCinema(); else render();
   } catch (error) {
     const message = error?.status === 402 ? t('Токены закончились. Откройте «Токены и пополнение» в меню слева внизу.', 'Токендер бітті.') : error?.status === 409 ? t('Коллега только что внёс правку. Обновите раздел и повторите.', 'Әріптес жаңа ғана түзетті. Бөлімді жаңартыңыз.') : (error?.message || t('Не получилось разобрать.', 'Талдау мүмкін болмады.'));
     assistantHistory.push({ role: 'assistant', content: message });
@@ -934,6 +964,10 @@ app.addEventListener('click', async event => {
   if (pick) { const id = pick.dataset.project; await runOperation(async () => { if (!await flushDraft()) { render(); return; } if (serverClient) state.projects[id] = await serverClient.loadProject(id); state.activeId = id; selectedScene = null; sceneFilter = 'all'; playTime = 0; persistPreferences(); go('overview'); render(); }); return; }
   const waitRow = event.target.closest('[data-open-cell]');
   if (waitRow) { event.preventDefault(); mapFilter = 'awaiting'; go('map'); await runOperation(() => mapCellDialog(waitRow.dataset.openCell)); return; }
+  const depTab = event.target.closest('[data-dep-tab]');
+  if (depTab) { const id = depTab.dataset.depTab; const art = ['heroes', 'locations', 'breakdown'].includes(id); if (art) { artTab = id; try { localStorage.setItem('nv-art-tab', id); } catch { /* optional */ } } else { directorTab = id; try { localStorage.setItem('nv-director-tab', id); } catch { /* optional */ } } go(art ? 'art' : 'director'); if (art) void refreshCinema(); return; }
+  const helperToggle = event.target.closest('[data-helper-toggle]');
+  if (helperToggle) { helperOpen = !helperOpen; try { localStorage.setItem('nv-helper-open', helperOpen ? '1' : '0'); } catch { /* optional */ } render(); if (helperOpen) document.querySelector('#voice-input')?.focus(); return; }
   const lang = event.target.closest('[data-lang]');
   if (lang) { state.locale = lang.dataset.lang; persistPreferences(); render(); return; }
   const filter = event.target.closest('[data-map-filter]');
@@ -1224,7 +1258,7 @@ function render() {
   stopPlayback(); document.documentElement.lang = state.locale; document.title = t('neyra.vision — от истории к кадру', 'neyra.vision — оқиғадан кадрға');
   app.innerHTML = route() === 'home' ? landing() : workspace(route()); app.inert = busy || connecting;
   if (route() === 'animatic') updatePlayer();
-  if (cinemaPages.includes(route()) && serverClient && project() && !connecting && !cinemaState.loading && !cinemaState.ready && !cinemaState.error) void refreshCinema();
+  if (cinemaPages.includes(cinemaRoute()) && serverClient && project() && !connecting && !cinemaState.loading && !cinemaState.ready && !cinemaState.error) void refreshCinema();
   if ((route() === 'map' || route() === 'overview') && serverClient && project() && !connecting && !mapState.loading && !mapState.ready && !mapState.error) void refreshProductionMap();
   if (route() !== 'home' && serverClient && project() && !connecting) void refreshMe();
 }

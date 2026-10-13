@@ -1,0 +1,26 @@
+/* Четыре отдела (ТЗ Ара Аруш 13.10.2026) — слой поверх okno.css; цвета только через токены */
+.workspace .side-nav a.dep{display:flex;align-items:center;gap:12px;min-height:48px;padding:6px 12px;border-radius:10px;color:var(--text)}
+.workspace .side-nav a.dep .dep-name{display:flex;flex-direction:column;line-height:1.15;font-size:15px;font-weight:500}
+.workspace .side-nav a.dep .dep-name small{font-size:12px;font-weight:400;color:var(--dim);margin-top:2px}
+.workspace .side-nav a.dep.active{background:var(--surface2)}
+.workspace .side-nav a.dep .icon{width:20px;height:20px;color:var(--muted)}
+.workspace .side-nav a.dep.active .icon{color:var(--text)}
+.workspace .side-nav a.dep .n.hot{margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--text);color:var(--bg);font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center}
+.dep-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:0 0 20px}
+.dep-kicker{font-size:13px;color:var(--dim);letter-spacing:.01em}
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--surface2)}
+.seg button{appearance:none;border:0;background:transparent;color:var(--muted);font:500 14px/1 var(--body,Onest);min-height:32px;padding:0 14px;border-radius:999px;cursor:pointer}
+.seg button:hover{color:var(--text)}
+.seg button.active{background:var(--text);color:var(--bg)}
+.helper-stub.collapsed{padding:0}
+.helper-stub.collapsed .helper-bar{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 14px;border:0;border-radius:14px;background:var(--surface,#212121);color:var(--muted);font:400 14px/1 var(--body,Onest);cursor:pointer;text-align:left}
+.helper-stub.collapsed .helper-bar:hover{color:var(--text)}
+.helper-stub.collapsed .helper-bar .icon{width:18px;height:18px;flex:none}
+.helper-stub.collapsed .helper-bar span:first-of-type{flex:1}
+.helper-stub.collapsed .helper-bar small{font-size:12px;color:var(--dim)}
+.helper-stub.collapsed .helper-bar .helper-open{font-size:13px;color:var(--dim)}
+.helper-stub.collapsed ~ .tabbar{z-index:31}
+.workspace .work-main{padding-bottom:84px}
+.helper-stub:not(.collapsed) ~ * .work-main{padding-bottom:250px}
+@media (max-width:768px){.helper-stub.collapsed{left:0;right:0;bottom:60px}.helper-stub.collapsed .helper-bar{border-radius:0}.dep-head{margin-bottom:12px}.seg{width:100%;overflow:auto}.seg button{flex:1;white-space:nowrap}}
+@media (max-width:768px){.workspace .side-nav{display:none}.workspace .sidebar{padding:6px 12px}}

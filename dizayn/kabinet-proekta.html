@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ru" data-theme="graphite">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f0f0f">
+  <meta name="description" content="Ер Төстік: решения проекта и итоги цехов в одном кабинете. Кликабельный прототип Neyra Vision.">
+  <title>Ер Төстік · Кабинет проекта · Neyra Vision</title>
+  <link rel="icon" href="../assets/favicon-64.png">
+  <link rel="stylesheet" href="tokeny.css">
+  <style>
+    /* №52 / №58. Общие тона; точная охра из задания, без теней. */
+    :root { --accent:#f2f2f2; --accent-ink:#111; --fs-title:26px; --assistant-reserve:240px; }
+    * { box-sizing:border-box; }
+    html { scroll-padding-top:80px; }
+    body { margin:0; background:var(--bg); color:var(--text); font:400 15px/1.5 var(--body); -webkit-font-smoothing:antialiased; }
+    button,input,textarea { font:inherit; color:inherit; }
+    button,a { -webkit-tap-highlight-color:transparent; }
+    button { cursor:pointer; }
+    a { color:inherit; text-decoration:none; }
+    h1,h2,h3,p,dl,dd,figure { margin:0; }
+    h1 { font:500 26px/1.3 var(--disp); }
+    h2,h3 { font-size:17px; font-weight:500; line-height:1.4; }
+    p + p { margin-top:12px; }
+    [hidden] { display:none!important; }
+    :focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+    ::selection { background:var(--accent); color:var(--accent-ink); }
+    .icon { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+    .muted { color:var(--muted); }
+    .small { font-size:13px; color:var(--muted); }
+    .mono { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:36px; padding:8px 16px; border:0; border-radius:999px; background:var(--surface-2); font-weight:500; line-height:1.4; }
+    .btn:hover { background:var(--field); }
+    .icon-btn { width:36px; padding:0; flex:none; }
+    .text-link { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:8px 0; font-weight:500; }
+    .text-link:hover { color:var(--muted); }
+    .topbar { min-height:56px; padding:8px 24px; display:flex; align-items:center; gap:16px; background:var(--bg); position:sticky; top:0; z-index:4; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand img { display:block; width:32px; height:32px; }
+    .brand-name { font-weight:500; }
+    .top-tools { display:flex; align-items:center; gap:12px; margin-left:auto; }
+    .project-pill { font-family:var(--disp); font-size:15px; }
+    .project-pill .icon { transform:rotate(90deg); }
+    .languages { display:flex; background:var(--surface-2); padding:4px; border-radius:999px; }
+    .languages button { min-height:28px; min-width:44px; padding:4px 12px; border:0; border-radius:999px; color:var(--muted); background:transparent; }
+    .languages button[aria-pressed="true"] { background:var(--field); color:var(--text); }
+    .app { display:grid; grid-template-columns:272px minmax(0,1fr); align-items:start; }
+    .side { position:sticky; top:56px; height:calc(100dvh - 56px); padding:16px 12px; display:flex; flex-direction:column; gap:24px; background:var(--bg-side); overflow:auto; }
+    .project-side { padding:16px; border-radius:12px; background:var(--surface); }
+    .project-side strong { display:block; font:500 17px/1.5 var(--disp); }
+    .project-side p { margin-top:4px; }
+    .side nav { display:grid; gap:4px; }
+    .nav-group { padding:16px 12px 4px; }
+    .nav-link { display:flex; align-items:center; gap:12px; min-height:40px; padding:8px 12px; color:var(--muted); border-radius:12px; }
+    .nav-link:hover { background:var(--surface); color:var(--text); }
+    .nav-link[aria-current="page"] { background:var(--surface-2); color:var(--text); }
+    .nav-count { margin-left:auto; font-size:13px; font-variant-numeric:tabular-nums; }
+    .account { margin-top:auto; }
+    .account summary { list-style:none; display:flex; align-items:center; gap:12px; min-height:44px; padding:8px 12px; border-radius:12px; cursor:pointer; }
+    .account summary::-webkit-details-marker { display:none; }
+    .account summary:hover { background:var(--surface); }
+    .account-links { display:grid; gap:4px; padding:8px; background:var(--surface); border-radius:16px; margin-bottom:8px; }
+    .account[open] { display:flex; flex-direction:column-reverse; }
+    .avatar { width:48px; height:48px; display:grid; place-items:center; background:var(--field); border-radius:50%; color:var(--text); font-weight:500; flex:none; }
+    .account .avatar { width:32px; height:32px; }
+    .main { min-width:0; }
+    .work { width:min(100% - 64px,900px); margin:0 auto; padding:32px 0 var(--assistant-reserve); }
+    .slate { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+    .intro { margin-bottom:32px; }
+    .intro h1 { margin-bottom:8px; }
+    .waiting { margin-bottom:32px; }
+    .section-heading { display:flex; justify-content:space-between; align-items:baseline; gap:16px; margin-bottom:16px; }
+    .sheet { background:var(--surface); border-radius:16px; overflow:hidden; }
+    .decision { width:100%; display:grid; grid-template-columns:minmax(0,1fr) 20px; gap:8px 24px; padding:16px 24px; border:0; background:transparent; text-align:left; }
+    .decision + .decision { border-top:1px solid var(--line-soft); }
+    .decision:hover { background:var(--surface-2); }
+    .decision .icon { grid-column:2; grid-row:1/3; align-self:center; }
+    .decision strong { font-weight:500; }
+    .decision .small { grid-column:1; }
+    .feed { display:grid; gap:16px; }
+    .workshop-card { padding:24px; scroll-margin-top:80px; }
+    .card-head { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+    .card-head > .icon { color:var(--muted); }
+    .card-head .small { margin-left:auto; text-align:right; }
+    .card-body { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:24px; align-items:center; }
+    .card-body > * { min-width:0; }
+    .card-foot { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:16px; }
+    .metrics { display:flex; flex-wrap:wrap; gap:24px; }
+    .metrics > div { min-width:64px; }
+    .metrics dd { font-size:26px; line-height:1.3; font-weight:500; font-variant-numeric:tabular-nums; }
+    .metrics dt { margin-top:4px; color:var(--muted); font-size:13px; }
+    .metrics .missing { color:var(--muted); }
+    .metric-note { margin-top:16px; }
+    .script-symbol { width:80px; height:80px; display:grid; place-items:center; color:var(--muted); }
+    .avatars { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .hero-avatar { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; padding:4px 0; border:0; background:transparent; text-align:center; }
+    .hero-avatar .avatar { width:56px; height:56px; font-size:17px; }
+    .hero-avatar:hover .avatar { background:#383838; }
+    .hero-avatar .icon { position:absolute; top:40px; margin-left:40px; background:var(--surface); border-radius:4px; color:var(--muted); }
+    .hero-avatar .small { overflow-wrap:anywhere; max-width:112px; }
+    .locations { display:flex; flex-wrap:wrap; gap:8px; }
+    .location-name { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:8px 12px; background:var(--surface-2); border-radius:999px; font-size:13px; }
+    .frames { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:16px; }
+    .frame-link { display:block; min-width:0; }
+    .frame { width:100%; aspect-ratio:16/9; display:grid; place-items:center; color:var(--muted); background:var(--surface-2); border-radius:8px; position:relative; }
+    .frame-link:hover .frame { background:var(--field); }
+    .frame-number { position:absolute; top:8px; left:12px; font-size:13px; }
+    .frame-link p { margin-top:8px; font-size:13px; color:var(--muted); }
+    .map-preview { display:grid; grid-template-columns:repeat(9,16px); gap:4px; }
+    .map-dot { width:16px; height:16px; border-radius:4px; background:var(--dim); }
+    .map-dot.working { background:var(--muted); }
+    .map-dot.accepted { background:var(--accent); }
+    .status-list { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:16px; }
+    .status-item { display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); }
+    .status-dot { width:8px; height:8px; border-radius:50%; background:var(--dim); flex:none; }
+    .status-dot.accepted { background:var(--accent); }
+    .team-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px 32px; }
+    .person { display:flex; gap:12px; align-items:center; min-width:0; }
+    .person > div { min-width:0; }
+    .person p,.person strong { overflow-wrap:anywhere; }
+    .person strong { font-weight:500; }
+    .person .avatar { width:40px; height:40px; }
+    .team-note { display:flex; align-items:center; gap:8px; margin-top:24px; }
+    .token-value { display:flex; align-items:baseline; gap:12px; font-size:26px; font-weight:500; }
+    .token-value .small { font-weight:400; }
+    .assistant { position:fixed; left:272px; right:0; bottom:0; padding:12px 32px max(12px,env(safe-area-inset-bottom)); background:var(--bg); z-index:3; }
+    .assistant-inner { width:100%; max-width:900px; margin:0 auto; }
+    .suggestions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .suggestions .btn { min-height:32px; padding:4px 12px; font-size:13px; font-weight:400; }
+    .composer { display:grid; grid-template-columns:36px minmax(0,1fr) 40px; gap:12px; align-items:end; padding:12px 16px; background:var(--field); border-radius:24px; }
+    .composer textarea { width:100%; min-height:40px; max-height:112px; resize:vertical; padding:8px 0; border:0; background:transparent; line-height:1.5; }
+    .composer textarea::placeholder { color:var(--muted); opacity:1; }
+    .composer .send { width:40px; min-height:40px; background:var(--accent); color:var(--accent-ink); }
+    .assistant-meta { display:flex; justify-content:space-between; gap:16px; padding:8px 16px 0; }
+    .conversation { max-height:176px; overflow:auto; margin-bottom:12px; padding:16px 24px; background:var(--surface); border-radius:16px; }
+    .conversation p { overflow-wrap:anywhere; }
+    .conversation .text-link { margin-top:8px; }
+    .bottom-nav { display:none; }
+    .mobile-menu { display:none; }
+    .skip-link { position:fixed; top:8px; left:8px; transform:translateY(-160%); z-index:9; }
+    .skip-link:focus { transform:none; }
+    .workshop-view .work { padding-top:24px; }
+    .workshop-view .back { margin-bottom:24px; }
+    .detail-stack { display:grid; gap:24px; }
+    .detail-sheet { padding:24px; }
+    .detail-sheet h2 { margin-bottom:16px; }
+    .detail-row { display:grid; grid-template-columns:44px minmax(0,1fr); gap:16px; padding:16px 0; }
+    .detail-row + .detail-row { border-top:1px solid var(--line-soft); }
+    .detail-row p { margin-top:4px; }
+    .detail-row .number { color:var(--muted); }
+    .detail-row .text-link { padding-top:12px; }
+    .detail-illustration { display:block; width:240px; max-width:100%; height:140px; margin:8px auto 24px; }
+    .detail-illustration svg { display:block; width:100%; height:100%; }
+    .map-scroll { overflow:auto; max-width:100%; padding:4px; }
+    .map-table { border-collapse:separate; border-spacing:8px; min-width:720px; width:100%; font-size:13px; }
+    .map-table th { text-align:left; font-weight:400; color:var(--muted); }
+    .map-table thead th { text-align:center; }
+    .map-table tbody th { min-width:160px; }
+    .map-table td { text-align:center; }
+    .map-cell { width:44px; height:44px; padding:0; border:0; border-radius:8px; background:var(--surface-2); color:var(--muted); }
+    .map-cell.working { background:var(--field); color:var(--text); }
+    .map-cell.accepted { background:var(--accent); color:var(--accent-ink); }
+    .map-cell:hover { background:var(--field); color:var(--text); }
+    .map-cell.accepted:hover { background:var(--accent); color:var(--accent-ink); }
+    body[data-workshop] .app { grid-template-columns:minmax(0,1fr); }
+    body[data-workshop] .side { display:none; }
+    body[data-workshop] .assistant { left:0; }
+    dialog { width:min(100% - 32px,560px); max-height:calc(100dvh - 32px); margin:auto; padding:24px; border:0; border-radius:16px; background:var(--surface); color:var(--text); overflow:auto; }
+    dialog::backdrop { background:rgb(0 0 0 / .72); }
+    .dialog-head { display:flex; justify-content:space-between; align-items:start; gap:24px; margin-bottom:24px; }
+    .dialog-head h2 { font-size:17px; }
+    .dialog-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:24px; }
+    .noscript { display:block; margin:16px 24px; color:var(--muted); }
+    @media(max-width:1100px) {
+      .card-body { grid-template-columns:minmax(0,1fr); }
+      .script-symbol { display:none; }
+      .avatars { justify-self:start; width:min(100%,400px); }
+      .map-preview { margin-top:0; }
+      .card-foot { align-items:start; }
+    }
+    @media(max-width:760px) {
+      :root { --assistant-reserve:272px; }
+      html { scroll-padding-top:80px; }
+      body { font-size:16px; }
+      .topbar { padding:8px 16px; gap:8px; min-height:64px; }
+      .brand-name,.prototype-label,.project-pill { display:none; }
+      .top-tools { gap:8px; }
+      .btn,.icon-btn,.languages button { min-height:44px; }
+      .icon-btn { width:44px; }
+      .languages button { min-width:44px; }
+      .languages { padding:0; }
+      .small,.nav-count,.nav-group,.metrics dt,.hero-avatar .small,.location-name,.frame-number,.frame-link p,.status-item,.map-table { font-size:16px; }
+      .app { grid-template-columns:minmax(0,1fr); }
+      .side { display:none; }
+      .work { width:calc(100% - 32px); padding:24px 0 var(--assistant-reserve); }
+      .intro { margin-bottom:32px; }
+      .section-heading { flex-wrap:wrap; gap:8px; }
+      .section-heading > .small { width:100%; }
+      .decision { padding:16px; gap:8px 16px; }
+      .workshop-card,.detail-sheet { padding:16px; }
+      .card-head { flex-wrap:wrap; gap:8px; }
+      .card-head .small { width:100%; margin-left:32px; text-align:left; }
+      .card-body { gap:16px; }
+      .metrics { gap:24px; }
+      .card-foot { flex-direction:column; gap:4px; }
+      .card-foot .text-link { align-self:flex-start; }
+      .avatars { gap:12px; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .hero-avatar { flex-direction:row; text-align:left; gap:12px; }
+      .hero-avatar .avatar { width:44px; height:44px; }
+      .hero-avatar .icon { top:32px; left:28px; margin-left:0; }
+      .hero-avatar .small { max-width:none; }
+      .hero-avatar .small:last-child { min-width:0; }
+      .locations { gap:8px; }
+      .location-name { min-height:44px; }
+      .frames { grid-template-columns:minmax(0,1fr); gap:16px; }
+      .workshop-card .frames { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+      .workshop-card .frame .icon { display:none; }
+      .workshop-card .frame-number { top:8px; left:8px; }
+      .frame-number { top:12px; left:16px; }
+      .team-list { grid-template-columns:minmax(0,1fr); gap:24px; }
+      .assistant { left:0; padding:12px 16px; bottom:calc(64px + env(safe-area-inset-bottom)); }
+      .suggestions { flex-wrap:nowrap; overflow:auto; padding:4px; margin:0 -4px 8px; }
+      .suggestions .btn { min-height:44px; font-size:16px; white-space:nowrap; flex:none; }
+      .composer { grid-template-columns:44px minmax(0,1fr) 44px; gap:8px; padding:12px; }
+      .composer textarea { min-height:44px; max-height:88px; padding:8px 0; resize:none; }
+      .composer .send { width:44px; min-height:44px; }
+      .assistant-meta { padding:8px 4px 0; }
+      .assistant-meta > :first-child { display:none; }
+      .conversation { max-height:160px; padding:16px; }
+      .bottom-nav { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; position:fixed; left:0; right:0; bottom:0; min-height:64px; padding:4px 8px max(4px,env(safe-area-inset-bottom)); background:var(--bg-side); z-index:4; }
+      .bottom-nav a,.bottom-nav button { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:56px; gap:4px; padding:4px 0; border:0; border-radius:12px; background:transparent; color:var(--muted); font-size:16px; }
+      .bottom-nav [aria-current="page"] { color:var(--text); background:var(--surface-2); }
+      .mobile-menu { display:block; }
+      .mobile-menu nav { display:grid; gap:4px; }
+      .mobile-menu .nav-link { min-height:44px; }
+      .dialog-head { gap:16px; }
+      .map-table { min-width:864px; }
+    }
+    @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+  </style>
+</head>
+<body>
+  <a class="btn skip-link" href="#main" data-kk="Мазмұнға өту">К содержанию</a>
+  <header class="topbar">
+    <a class="brand" href="#overview" aria-label="Neyra Vision · Кабинет проекта" data-aria-kk="Neyra Vision · Жоба кабинеті">
+      <img src="../assets/znak-nv.png" width="32" height="32" alt="">
+      <span class="brand-name">Neyra Vision</span>
+    </a>
+    <span class="small prototype-label" data-kk="Кабинет үлгісі">Прототип кабинета</span>
+    <div class="top-tools">
+      <button class="btn project-pill" type="button" data-dialog="project">Ер Төстік <svg class="icon" data-icon="arrow" aria-hidden="true"></svg></button>
+      <div class="languages" role="group" aria-label="Язык интерфейса" data-aria-kk="Интерфейс тілі">
+        <button type="button" data-lang="ru" aria-pressed="true">Рус</button>
+        <button type="button" data-lang="kk" aria-pressed="false">Қаз</button>
+      </div>
+      <button class="btn icon-btn" type="button" data-dialog="about" aria-label="О кабинете" data-aria-kk="Кабинет туралы"><svg class="icon" data-icon="info" aria-hidden="true"></svg></button>
+    </div>
+  </header>
+  <div class="app">
+    <aside class="side" aria-label="Цехи проекта" data-aria-kk="Жоба цехтары">
+      <div class="project-side"><strong>Ер Төстік</strong><p class="small" data-kk="Отбасылық анимациялық фильм">Семейный анимационный фильм</p></div>
+      <nav>
+        <a class="nav-link" href="#overview" aria-current="page"><svg class="icon" data-icon="overview" aria-hidden="true"></svg><span data-kk="Кабинет">Кабинет</span></a>
+        <p class="small nav-group" data-kk="Әзірлеу">Девелопмент</p>
+        <a class="nav-link" href="#script"><svg class="icon" data-icon="script" aria-hidden="true"></svg><span data-kk="Сценарий">Сценарий</span></a>
+        <a class="nav-link" href="#breakdown"><svg class="icon" data-icon="breakdown" aria-hidden="true"></svg><span data-kk="Сахналарға бөлу">Разбивка</span></a>
+        <p class="small nav-group" data-kk="Дайындық">Препродакшн</p>
+        <a class="nav-link" href="#heroes"><svg class="icon" data-icon="heroes" aria-hidden="true"></svg><span data-kk="Кейіпкерлер">Герои</span><span class="nav-count">6</span></a>
+        <a class="nav-link" href="#locations"><svg class="icon" data-icon="locations" aria-hidden="true"></svg><span data-kk="Локациялар">Локации</span><span class="nav-count">3</span></a>
+        <a class="nav-link" href="#storyboard"><svg class="icon" data-icon="storyboard" aria-hidden="true"></svg><span data-kk="Кадрлау">Раскадровка</span></a>
+        <p class="small nav-group" data-kk="Жобаны басқару">Управление проектом</p>
+        <a class="nav-link" href="#map"><svg class="icon" data-icon="map" aria-hidden="true"></svg><span data-kk="Карта">Карта</span></a>
+        <a class="nav-link" href="#team"><svg class="icon" data-icon="team" aria-hidden="true"></svg><span data-kk="Команда">Команда</span><span class="nav-count">4</span></a>
+        <a class="nav-link" href="#tokeny"><svg class="icon" data-icon="tokeny" aria-hidden="true"></svg><span data-kk="Токендер">Токены</span></a>
+      </nav>
+      <details class="account">
+        <summary><span class="avatar" aria-hidden="true">А</span><span data-kk="Александр · продюсер">Александр · продюсер</span></summary>
+        <div class="account-links">
+          <a class="nav-link" href="#team"><svg class="icon" data-icon="team" aria-hidden="true"></svg><span data-kk="Команда">Команда</span></a>
+          <a class="nav-link" href="#tokeny"><svg class="icon" data-icon="tokeny" aria-hidden="true"></svg><span data-kk="Токендер">Токены</span></a>
+          <button class="btn" type="button" data-dialog="about" data-kk="Кабинет туралы">О кабинете</button>
+        </div>
+      </details>
+    </aside>
+    <main class="main" id="main" tabindex="-1">
+      <div class="work" id="overview">
+        <div class="intro">
+          <p class="small slate"><span>Ер Төстік</span><span aria-hidden="true">·</span><span data-kk="Әзірлеу">Девелопмент</span><span aria-hidden="true">·</span><span data-kk="Б негізі">Основа Б</span></p>
+          <h1 data-kk="Жоба кабинеті">Кабинет проекта</h1>
+          <p class="muted" data-kk="Бүкіл фильм бір терезеде.">Весь фильм — в одном окне.</p>
+        </div>
+        <section class="waiting" aria-labelledby="waiting-title">
+          <div class="section-heading"><h2 id="waiting-title" data-kk="Менің шешімімді күтеді">Ждёт меня</h2><span class="small" data-kk="Жобаның ашық сұрақтары">Открытые вопросы проекта</span></div>
+          <div class="sheet">
+            <button class="decision" type="button" data-dialog="rights"><strong data-kk="Құқықтар мен үлестерді келісу">Зафиксировать права и доли</strong><span class="small" data-kk="Б негізінің алғашқы нұсқасына дейін">До первого драфта основы Б</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></button>
+            <button class="decision" type="button" data-dialog="palette"><strong data-kk="Палитра мен жарықты таңдау">Выбрать палитру и свет</strong><span class="small" data-kk="Суретшінің шешімі қажет">Нужен выбор художника</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></button>
+          </div>
+        </section>
+        <section aria-labelledby="workshops-title">
+          <div class="section-heading"><h2 id="workshops-title" data-kk="Цехтарда не дайын">Что готово в цехах</h2><span class="small" data-kk="Әр цехқа бір қадам">Один шаг до любого цеха</span></div>
+          <div class="feed">
+            <article class="sheet workshop-card" id="card-script">
+              <header class="card-head"><svg class="icon" data-icon="script" aria-hidden="true"></svg><h3 data-kk="Сценарий">Сценарий</h3><span class="small" data-kk="Б негізі">Основа Б</span></header>
+              <div class="card-body">
+                <div><dl class="metrics"><div><dd class="missing">—</dd><dt data-kk="бет">страниц</dt></div><div><dd class="missing">—</dd><dt data-kk="сахна">сцен</dt></div><div><dd>15</dd><dt data-kk="оқиға кезеңі">битов истории</dt></div></dl><p class="small metric-note" data-kk="Поэпизодник бар. Алғашқы нұсқа әлі жазылмаған.">Поэпизодник есть. Новый драфт ещё впереди.</p></div>
+                <div class="script-symbol" aria-hidden="true"><svg class="icon" data-icon="script"></svg></div>
+              </div>
+              <footer class="card-foot"><p class="small" data-kk="Соңғы түзету · 12 қазан 2026">Последняя правка · 12 октября 2026</p><a class="text-link" href="#script"><span data-kk="Цехты ашу">Открыть цех</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></a></footer>
+            </article>
+            <article class="sheet workshop-card" id="card-heroes">
+              <header class="card-head"><svg class="icon" data-icon="heroes" aria-hidden="true"></svg><h3 data-kk="Кейіпкерлер">Герои</h3><span class="small" data-kk="Портреттер әлі таңдалмаған">Портреты ждут выбора</span></header>
+              <div class="card-body"><dl class="metrics"><div><dd>6</dd><dt data-kk="паспорт">паспортов</dt></div><div><dd>0</dd><dt data-kk="бейне бекітілді">обликов зафиксировано</dt></div></dl>
+                <div class="avatars" aria-label="Четыре героя" data-aria-kk="Төрт кейіпкер">
+                  <a class="hero-avatar" href="#heroes/erke"><span class="avatar" aria-hidden="true">Е</span><svg class="icon" data-icon="unlock" aria-hidden="true"></svg><span class="small">Ерке</span></a>
+                  <a class="hero-avatar" href="#heroes/tostik"><span class="avatar" aria-hidden="true">Т</span><svg class="icon" data-icon="unlock" aria-hidden="true"></svg><span class="small">Төстік</span></a>
+                  <a class="hero-avatar" href="#heroes/shalquyryq"><span class="avatar" aria-hidden="true">Ш</span><svg class="icon" data-icon="unlock" aria-hidden="true"></svg><span class="small">Шалқұйрық</span></a>
+                  <a class="hero-avatar" href="#heroes/mystan-kempir"><span class="avatar" aria-hidden="true">М</span><svg class="icon" data-icon="unlock" aria-hidden="true"></svg><span class="small">Мыстан-кемпір</span></a>
+                </div>
+              </div>
+              <footer class="card-foot"><p class="small" data-kk="Ерке мен Төстік — тарихтың ортасында">Ерке и Төстік — в центре истории</p><a class="text-link" href="#heroes"><span data-kk="Цехты ашу">Открыть цех</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></a></footer>
+            </article>
+            <article class="sheet workshop-card" id="card-locations">
+              <header class="card-head"><svg class="icon" data-icon="locations" aria-hidden="true"></svg><h3 data-kk="Локациялар">Локации</h3><span class="small" data-kk="Негізгі суреттер әлі таңдалмаған">Мастер-пластины ждут выбора</span></header>
+              <div class="card-body"><dl class="metrics"><div><dd>3</dd><dt data-kk="паспорт">паспорта</dt></div><div><dd>0</dd><dt data-kk="негізгі сурет">мастер-пластин</dt></div></dl><div class="locations"><span class="location-name"><svg class="icon" data-icon="locations" aria-hidden="true"></svg><span data-kk="Ауыл">Аул</span></span><span class="location-name"><svg class="icon" data-icon="locations" aria-hidden="true"></svg><span data-kk="Дала">Степь</span></span><span class="location-name"><svg class="icon" data-icon="locations" aria-hidden="true"></svg><span data-kk="Жерасты әлемі">Подземный мир</span></span></div></div>
+              <footer class="card-foot"><p class="small" data-kk="Әр орынға бір тұрақты бейне">Один постоянный облик для каждого места</p><a class="text-link" href="#locations"><span data-kk="Цехты ашу">Открыть цех</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></a></footer>
+            </article>
+            <article class="sheet workshop-card" id="card-storyboard">
+              <header class="card-head"><svg class="icon" data-icon="storyboard" aria-hidden="true"></svg><h3 data-kk="Кадрлау">Раскадровка</h3><span class="small" data-kk="Ерте сынама">Ранняя проба</span></header>
+              <dl class="metrics"><div><dd>17</dd><dt data-kk="кадр нобайы">черновых кадров</dt></div><div><dd>0</dd><dt data-kk="бекітілді">утверждено</dt></div></dl>
+              <div class="frames">
+                <a class="frame-link" href="#storyboard/01-01"><div class="frame"><span class="mono frame-number">01-01</span><svg class="icon" data-icon="storyboard" aria-hidden="true"></svg></div><p data-kk="Нобай">Черновик</p></a>
+                <a class="frame-link" href="#storyboard/01-02"><div class="frame"><span class="mono frame-number">01-02</span><svg class="icon" data-icon="storyboard" aria-hidden="true"></svg></div><p data-kk="Нобай">Черновик</p></a>
+                <a class="frame-link" href="#storyboard/01-03"><div class="frame"><span class="mono frame-number">01-03</span><svg class="icon" data-icon="storyboard" aria-hidden="true"></svg></div><p data-kk="Нобай">Черновик</p></a>
+              </div>
+              <footer class="card-foot"><p class="small" data-kk="А негізінің сынамасы · Б негізіне қайта жинау">Проба основы А · пересобрать под основу Б</p><a class="text-link" href="#storyboard"><span data-kk="Цехты ашу">Открыть цех</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></a></footer>
+            </article>
+            <article class="sheet workshop-card" id="card-map">
+              <header class="card-head"><svg class="icon" data-icon="map" aria-hidden="true"></svg><h3 data-kk="Карта">Карта</h3><span class="small" data-kk="Фильмнің 5 бөлігі · 9 цех">5 частей фильма · 9 цехов</span></header>
+              <div class="card-body"><div><dl class="metrics"><div><dd>38</dd><dt data-kk="әлі алда">ещё впереди</dt></div><div><dd>6</dd><dt data-kk="жұмыста">в работе</dt></div><div><dd>1</dd><dt data-kk="қабылданды">принято</dt></div></dl><p class="small metric-note" data-kk="Концепция мен синопсис қабылданды">Концепция и синопсис приняты</p></div><div class="map-preview" id="map-preview" role="img" aria-label="45 клеток: 38 не начато, 6 в работе, 1 принято" data-aria-kk="45 ұяшық: 38 басталмаған, 6 жұмыста, 1 қабылданған"></div></div>
+              <footer class="card-foot"><p class="small" data-kk="Жоба картасы · 12 қазан">Карта проекта · 12 октября</p><a class="text-link" href="#map"><span data-kk="Цехты ашу">Открыть цех</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></a></footer>
+            </article>
+            <article class="sheet workshop-card" id="card-team">
+              <header class="card-head"><svg class="icon" data-icon="team" aria-hidden="true"></svg><h3 data-kk="Команда">Команда</h3><span class="small" data-kk="4 қатысушы">4 участника</span></header>
+              <div class="team-list">
+                <div class="person"><span class="avatar" aria-hidden="true">А</span><div><strong>Анна Чакиртова</strong><p class="small" data-kk="Серіктес · Taurus Asia Production">Партнёр · Taurus Asia Production</p></div></div>
+                <div class="person"><span class="avatar" aria-hidden="true">А</span><div><strong>Анара Жунусова</strong><p class="small" data-kk="Серіктес · Taurus Asia Production">Партнёр · Taurus Asia Production</p></div></div>
+                <div class="person"><span class="avatar" aria-hidden="true">Л</span><div><strong>Лена</strong><p class="small" data-kk="Концепция және сценарий">Концепция и сценарий</p></div></div>
+                <div class="person"><span class="avatar" aria-hidden="true">А</span><div><strong>Александр Андреянов</strong><p class="small" data-kk="Әзірлеу және продюсирлеу">Разработка и продюсирование</p></div></div>
+              </div>
+              <footer class="card-foot"><p class="small" data-kk="Кім желіде — әзірге көрінбейді">Кто онлайн — пока не видно</p><a class="text-link" href="#team"><span data-kk="Цехты ашу">Открыть цех</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></a></footer>
+            </article>
+            <article class="sheet workshop-card" id="card-tokeny">
+              <header class="card-head"><svg class="icon" data-icon="tokeny" aria-hidden="true"></svg><h3 data-kk="Токендер">Токены</h3></header>
+              <p class="token-value"><span class="muted">—</span><span class="small" data-kk="қалған токен">токенов осталось</span></p>
+              <footer class="card-foot"><p class="small" data-kk="Баланс әлі қосылмаған">Баланс пока не подключён</p><a class="text-link" href="#tokeny"><span data-kk="Цехты ашу">Открыть цех</span><svg class="icon" data-icon="arrow" aria-hidden="true"></svg></a></footer>
+            </article>
+          </div>
+        </section>
+      </div>
+      <section class="workshop-view" id="workshop" hidden aria-label="Цех проекта" data-aria-kk="Жоба цехы"></section>
+    </main>
+  </div>
+  <aside class="assistant" aria-label="Помощник NEYRA" data-aria-kk="NEYRA көмекшісі">
+    <div class="assistant-inner">
+      <div class="conversation" id="conversation" role="status" aria-live="polite" hidden></div>
+      <div class="suggestions"><button class="btn" type="button" data-command="waiting" data-kk="Не шешу керек?">Что ждёт решения?</button><button class="btn" type="button" data-command="heroes" data-kk="Кейіпкерлерді көрсет">Покажи героев</button><button class="btn" type="button" data-command="map" data-kk="Картаны аш">Открой карту</button></div>
+      <form class="composer" id="composer">
+        <button class="btn icon-btn" type="button" data-dialog="voice" aria-label="Голосовое сообщение" data-aria-kk="Дауыстық хабарлама"><svg class="icon" data-icon="mic" aria-hidden="true"></svg></button>
+        <textarea id="assistant-input" rows="1" aria-label="Сообщение помощнику" data-aria-kk="Көмекшіге хабарлама" placeholder="Спросите NEYRA о проекте" data-placeholder-kk="NEYRA-дан жоба туралы сұраңыз"></textarea>
+        <button class="btn icon-btn send" type="submit" aria-label="Отправить сообщение" data-aria-kk="Хабарламаны жіберу"><svg class="icon" data-icon="send" aria-hidden="true"></svg></button>
+      </form>
+      <p class="small assistant-meta"><span id="helper-context">Ер Төстік · <span data-kk="Кабинет">Кабинет</span></span><span data-kk="Үлгі · ақылы әрекеттерсіз">Прототип · без платных действий</span></p>
+    </div>
+  </aside>
+  <nav class="bottom-nav" aria-label="Основные разделы" data-aria-kk="Негізгі бөлімдер">
+    <a href="#overview" aria-current="page"><svg class="icon" data-icon="overview" aria-hidden="true"></svg><span data-kk="Үй">Домой</span></a>
+    <a href="#script"><svg class="icon" data-icon="script" aria-hidden="true"></svg><span data-kk="Мәтін">Текст</span></a>
+    <a href="#heroes"><svg class="icon" data-icon="heroes" aria-hidden="true"></svg><span data-kk="Кейіп">Герои</span></a>
+    <a href="#map"><svg class="icon" data-icon="map" aria-hidden="true"></svg><span data-kk="Карта">Карта</span></a>
+    <button type="button" data-dialog="menu"><svg class="icon" data-icon="plus" aria-hidden="true"></svg><span data-kk="Тағы">Ещё</span></button>
+  </nav>
+  <dialog id="dialog" aria-labelledby="dialog-title">
+    <div class="dialog-head"><h2 id="dialog-title"></h2><button class="btn icon-btn" type="button" id="dialog-close" aria-label="Закрыть" data-aria-kk="Жабу"><svg class="icon" data-icon="close" aria-hidden="true"></svg></button></div>
+    <div id="dialog-content"></div>
+  </dialog>
+  <noscript><p class="noscript">Итоги цехов можно прочитать без JavaScript. Для открытия цехов и помощника включите JavaScript.</p></noscript>
+  <script type="module">
+    import { svgPaths, illustrations } from '../studio/ikonki.js';
+
+    // Срез документов проекта, 13.10.2026. Никаких запросов к рабочему серверу.
+    const $ = selector => document.querySelector(selector);
+    const overview = $('#overview'), workshop = $('#workshop'), dialog = $('#dialog');
+    let locale = 'ru', overviewY = 0, activeRoute = 'overview', dialogInvoker;
+    const t = (ru,kk) => locale === 'kk' ? kk : ru;
+    const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const icon = name => `<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="${svgPaths[name]}"/></svg>`;
+    const illustration = name => `<div class="detail-illustration" aria-hidden="true">${illustrations[name] || ''}</div>`;
+    const openLink = (route,label = t('Открыть цех','Цехты ашу')) => `<a class="text-link" href="#${route}">${esc(label)}${icon('arrow')}</a>`;
+    const names = {overview:['Кабинет','Кабинет'],script:['Сценарий','Сценарий'],breakdown:['Разбивка','Сахналарға бөлу'],heroes:['Герои','Кейіпкерлер'],locations:['Локации','Локациялар'],storyboard:['Раскадровка','Кадрлау'],map:['Карта','Карта'],team:['Команда','Команда'],tokeny:['Токены','Токендер']};
+    const routeName = route => t(...names[route.split('/')[0]]);
+    const heroes = [
+      {id:'erke',name:'Ерке',ru:'Девочка с двумя чёрными косами, красными лентами и мешочком асыков на поясе.',kk:'Қара қос бұрымды, қызыл ленталы, белінде асық дорбасы бар қыз.'},
+      {id:'tostik',name:'Төстік',ru:'Худой мальчик в войлочной шапке и синем кафтане. Лук за спиной, сапоги великоваты.',kk:'Киіз қалпақты, көк шапанды арық бала. Арқасында садақ, етігі үлкендеу.'},
+      {id:'shalquyryq',name:'Шалқұйрық',ru:'Говорящий гнедой конь с белой звездой на лбу, тёмной гривой и усталым мудрым взглядом.',kk:'Маңдайында ақ жұлдызы, қара жалы бар, дана әрі шаршаңқы көзқарасты сөйлейтін торы ат.'},
+      {id:'mystan-kempir',name:'Мыстан-кемпір',ru:'Высокая пожилая женщина с прямой спиной и длинной седой косой. На шее безымянный медальон.',kk:'Арқасы тік, ұзын ақ бұрымды қарт әйел. Мойнында аты жоқ медальон.'},
+      {id:'shoyynqulaq',name:'Шойынқұлақ',ru:'Широкоплечий властитель подземного мира. На доспехах наплечники в форме чугунных ушей.',kk:'Кең иықты жерасты билеушісі. Сауытының иықтары шойын құлақ түрінде.'},
+      {id:'sputnik',name:'Спутник',ru:'Весёлый путешественник в лоскутном чапане. Меняются выражение лица и предмет в руках.',kk:'Құрақ шапанды көңілді саяхатшы. Бет әлпеті мен қолындағы зат қана өзгереді.'}
+    ];
+    const locations = [
+      {name:['Аул','Ауыл'],ru:'Семь белых юрт у ручья, коновязь, круг для асыков и холмы на горизонте.',kk:'Бұлақ жанындағы жеті ақ киіз үй, ат байлайтын орын, асық алаңы мен алыстағы төбелер.'},
+      {name:['Степь','Дала'],ru:'Ковыльная степь, один сухой тополь, двухколейная дорога и далёкие горы.',kk:'Селеулі дала, жалғыз қураған терек, қос ізді жол және алыстағы таулар.'},
+      {name:['Подземный мир','Жерасты әлемі'],ru:'Своды из корней, прожилки света в камне, галерея портретов, стена имён и кристалл слёз.',kk:'Тамырлардан жасалған күмбездер, тастағы жарық жолақтары, портреттер галереясы, есімдер қабырғасы мен көз жасы кристалы.'}
+    ];
+    const beats = [
+      ['Открывающий кадр','Алғашқы кадр'],['Тема заявлена','Тақырып айтылды'],['Установка','Бастапқы жағдай'],['Катализатор','Қозғаушы оқиға'],['Сомнение','Күмән'],['Переход во второй акт','Екінші актке өту'],['Вторая линия','Екінші желі'],['Веселье и игры','Көңіл көтеру мен ойын'],['Середина','Орта тұс'],['Злодеи смыкаются','Жаулар жақындайды'],['Всё потеряно','Бәрі жоғалды'],['Тёмная ночь','Қараңғы түн'],['Переход в третий акт','Үшінші актке өту'],['Финал','Финал'],['Финальный кадр','Соңғы кадр']
+    ];
+    const mapRows = [['Концепция и синопсис','Концепция мен синопсис'],['Акт 1 · аул','1-акт · ауыл'],['Акт 2 · степь и подземный мир','2-акт · дала мен жерасты әлемі'],['Акт 3 · имя','3-акт · есім'],['Песни','Әндер']];
+    const stages = [['Сценарий','Сценарий'],['Разбивка','Бөлу'],['Герои','Кейіпкерлер'],['Локации','Локациялар'],['Раскадровка','Кадрлау'],['Кадры','Кадрлар'],['Видео','Видео'],['Звук','Дыбыс'],['Монтаж','Монтаж']];
+    const mapStates = [['accepted','todo','working','working','todo','todo','todo','todo','todo'],['working',...Array(8).fill('todo')],['working',...Array(8).fill('todo')],['working',...Array(8).fill('todo')],[...Array(7).fill('todo'),'working','todo']];
+    const statusNames = state => state === 'accepted' ? t('Принято','Қабылданды') : state === 'working' ? t('В работе','Жұмыста') : t('Ещё впереди','Әлі алда');
+    const statuses = () => `<div class="status-list"><span class="status-item">${t('38 ещё впереди','38 әлі алда')}</span><span class="status-item"><i class="status-dot" aria-hidden="true"></i>${t('6 в работе','6 жұмыста')}</span><span class="status-item"><i class="status-dot accepted" aria-hidden="true"></i>${t('1 принято','1 қабылданды')}</span></div>`;
+
+    function hydrate(root = document) {
+      root.querySelectorAll('[data-icon]').forEach(svg => { svg.setAttribute('viewBox','0 0 20 20'); svg.innerHTML = `<path d="${svgPaths[svg.dataset.icon]}"/>`; });
+    }
+    function translate(root = document) {
+      root.querySelectorAll('[data-kk]').forEach(el => { el.dataset.ru ??= el.textContent; el.textContent = locale === 'kk' ? el.dataset.kk : el.dataset.ru; });
+      root.querySelectorAll('[data-aria-kk]').forEach(el => { el.dataset.ariaRu ??= el.getAttribute('aria-label'); el.setAttribute('aria-label',locale === 'kk' ? el.dataset.ariaKk : el.dataset.ariaRu); });
+      const input = $('#assistant-input');
+      input.placeholder = t('Спросите NEYRA о проекте',input.dataset.placeholderKk);
+      document.documentElement.lang = locale;
+      document.title = `Ер Төстік · ${t('Кабинет проекта','Жоба кабинеті')} · Neyra Vision`;
+      document.querySelectorAll('[data-lang]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.lang === locale)));
+    }
+    const row = (number,title,body,link = '') => `<div class="detail-row"><span class="number">${number}</span><div><h3>${esc(title)}</h3><p class="muted">${esc(body)}</p>${link}</div></div>`;
+    const sheet = (title,content) => `<section class="sheet detail-sheet"><h2>${esc(title)}</h2>${content}</section>`;
+
+    function workshopContent(route) {
+      const [section,item] = route.split('/');
+      if (section === 'script') return sheet(t('Поэпизодник · основа Б','Поэпизодник · Б негізі'),`<p class="muted">${t('15 битов. План на 90 страниц. Фактический объём и сцены появятся после нового драфта.','15 оқиға кезеңі. 90 бетке арналған жоспар. Нақты көлем мен сахналар жаңа нұсқадан кейін пайда болады.')}</p>` + beats.map((beat,i) => row(i+1,t(...beat),i === 10 || i === 11 ? t('Ждём продолжение Лены.','Ленаның жалғасын күтеміз.') : t('Каркас истории.','Тарих қаңқасы.'))).join(''));
+      if (section === 'breakdown') return sheet(t('Начните со сценария','Сценарийден бастаңыз'),illustration('breakdown') + `<p class="muted">${t('Соберите новый драфт основы Б — из него появятся сцены, герои и локации.','Б негізінің жаңа нұсқасын жинаңыз — одан сахналар, кейіпкерлер мен локациялар пайда болады.')}</p>${openLink('script',t('Открыть сценарий','Сценарийді ашу'))}`);
+      if (section === 'heroes') {
+        const hero = heroes.find(record => record.id === item);
+        if (hero) return sheet(hero.id === 'sputnik' ? t('Спутник','Серік') : hero.name,illustration('heroes') + `<p class="muted">${esc(locale === 'kk' ? hero.kk : hero.ru)}</p><p>${t('Облик — черновик. Портрет и постоянные детали ещё нужно выбрать.','Бейне — нобай. Портрет пен тұрақты белгілерді әлі таңдау керек.')}</p>${openLink('heroes',t('Все герои','Барлық кейіпкер'))}`);
+        return sheet(t('6 паспортов · 0 обликов зафиксировано','6 паспорт · 0 бейне бекітілген'),heroes.map((hero,i) => row(i+1,hero.id === 'sputnik' ? t('Спутник','Серік') : hero.name,locale === 'kk' ? hero.kk : hero.ru,openLink(`heroes/${hero.id}`,t('Открыть паспорт','Паспортты ашу')))).join(''));
+      }
+      if (section === 'locations') return sheet(t('3 места нашей истории','Тарихымыздың 3 орны'),illustration('locations') + locations.map((location,i) => row(i+1,t(...location.name),locale === 'kk' ? location.kk : location.ru)).join('') + `<p class="small">${t('Мастер-пластины ещё не выбраны.','Негізгі суреттер әлі таңдалмаған.')}</p>`);
+      if (section === 'storyboard') {
+        const frameIds = [...Array.from({length:8},(_,i) => `01-${String(i+1).padStart(2,'0')}`),...Array.from({length:9},(_,i) => `02-${String(i+1).padStart(2,'0')}`)];
+        const selected = frameIds.includes(item) ? `<h2>${t('Кадр','Кадр')} <span class="mono">${esc(item)}</span></h2>` : '';
+        return sheet(t('Ранняя проба · 17 черновых кадров','Ерте сынама · 17 кадр нобайы'),`<p class="muted">${t('Эта проба сделана по основе А. Для основы Б раскадровку предстоит пересобрать. Ни один кадр не утверждён, рисунков пока нет.','Бұл сынама А негізімен жасалған. Б негізіне кадрлауды қайта жинау керек. Бірде-бір кадр бекітілмеген, суреттер әлі жоқ.')}</p>${illustration('storyboard')}${selected}<div class="frames">${(item && frameIds.includes(item) ? [item] : frameIds).map(id => `<a class="frame-link" href="#storyboard/${id}"><div class="frame"><span class="mono frame-number">${id}</span>${icon('storyboard')}</div><p>${t('Рисунок ещё впереди','Сурет әлі жоқ')}</p></a>`).join('')}</div>${item ? openLink('storyboard',t('Все кадры','Барлық кадр')) : ''}`);
+      }
+      if (section === 'map') return sheet(t('Карта производства · 12 октября','Өндіріс картасы · 12 қазан'),`<p class="muted">${t('Готово и принято — разные этапы. Здесь принята концепция, остальные цехи ещё работают.','Дайын және қабылданған — бөлек кезеңдер. Мұнда концепция қабылданған, қалған цехтар жұмыста.')}</p>${statuses()}<div class="map-scroll" tabindex="0" role="region" aria-label="${t('Карта цехов, прокрутка по горизонтали','Цехтар картасы, көлденең айналдыру')}"><table class="map-table"><thead><tr><th>${t('Часть фильма','Фильм бөлігі')}</th>${stages.map(stage => `<th scope="col">${t(...stage)}</th>`).join('')}</tr></thead><tbody>${mapRows.map((name,r) => `<tr><th scope="row">${t(...name)}</th>${mapStates[r].map((state,c) => `<td><button type="button" class="map-cell ${state}" data-map-cell="${r}-${c}" aria-label="${esc(t(...name))} · ${esc(t(...stages[c]))} · ${statusNames(state)}">${state === 'accepted' ? icon('check') : state === 'working' ? icon('clock') : '·'}</button></td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      if (section === 'team') return sheet(t('Кто за что отвечает','Кім неге жауапты'),$('#card-team .team-list').outerHTML + `<p class="muted team-note">${t('Онлайн-статусы пока не подключены. За цель второго акта отвечает Лена.','Желідегі күй әзірге қосылмаған. Екінші акттің мақсатына Лена жауапты.')}</p>${openLink('script',t('Вернуться к истории','Тарихқа оралу'))}<div class="dialog-actions"><button class="btn" type="button" data-dialog="rights">${t('Права и доли','Құқықтар мен үлестер')}</button></div>`);
+      if (section === 'tokeny') return sheet(t('Остаток токенов','Қалған токендер'),illustration('tokeny') + `<p class="token-value">—</p><p class="muted">${t('Баланс проекта пока не подключён. В этом прототипе вопросы не списывают токены.','Жоба балансы әзірге қосылмаған. Бұл үлгідегі сұрақтар токенді жұмсамайды.')}</p><p>${t('План любой платной генерации сначала показываем Александру.','Кез келген ақылы генерация жоспарын алдымен Александрға көрсетеміз.')}</p>`);
+      return '';
+    }
+
+    function renderRoute({restore = true,focus = true} = {}) {
+      const candidate = location.hash.slice(1) || 'overview';
+      const requestedSection = candidate.split('/')[0];
+      const section = Object.hasOwn(names,requestedSection) ? requestedSection : 'overview';
+      const route = section !== 'overview' ? candidate : 'overview';
+      const isOverview = route === 'overview';
+      if (activeRoute === 'overview' && !isOverview) overviewY = window.scrollY;
+      if (dialog.open) dialog.close();
+      overview.hidden = !isOverview;
+      workshop.hidden = isOverview;
+      if (isOverview) {
+        delete document.body.dataset.workshop;
+        workshop.innerHTML = '';
+      } else {
+        document.body.dataset.workshop = section;
+        workshop.innerHTML = `<div class="work"><a class="btn back" href="#overview">${icon('back')}${t('В кабинет','Кабинетке')}</a><div class="intro"><p class="small slate">Ер Төстік · ${t('Цех','Цех')}</p><h1 tabindex="-1">${esc(routeName(route))}</h1></div><div class="detail-stack">${workshopContent(route)}</div></div>`;
+        hydrate(workshop);
+        translate(workshop);
+      }
+      document.querySelectorAll('.nav-link,.bottom-nav a').forEach(link => {
+        if (link.getAttribute('href') === `#${section}`) link.setAttribute('aria-current','page');
+        else link.removeAttribute('aria-current');
+      });
+      $('#helper-context').textContent = `Ер Төстік · ${routeName(route)}`;
+      activeRoute = route;
+      if (focus) (isOverview ? $('#main') : workshop.querySelector('h1')).focus({preventScroll:true});
+      if (restore) window.scrollTo({top:isOverview ? overviewY : 0,behavior:'instant'});
+    }
+
+    function showDialog(kind,invoker) {
+      dialogInvoker = invoker || document.activeElement;
+      let title,content;
+      if (kind === 'rights') {
+        title = t('Права и доли','Құқықтар мен үлестер');
+        content = `<p>${t('Проект развивается как совместный IP. Права и доли нужно зафиксировать письменно до первого драфта основы Б.','Жоба ортақ IP ретінде әзірленеді. Құқықтар мен үлестерді Б негізінің алғашқы нұсқасына дейін жазбаша бекіту қажет.')}</p><p class="muted">${t('Решение остаётся за людьми. Этот кабинет только показывает вопрос.','Шешімді адамдар қабылдайды. Бұл кабинет сұрақты ғана көрсетеді.')}</p><div class="dialog-actions">${openLink('team')}</div>`;
+      } else if (kind === 'palette') {
+        title = t('Палитра и свет','Палитра мен жарық');
+        content = `<p>${t('Художнику предстоит выбрать три цвета палитры и правило света. После этого у всех кадров будет один визуальный язык.','Суретші палитраның үш түсі мен жарық ережесін таңдайды. Осыдан кейін барлық кадрдың бейнелеу тілі бір болады.')}</p><p class="muted">${t('Выбор пока открыт. Генерацию здесь не запускаем.','Таңдау әлі ашық. Мұнда генерацияны бастамаймыз.')}</p><div class="dialog-actions">${openLink('locations')}</div>`;
+      } else if (kind === 'voice') {
+        title = t('Скажите, что нужно проекту','Жобаға не керек екенін айтыңыз');
+        content = `<p>${t('Голос появится в рабочем окне. Пока напишите «покажи героев» или «открой карту» в строке NEYRA.','Дауыстық енгізу жұмыс терезесінде пайда болады. Әзірге NEYRA жолына «кейіпкерлерді көрсет» немесе «картаны аш» деп жазыңыз.')}</p>`;
+      } else if (kind === 'menu') {
+        title = t('Цехи проекта','Жоба цехтары');
+        content = `<div class="mobile-menu"><nav>${['script','breakdown','heroes','locations','storyboard','map','team','tokeny'].map(route => `<a class="nav-link" href="#${route}">${icon(route)}${routeName(route)}</a>`).join('')}</nav></div>`;
+      } else if (kind === 'project') {
+        title = 'Ер Төстік';
+        content = `<p>${t('Семейный анимационный фильм. Сейчас — основа Б, концепция Лены.','Отбасылық анимациялық фильм. Қазіргі негіз — Ленаның Б концепциясы.')}</p><div class="dialog-actions">${openLink('overview',t('В кабинет','Кабинетке'))}</div>`;
+      } else {
+        title = t('О кабинете','Кабинет туралы');
+        content = `<p>${t('Это кликабельный прототип на материалах «Ер Төстік». Можно открыть каждый цех и вернуться в кабинет.','Бұл «Ер Төстік» материалдарына негізделген интерактивті үлгі. Әр цехты ашып, кабинетке оралуға болады.')}</p><p class="muted">${t('Здесь нет живых онлайн-статусов, баланса или утверждения материалов. NEYRA помогает только с навигацией.','Мұнда желідегі күй, баланс немесе материалды бекіту қосылмаған. NEYRA тек жол табуға көмектеседі.')}</p>`;
+      }
+      $('#dialog-title').textContent = title;
+      $('#dialog-content').innerHTML = content;
+      hydrate(dialog);
+      dialog.showModal();
+      $('#dialog-close').focus();
+    }
+    function respond(message,route) {
+      const conversation = $('#conversation');
+      conversation.innerHTML = `<strong>NEYRA</strong><p>${esc(message)}</p>${route ? openLink(route) : ''}<button class="text-link" type="button" data-dismiss style="border:0;background:transparent;color:var(--muted)">${t('Скрыть ответ','Жауапты жасыру')}${icon('close')}</button>`;
+      conversation.hidden = false;
+    }
+    function command(value) {
+      const text = value.trim().toLocaleLowerCase();
+      if (!text) { $('#assistant-input').focus(); return; }
+      const route = /геро|кейіпкер|heroes/.test(text) ? 'heroes' : /карт|map/.test(text) ? 'map' : /сценари|script/.test(text) ? 'script' : /разбив|сахна|breakdown/.test(text) ? 'breakdown' : /локац|location/.test(text) ? 'locations' : /раскад|кадрла|storyboard/.test(text) ? 'storyboard' : /команд|team/.test(text) ? 'team' : /токен|token/.test(text) ? 'tokeny' : /кабинет|overview/.test(text) ? 'overview' : '';
+      if (route) {
+        location.hash = route;
+        respond(t(`Открываю цех «${routeName(route)}».`,`«${routeName(route)}» цехын ашамын.`));
+      } else if (/жд|решен|waiting|шеш|күт/.test(text)) {
+        if (activeRoute !== 'overview') location.hash = 'overview';
+        respond(t('Открыты права и доли, палитра и свет. Цель второго акта выбирает Лена.','Құқықтар мен үлестер, палитра мен жарық әлі шешілмеген. Екінші акттің мақсатын Лена таңдайды.'));
+      } else respond(t('В этой пробе я могу открыть цех или показать открытые вопросы. Например: «покажи героев».','Бұл үлгіде цехты аша аламын немесе ашық сұрақтарды көрсете аламын. Мысалы: «кейіпкерлерді көрсет».'));
+    }
+    document.addEventListener('click',event => {
+      if (event.target.closest('.skip-link')) {
+        event.preventDefault();
+        $('#main').focus({preventScroll:true});
+        $('#main').scrollIntoView({block:'start'});
+        return;
+      }
+      const button = event.target.closest('[data-dialog],[data-lang],[data-command],[data-map-cell],[data-dismiss]');
+      if (!button) return;
+      if (button.dataset.dialog) showDialog(button.dataset.dialog,button);
+      if (button.dataset.lang) {
+        locale = button.dataset.lang;
+        translate();
+        renderRoute({restore:false,focus:false});
+        $('#conversation').hidden = true;
+      }
+      if (button.dataset.command) command(button.dataset.command);
+      if (button.hasAttribute('data-dismiss')) $('#conversation').hidden = true;
+      if (button.dataset.mapCell) {
+        const [r,c] = button.dataset.mapCell.split('-').map(Number);
+        dialogInvoker = button;
+        $('#dialog-title').textContent = `${t(...mapRows[r])} · ${t(...stages[c])}`;
+        $('#dialog-content').innerHTML = `<p>${statusNames(mapStates[r][c])}</p><p class="muted">${t('Состояние на карте проекта от 12 октября. В прототипе его можно посмотреть, а изменить — в рабочем окне.','12 қазандағы жоба картасының күйі. Үлгіде көруге болады, ал өзгерту жұмыс терезесінде жасалады.')}</p>`;
+        dialog.showModal();
+        $('#dialog-close').focus();
+      }
+    });
+    document.addEventListener('click',event => { if (event.target.closest('#dialog a[href^="#"]')) dialog.close(); });
+    $('#dialog-close').addEventListener('click',() => dialog.close());
+    dialog.addEventListener('close',() => { if (dialogInvoker?.isConnected && !dialogInvoker.closest('[hidden]')) dialogInvoker.focus({preventScroll:true}); });
+    $('#composer').addEventListener('submit',event => { event.preventDefault(); const input = $('#assistant-input'); command(input.value); input.value = ''; });
+    $('#assistant-input').addEventListener('keydown',event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); $('#composer').requestSubmit(); } });
+    window.addEventListener('hashchange',() => renderRoute());
+    // Ответ и перенос строк меняют высоту помощника: последняя карточка остаётся доступна.
+    const reserveAssistant = () => {
+      const height = $('.assistant').getBoundingClientRect().height + $('.bottom-nav').getBoundingClientRect().height + 32;
+      document.documentElement.style.setProperty('--assistant-reserve',`${height}px`);
+    };
+    const assistantObserver = new ResizeObserver(reserveAssistant);
+    assistantObserver.observe($('.assistant'));
+    assistantObserver.observe($('.bottom-nav'));
+    hydrate();
+    translate();
+    $('#map-preview').innerHTML = mapStates.flat().map(state => `<i class="map-dot ${state}" aria-hidden="true"></i>`).join('');
+    renderRoute({restore:false,focus:false});
+    reserveAssistant();
+  </script>
+</body>
+</html>
