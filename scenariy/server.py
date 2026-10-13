@@ -9,6 +9,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.request
 import urllib.error
@@ -24,13 +25,19 @@ ROLE_FILE = HERE / "NEYRA-SCENARIST.md"
 
 
 def load_key():
-    k = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if k:
-        return k
+    """Ключ модели — только из файла ~/.config/neyra-studio/key (критерий №03)."""
     f = Path.home() / ".config" / "neyra-studio" / "key"
     if f.exists():
         return f.read_text(encoding="utf-8").strip()
     return ""
+
+
+def local_origin(headers):
+    """Платный прокси отвечает только своей странице: Origin/Referer с 127.0.0.1 или localhost, либо без Origin (curl с этой машины)."""
+    origin = headers.get("Origin") or headers.get("Referer") or ""
+    if not origin:
+        return True
+    return bool(re.match(r"^https?://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(/|$)", origin))
 
 
 def load_role():
@@ -60,24 +67,33 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path.split("?")[0] != "/api/ask":
             return self._json(404, {"error": "нет такой ручки"})
+        if not local_origin(self.headers):
+            return self._json(403, {"error": "запрос не с этой страницы"})
+        if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+            return self._json(400, {"error": "нужен Content-Type: application/json"})
         key = load_key()
         if not key:
-            return self._json(503, {"error": "Ключ API не задан: ANTHROPIC_API_KEY или ~/.config/neyra-studio/key"})
+            return self._json(503, {"error": "Ключ модели не задан: положите его одной строкой в ~/.config/neyra-studio/key"})
         try:
             n = int(self.headers.get("Content-Length", "0"))
             req = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
         except Exception as e:  # noqa: BLE001
             return self._json(400, {"error": "плохой запрос: %s" % e})
-
-        messages = req.get("messages") or []
-        if not messages:
-            return self._json(400, {"error": "пустой запрос"})
+        if not isinstance(req, dict):
+            return self._json(400, {"error": "ожидался объект JSON"})
+        messages = req.get("messages")
+        if not isinstance(messages, list) or not messages or not all(isinstance(m, dict) and m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str) for m in messages):
+            return self._json(400, {"error": "messages — список {role, content}"})
+        try:
+            max_tokens = max(256, min(int(req.get("max_tokens") or 4096), 8192))
+        except (TypeError, ValueError):
+            return self._json(400, {"error": "max_tokens — целое число"})
         system = load_role()
         if req.get("system"):
             system = system + "\n\n" + str(req["system"])
         payload = {
-            "model": req.get("model") or MODEL,
-            "max_tokens": int(req.get("max_tokens") or 4096),
+            "model": MODEL,
+            "max_tokens": max_tokens,
             "system": system,
             "messages": messages,
         }
