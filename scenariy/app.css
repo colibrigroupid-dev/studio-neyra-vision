@@ -28,8 +28,8 @@ html[data-lang="ru"] .kz{display:none!important}html[data-lang="kz"] .ru{display
 .top{display:flex;align-items:center;gap:.6rem;padding:0 .7rem;border-bottom:1px solid var(--line-soft);background:var(--bg-2)}
 .ic{appearance:none;background:transparent;border:1px solid transparent;border-radius:var(--r);min-width:36px;min-height:36px;padding:0 .5em;color:var(--muted);font-size:1.05rem;line-height:1}
 .ic:hover{background:var(--surface);color:var(--text)}
-.brand{display:flex;align-items:center;gap:.5rem;text-decoration:none;flex:none}
-.brand b{font:600 .78rem/1 var(--disp);letter-spacing:.14em;text-transform:uppercase}
+.back{display:inline-flex;align-items:center;gap:.3rem;flex:none;text-decoration:none;color:var(--muted);font:500 .8rem/1 var(--mono);letter-spacing:.04em;padding:.5em .6em;border-radius:var(--r);min-height:36px}
+.back:hover{color:var(--text);background:var(--surface)}
 .title-in{flex:1 1 0;width:0;min-width:0;background:transparent;border:1px solid transparent;border-radius:var(--r);padding:.35em .6em;font:500 1rem var(--disp)}
 .title-in:hover,.title-in:focus{border-color:var(--line);background:var(--surface)}
 .pages{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px}
@@ -222,7 +222,7 @@ html[data-paper="graphite"] .b-page_break::after{background:var(--paper-g)}
 @media (max-width:860px){
   :root{--mm:1.9px}
   body.scene-open .main{grid-template-columns:1fr}.scene-panel{position:absolute;inset:0;z-index:11}
-  .top{gap:.4rem;padding:0 .5rem;overflow:hidden}.brand b{display:none}.pages .pg{padding:.5em .6em;font-size:.7rem}.state span:last-child{display:none}.mob{display:inline-flex}
+  .top{gap:.4rem;padding:0 .5rem;overflow:hidden}.back span{display:none}.pages .pg{padding:.5em .6em;font-size:.7rem}.state span:last-child{display:none}.mob{display:inline-flex}
   .main{grid-template-columns:1fr}body.neyra-open .main{grid-template-columns:1fr}
   .nav{display:none;position:absolute;inset:0;z-index:12}body.show-nav .nav{display:flex}
   .neyra{position:absolute;inset:0;z-index:11}
