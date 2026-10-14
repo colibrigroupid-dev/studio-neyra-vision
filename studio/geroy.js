@@ -11,7 +11,7 @@ function portraitSource(path) {
 }
 
 export function renderGeroyWorkshop({ record = null, locale = 'ru', t = (ru, kk) => locale === 'kk' ? kk : ru,
-  connected = false, loading = false, error = '', canEdit = false, mode = 'graphite', cena = 12, collection = 'characters' } = {}) {
+  connected = false, loading = false, error = '', canEdit = false, mode = 'graphite', cena = 15, collection = 'characters' } = {}) {
   const isLoc = collection === 'locations';
   const L = (hero, place) => isLoc ? place : hero;
   const value = key => record?.translations?.[locale] && Object.hasOwn(record.translations[locale], key)

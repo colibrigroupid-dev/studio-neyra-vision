@@ -27,7 +27,7 @@ import uuid
 TARIFY_DEFAULT = {
     "token_usd": 0.01, "nacenka": 0.10, "probnyy_paket": 300, "kurs_kzt": 0,
     "modeli_usd_1m": {"claude-sonnet-5-5": [2, 10], "claude-opus-5-5": [4, 20]},
-    "kartinka_usd": {"1k": 0.067, "2k": 0.101, "4k": 0.151},
+    "kartinka_usd": {"1k": 0.067, "2k": 0.101, "4k": 0.151, "karandash": 0.0336, "pro": 0.134, "pro_4k": 0.24},
     "video_usd_sek": {"720p": 0.231, "1080p": 0.569},
     "pakety": [{"tokeny": 500}, {"tokeny": 2000}, {"tokeny": 10000}],
 }
@@ -91,8 +91,13 @@ def cena_voprosa(model, usage, tier="standard"):
     return tokens_for_usd(usd, MIN_VOPROS.get(tier, 1))
 
 
+KARTINKA_USD_DEFAULT = {"1k": 0.067, "2k": 0.101, "4k": 0.151, "karandash": 0.0336, "pro": 0.134, "pro_4k": 0.24}
+
+
 def cena_kartinki(size="2k"):
-    return tokens_for_usd(tarify()["kartinka_usd"].get(size, 0.101))
+    """size: 1k|2k|4k (Nano Banana 2), karandash (Lite 1K, черновик), pro / pro_4k (Nano Banana Pro)."""
+    table = dict(KARTINKA_USD_DEFAULT, **tarify()["kartinka_usd"])
+    return tokens_for_usd(table.get(size, 0.101))
 
 
 def cena_video(sekundy=5, kachestvo="720p"):
@@ -107,7 +112,7 @@ def ceny():
     table = {
         "vopros": [vopros("claude-sonnet-5-5", 5000, 300, "standard"), vopros("claude-sonnet-5-5", 20000, 2500, "standard")],
         "vopros_pro": [vopros("claude-opus-5-5", 5000, 1500, "pro"), vopros("claude-opus-5-5", 20000, 6000, "pro")],
-        "kartinka_2k": cena_kartinki("2k"), "kartinka_4k": cena_kartinki("4k"),
+        "kartinka_2k": cena_kartinki("2k"), "kartinka_4k": cena_kartinki("4k"), "kartinka_karandash": cena_kartinki("karandash"), "kartinka_pro": cena_kartinki("pro"),
         "video_5s_720p": cena_video(5, "720p"), "video_5s_1080p": cena_video(5, "1080p"),
         "token_usd": t["token_usd"], "nacenka": t["nacenka"], "kurs_kzt": t["kurs_kzt"],
     }

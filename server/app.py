@@ -893,7 +893,7 @@ def shot_refs(project, store, slug, shot, scene):
     return refs, loc
 
 
-def shot_prompt(project, shot, scene, ref_labels, loc, pravka=""):
+def shot_prompt(project, shot, scene, ref_labels, loc, pravka="", karandash=False):
     lines = [f"Кадр раскадровки {shot.get('title', '')}: {shot.get('description', '')}",
              f"Крупность: {shot.get('lens') or 'средний'}. Камера: {shot.get('movement') or 'статика'}."]
     if scene.get("ton"):
@@ -918,7 +918,7 @@ def shot_prompt(project, shot, scene, ref_labels, loc, pravka=""):
         lines.append("Не рисовать: " + "; ".join(dict.fromkeys(str(t) for t in taboo)) + ".")
     if pravka:
         lines.append("Правка режиссёра: " + pravka + ".")
-    lines.append("Стиль: " + (project.get("stil") or kartinki.STYLE_DEFAULT) + ".")
+    lines.append("Стиль: " + (kartinki.KARANDASH_STYLE if karandash else (project.get("stil") or kartinki.STYLE_DEFAULT)) + ".")
     return "\n".join(lines)
 
 
@@ -1711,14 +1711,18 @@ class Handler(SimpleHTTPRequestHandler):
             passport.setdefault("obrazy", [])
             if parts[5] == "narisovat" and len(parts) == 6 and method == "POST":
                 body = self.body()
-                fields(body, ("rakurs", "pravka", "baseId", "size"), ("rakurs",))
+                fields(body, ("rakurs", "pravka", "baseId", "size", "kachestvo"), ("rakurs",))
                 rakurs = text(body["rakurs"], "rakurs", 40, required=True)
                 pravka = text(body.get("pravka", ""), "pravka", 1000)
-                size = text(body.get("size", "2K"), "size", 4) or "2K"
+                kachestvo = body.get("kachestvo", "pro")  # герои и места — Nano Banana Pro 2K (установка 14.10)
+                if kachestvo not in kartinki.UROVNI:
+                    raise ApiError(422, "VALIDATION", "kachestvo — karandash, standard или pro.")
+                model_name, size, cena_key = kartinki.UROVNI[kachestvo]
+                size = (text(body.get("size", ""), "size", 4) or size).upper()
                 base_id = text(body.get("baseId", ""), "baseId", 64)
                 try:
                     kartinki.rakurs_info(resource, rakurs)
-                    cost = tokeny.cena_kartinki(size.lower())
+                    cost = tokeny.cena_kartinki("pro_4k" if kachestvo == "pro" and size == "4K" else cena_key if size != "4K" else "4k")
                     wallets = store.read_tokeny()
                     wallet = tokeny.ensure_wallet(wallets, principal)
                     if not tokeny.can_spend(wallet, cost):
@@ -1737,10 +1741,10 @@ class Handler(SimpleHTTPRequestHandler):
                         except (OSError, ApiError):
                             continue
                     text_prompt = kartinki.prompt(passport, resource, rakurs, pravka, project.get("stil", ""), bool(refs))
-                    png, usage, model = kartinki.generate(text_prompt, refs, size.upper())
+                    png, usage, model = kartinki.generate(text_prompt, refs, size.upper(), model=model_name)
                     file_id = breakdown.ulid()
                     store.save_file(slug, file_id, png)
-                    obraz = {"id": breakdown.ulid(), "rakurs": rakurs, "fileId": file_id, "status": "variant", "prompt": text_prompt,
+                    obraz = {"id": breakdown.ulid(), "rakurs": rakurs, "fileId": file_id, "status": "variant", "prompt": text_prompt, "kachestvo": kachestvo,
                              "pravka": pravka, "baseId": base_id or None, "model": model, "size": size.upper(), "createdAt": timestamp(),
                              "by": principal["id"], "tokeny": cost}
                     passport["obrazy"].append(obraz)
@@ -2001,6 +2005,8 @@ class Handler(SimpleHTTPRequestHandler):
             first = next((o for o in shot.get("obrazy", []) if o.get("status") == "approved"), None)
             if first is None:
                 raise ApiError(409, "SHOT_NO_IMAGE", "У кадра нет утверждённой картинки — она станет первым кадром видео.")
+            if first.get("kachestvo") == "karandash":
+                raise ApiError(409, "SHOT_ONLY_SKETCH", "Утверждён карандашный набросок. Сначала нарисуйте и утвердите чистовой кадр — он станет первым кадром видео.")
             try:
                 if resolution not in video.RESOLUTIONS or isinstance(duration, bool) or not isinstance(duration, int) or not 4 <= duration <= 15:
                     raise video.VideoError(422, "VALIDATION", "Длительность — целое от 4 до 15 секунд, разрешение — 480p, 720p или 1080p.")
@@ -2115,18 +2121,32 @@ class Handler(SimpleHTTPRequestHandler):
             shot.setdefault("obrazy", [])
             if parts[5] == "narisovat" and len(parts) == 6 and method == "POST":
                 body = self.body(allow_empty=True)
-                fields(body, ("pravka", "baseId", "size"))
+                fields(body, ("pravka", "baseId", "size", "kachestvo"))
                 pravka = text(body.get("pravka", ""), "pravka", 1000)
-                size = (text(body.get("size", "2K"), "size", 4) or "2K").upper()
+                kachestvo = body.get("kachestvo", "karandash")  # черновая раскадровка — всегда карандашом (установка 14.10)
+                if kachestvo not in kartinki.UROVNI:
+                    raise ApiError(422, "VALIDATION", "kachestvo — karandash, standard или pro.")
+                model_name, size, cena_key = kartinki.UROVNI[kachestvo]
                 base_id = text(body.get("baseId", ""), "baseId", 64)
+                if base_id and "kachestvo" not in body:  # правка словами — на том же уровне, что и вариант
+                    kachestvo = next((o.get("kachestvo") or "standard" for o in shot["obrazy"] if o["id"] == base_id), kachestvo)
+                    model_name, size, cena_key = kartinki.UROVNI[kachestvo]
                 try:
-                    cost = tokeny.cena_kartinki(size.lower())
+                    cost = tokeny.cena_kartinki(cena_key)
                     wallets = store.read_tokeny()
                     wallet = tokeny.ensure_wallet(wallets, principal)
                     if not tokeny.can_spend(wallet, cost):
                         store.save_tokeny(wallets)
                         raise ApiError(402, "TOKENY_EMPTY", f"Нужно {cost} токенов, на счёте {wallet['balance']}. Пополните — и рисуем.")
                     labelled, loc = shot_refs(project, store, slug, shot, scene)
+                    if kachestvo != "karandash" and not base_id:
+                        sketch = next((o for o in reversed(shot["obrazy"]) if o.get("kachestvo") == "karandash" and o.get("status") == "approved"), None) \
+                            or next((o for o in reversed(shot["obrazy"]) if o.get("kachestvo") == "karandash"), None)
+                        if sketch is not None:
+                            try:
+                                labelled = [("карандашный набросок этого кадра — сохрани композицию, крупность, позы и направление камеры", store.file_path(slug, sketch["fileId"]).read_bytes())] + labelled
+                            except OSError:
+                                pass
                     if base_id:
                         base = next((o for o in shot["obrazy"] if o["id"] == base_id), None)
                         if base is None:
@@ -2135,11 +2155,11 @@ class Handler(SimpleHTTPRequestHandler):
                             labelled = [("предыдущий вариант этого кадра", store.file_path(slug, base["fileId"]).read_bytes())] + labelled
                         except OSError:
                             pass
-                    text_prompt = shot_prompt(project, shot, scene, [lab for lab, _ in labelled], loc, pravka)
-                    png, usage, model = kartinki.generate(text_prompt, [("image/png", blob) for _, blob in labelled], size)
+                    text_prompt = shot_prompt(project, shot, scene, [lab for lab, _ in labelled], loc, pravka, karandash=(kachestvo == "karandash"))
+                    png, usage, model = kartinki.generate(text_prompt, [("image/png", blob) for _, blob in labelled], size, model=model_name)
                     file_id = breakdown.ulid()
                     store.save_file(slug, file_id, png)
-                    obraz = {"id": breakdown.ulid(), "fileId": file_id, "status": "variant", "prompt": text_prompt, "pravka": pravka,
+                    obraz = {"id": breakdown.ulid(), "fileId": file_id, "status": "variant", "prompt": text_prompt, "pravka": pravka, "kachestvo": kachestvo,
                              "baseId": base_id or None, "model": model, "size": size, "createdAt": timestamp(), "by": principal["id"],
                              "tokeny": cost, "refs": [lab for lab, _ in labelled]}
                     shot["obrazy"].append(obraz)

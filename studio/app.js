@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014g';
-import { frameAt, totalDuration } from './timeline.js?v=20261014g';
-import { StudioServer } from './storage.js?v=20261014g';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014g';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014g';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014g';
-import { renderGeroyWorkshop } from './geroy.js?v=20261014g';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014g';
-import { parseCommand, describeCommand } from './golos.js?v=20261014g';
-import { svgPaths as ikonki } from './ikonki.js?v=20261014g';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014h';
+import { frameAt, totalDuration } from './timeline.js?v=20261014h';
+import { StudioServer } from './storage.js?v=20261014h';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014h';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014h';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014h';
+import { renderGeroyWorkshop } from './geroy.js?v=20261014h';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014h';
+import { parseCommand, describeCommand } from './golos.js?v=20261014h';
+import { svgPaths as ikonki } from './ikonki.js?v=20261014h';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -326,11 +326,11 @@ function directorBoard() {
   const p = project();
   const scenes = (p.scenes || []).filter(sc => !sc.deletedAt && sc.n != null).sort((a, b) => a.n - b.n);
   if (!scenes.length) return `<div class='empty'><h2>${t('Сцен пока нет.', 'Көріністер әзірге жоқ.')}</h2><p>${t('Напишите сценарий в Writer и сохраните версию — сцены появятся здесь.', 'Writer-де сценарий жазып, нұсқаны сақтаңыз.')}</p></div>`;
-  const cena = 12;
+  const cena = { karandash: 4, pro: 15 };  // набросок карандашом и чистовой кадр (установка 14.10)
   const card = sh => {
     const variants = (sh.obrazy || []).filter(o => o.url);
     const img = sh.kartinka ? `<img src='${e(sh.kartinka)}' alt='' width='1600' height='900' loading='lazy'>` : `<span class='kadr-empty'>${t('кадр не нарисован', 'кадр салынбаған')}</span>`;
-    const actions = canOpen(['shots', 'storyboard']) ? `<div class='kadr-actions'><button type='button' class='btn small' data-kadr-narisovat='${e(sh.id)}'>${variants.length ? t('Ещё вариант', 'Тағы нұсқа') : t('Нарисовать', 'Салу')} · ${cena}</button>${variants.length ? `<button type='button' class='btn small' data-kadr-pravka='${e(sh.id)}' data-base='${e(variants[variants.length - 1].id)}'>${t('Правка словами', 'Сөзбен түзету')}</button>` : ''}</div>${variants.length > 1 || (variants.length === 1 && variants[0].status !== 'approved') ? `<div class='kadr-variants'>${variants.map(o => `<button type='button' class='kadr-variant ${o.status === 'approved' ? 'approved' : ''}' data-kadr-utverdit='${e(sh.id)}' data-obraz='${e(o.id)}' title='${t('Утвердить этот вариант', 'Осы нұсқаны бекіту')}'><img src='${e(o.url)}' alt='' width='160' height='90' loading='lazy'></button>`).join('')}</div>` : ''}` : '';
+    const actions = canOpen(['shots', 'storyboard']) ? `<div class='kadr-actions'><button type='button' class='btn small' data-kadr-narisovat='${e(sh.id)}' data-kachestvo='karandash' title='${t('Черновой набросок карандашом', 'Қарындашпен жоба')}'>${t('Набросок', 'Нобай')} · ${cena.karandash}</button><button type='button' class='btn small ${variants.some(o => o.kachestvo === 'karandash') && !variants.some(o => o.kachestvo !== 'karandash') ? 'primary' : ''}' data-kadr-narisovat='${e(sh.id)}' data-kachestvo='pro' title='${t('Чистовой кадр по наброску, с утверждёнными героями и местом. По нему снимается видео.', 'Нобай бойынша таза кадр. Бейне осыдан түсіріледі.')}'>${t('Чистовой', 'Таза')} · ${cena.pro}</button>${variants.length ? `<button type='button' class='btn small' data-kadr-pravka='${e(sh.id)}' data-base='${e(variants[variants.length - 1].id)}'>${t('Правка словами', 'Сөзбен түзету')}</button>` : ''}</div>${variants.length > 1 || (variants.length === 1 && variants[0].status !== 'approved') ? `<div class='kadr-variants'>${variants.map(o => `<button type='button' class='kadr-variant ${o.status === 'approved' ? 'approved' : ''}' data-kadr-utverdit='${e(sh.id)}' data-obraz='${e(o.id)}' title='${o.kachestvo === 'karandash' ? t('Набросок · утвердить', 'Нобай · бекіту') : t('Чистовой · утвердить', 'Таза · бекіту')}'><img src='${e(o.url)}' alt='' width='160' height='90' loading='lazy'></button>`).join('')}</div>` : ''}` : '';
     return `<article class='kadr ${sh.status === 'approved' ? 'approved' : ''}'><div class='kadr-frame'>${img}${sh.status === 'approved' ? `<span class='geroy-approved'>${t('утверждён', 'бекітілді')}</span>` : ''}</div><div class='kadr-body'><div class='kadr-head'><b>${e(local(sh.title))}</b><small>${e(String(sh.duration || ''))} ${t('с', 'с')}</small></div><p>${e(local(sh.description))}</p><dl><div><dt>${t('Крупность', 'Ірілік')}</dt><dd>${e(sh.lens || '—')}</dd></div><div><dt>${t('Камера', 'Камера')}</dt><dd>${e(local(sh.movement) || '—')}</dd></div></dl>${sh.dialogue ? `<blockquote>${e(sh.dialogue)}</blockquote>` : ''}${sh.needsReview ? `<p class='kadr-warn'>${t('Сцена изменилась — проверьте кадр.', 'Көрініс өзгерді — кадрды тексеріңіз.')}</p>` : ''}${actions}</div></article>`;
   };
   return scenes.map(sc => {
@@ -857,7 +857,7 @@ async function tokenyDialog() {
   const open = (data.zayavki || []).filter(z => z.status === 'new');
   const balance = data.unlimited ? t('Без лимита', 'Шектеусіз') : `${data.balance} ${state.locale === 'kk' ? 'токен' : tokenyWord(data.balance)}`;
   const c = data.ceny || {}; const range = v => Array.isArray(v) ? `${v[0]}–${v[1]}` : String(v ?? '');
-  const cenyText = c.vopros ? t(`1 токен = ${Math.round((c.token_usd || 0.01) * 100)} ¢. Вопрос помощнику ${range(c.vopros)}, в режиме PRO ${range(c.vopros_pro)}, картинка 2K ${c.kartinka_2k}, видео 5 с ${c.video_5s_720p}. Списание по реальному расходу.`, `1 токен = ${Math.round((c.token_usd || 0.01) * 100)} ¢. Сұрақ ${range(c.vopros)}, PRO ${range(c.vopros_pro)}, сурет 2K ${c.kartinka_2k}, бейне 5 с ${c.video_5s_720p}.`) : t('Списание по реальному расходу модели.', 'Нақты шығын бойынша есептеледі.');
+  const cenyText = c.vopros ? t(`1 токен = ${Math.round((c.token_usd || 0.01) * 100)} ¢. Вопрос помощнику ${range(c.vopros)}, в режиме PRO ${range(c.vopros_pro)}, набросок кадра ${c.kartinka_karandash ?? 4}, чистовая картинка 2K ${c.kartinka_pro ?? 15}, видео 5 с ${c.video_5s_720p}. Списание по реальному расходу.`, `1 токен = ${Math.round((c.token_usd || 0.01) * 100)} ¢. Сұрақ ${range(c.vopros)}, PRO ${range(c.vopros_pro)}, нобай ${c.kartinka_karandash ?? 4}, таза сурет 2K ${c.kartinka_pro ?? 15}, бейне 5 с ${c.video_5s_720p}.`) : t('Списание по реальному расходу модели.', 'Нақты шығын бойынша есептеледі.');
   const paketLabel = pk => `${pk.tokeny}${pk.cena ? ` · ${pk.cena}` : pk.kzt ? ` · ${pk.kzt.toLocaleString('ru-RU')} ₸` : pk.usd ? ` · $${pk.usd}` : ''}`;
   openDialog(`${dialogHead(t('Токены', 'Токендер'), e(cenyText))}
     <div class='tokeny-balance'><span>${t('На счёте', 'Шотта')}</span><b>${e(balance)}</b></div>
@@ -1157,8 +1157,8 @@ app.addEventListener('click', async event => {
   }
   const kadrDraw = event.target.closest('[data-kadr-narisovat]');
   if (kadrDraw) {
-    const st = document.querySelector('[data-voice-status]'); if (st) st.textContent = t('рисую кадр… обычно 10–30 секунд', 'кадр салып жатырмын…');
-    await runOperation(() => directorCall('POST', `/shots/${encodeURIComponent(kadrDraw.dataset.kadrNarisovat)}/narisovat`, {}, d => d.tokeny?.spisano ? t(`Кадр готов · списано ${d.tokeny.spisano}`, `Кадр дайын · ${d.tokeny.spisano} алынды`) : t('Кадр готов.', 'Кадр дайын.')));
+    const st = document.querySelector('[data-voice-status]'); if (st) st.textContent = kadrDraw.dataset.kachestvo === 'pro' ? t('рисую чистовой кадр… обычно 20–60 секунд', 'таза кадр салып жатырмын…') : t('набрасываю карандашом… обычно 10–20 секунд', 'қарындашпен салып жатырмын…');
+    await runOperation(() => directorCall('POST', `/shots/${encodeURIComponent(kadrDraw.dataset.kadrNarisovat)}/narisovat`, { kachestvo: kadrDraw.dataset.kachestvo || 'karandash' }, d => d.tokeny?.spisano ? t(`Кадр готов · списано ${d.tokeny.spisano}`, `Кадр дайын · ${d.tokeny.spisano} алынды`) : t('Кадр готов.', 'Кадр дайын.')));
     return;
   }
   const kadrOk = event.target.closest('[data-kadr-utverdit]');

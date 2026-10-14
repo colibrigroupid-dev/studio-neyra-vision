@@ -1594,7 +1594,7 @@ class TeamAccessTests(unittest.TestCase):
         Path(os.environ["NEYRA_TARIFY_FILE"]).write_text(json.dumps({"probnyy_paket": 50}), encoding="utf-8")
         producer2 = self.issue("producer", ["overview", "heroes", "locations"], email="p2@example.test")
         drawn = self.api("POST", base + "/narisovat", {"rakurs": "rost"}, 201, key=producer2["key"])["data"]
-        self.assertEqual((drawn["tokeny"]["spisano"], drawn["tokeny"]["balance"]), (12, 38))
+        self.assertEqual((drawn["tokeny"]["spisano"], drawn["tokeny"]["balance"]), (15, 35))  # герои — Nano Banana Pro 2K
         self.api("POST", base + "/narisovat", {"rakurs": "anfas"}, 403, key="temporary-viewer")
         self.assertIn("character.obraz.created", [a["action"] for a in self.api("GET", "/api/projects/film/activity?limit=200")["data"]])
         loc = self.api("POST", "/api/projects/film/locations", {"name": "Юрта"}, 201)["data"]
@@ -1652,7 +1652,7 @@ class TeamAccessTests(unittest.TestCase):
         self.api("POST", f"/api/projects/film/characters/{hero['id']}/obrazy/{img['id']}/utverdit", {})
         shot = self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {}, 201)["data"]["kadry"][1]
         self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {}, 409)  # кадр не утверждён
-        frame = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {}, 201)["data"]
+        frame = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {"kachestvo": "pro"}, 201)["data"]
         self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{frame['id']}/utverdit", {})
         self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 3}, 422)
         job = self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 201)["data"]
@@ -1701,7 +1701,7 @@ class TeamAccessTests(unittest.TestCase):
         self.assertEqual(self.api("GET", "/api/tokeny", key=producer)["data"]["balance"], balance)
         # готовим утверждённый кадр
         shot = shots[0]
-        frame = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {}, 201, key=producer)["data"]
+        frame = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {"kachestvo": "pro"}, 201, key=producer)["data"]
         self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{frame['id']}/utverdit", {}, key=producer)
         # 1: провайдер сообщает о сбое — возврат ровно один раз, даже при повторном опросе
         before = self.api("GET", "/api/tokeny", key=producer)["data"]["balance"]
@@ -1740,6 +1740,35 @@ class TeamAccessTests(unittest.TestCase):
         stale = self.api("GET", f"/api/projects/film/shots/{shot['id']}")["data"]
         if stale.get("needsReview"):
             self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 409, key=producer)
+
+    def test_image_levels_pencil_draft_then_pro_final_and_video_needs_final(self):
+        # Установка Александра 14.10 15:01: черновая раскадровка — карандашом (Lite), герои и чистовые кадры — Nano Banana Pro.
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        self.create()
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — НОЧЬ\n\nТӨСТІК\nМама?\n", "language": "ru"})
+        self.api("POST", "/api/projects/film/versions", {}, 201)
+        scene = self.api("GET", "/api/projects/film/scenes")["data"][0]
+        hero = self.api("GET", "/api/projects/film/characters")["data"][0]
+        portrait = self.api("POST", f"/api/projects/film/characters/{hero['id']}/narisovat", {"rakurs": "anfas"}, 201)["data"]
+        self.assertEqual((portrait["kachestvo"], portrait["size"]), ("pro", "2K"))
+        shot = self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {}, 201)["data"]["kadry"][1]
+        sketch = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {}, 201)["data"]
+        self.assertEqual((sketch["kachestvo"], sketch["size"]), ("karandash", "1K"))
+        self.assertIn("графитовый карандаш", self.stored_prompt("shots", shot["id"], sketch["id"]))
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{sketch['id']}/utverdit", {})
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 409)  # по наброску видео не снимаем
+        final = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {"kachestvo": "pro"}, 201)["data"]
+        self.assertEqual(final["kachestvo"], "pro")
+        self.assertTrue(final["refs"][0].startswith("карандашный набросок этого кадра"))
+        self.assertNotIn("графитовый карандаш", self.stored_prompt("shots", shot["id"], final["id"]))
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{final['id']}/utverdit", {})
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 201)
+        fixed = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {"pravka": "ниже ракурс", "baseId": final["id"]}, 201)["data"]
+        self.assertEqual(fixed["kachestvo"], "pro")  # правка словами остаётся на уровне варианта
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {"kachestvo": "ultra"}, 422)
+        ceny = self.api("GET", "/api/tokeny")["data"]["ceny"]
+        self.assertEqual((ceny["kartinka_karandash"], ceny["kartinka_2k"], ceny["kartinka_pro"]), (4, 12, 15))
 
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).

@@ -17,6 +17,18 @@ import urllib.request
 
 GOOGLE_API = "https://generativelanguage.googleapis.com/v1beta"
 MODEL = os.environ.get("NEYRA_IMAGE_MODEL", "gemini-3.1-flash-image")
+# Уровни (установка Александра 14.10 15:01): черновая раскадровка — карандашом на дешёвой модели,
+# герои/аватары и чистовые кадры — Nano Banana Pro 2K. Ключ — уровень, значение — (модель, размер, ключ цены).
+UROVNI = {
+    "karandash": (os.environ.get("NEYRA_IMAGE_MODEL_DRAFT", "gemini-3.1-flash-lite-image"), "1K", "karandash"),
+    "standard": (MODEL, "2K", "2k"),
+    "pro": (os.environ.get("NEYRA_IMAGE_MODEL_PRO", "gemini-3-pro-image"), "2K", "pro"),
+}
+# Вшитый стиль черновика: не виден пользователю, одинаков для всех кадров проекта.
+KARANDASH_STYLE = ("черновой карандашный набросок раскадровки: графитовый карандаш на белой бумаге, строго чёрно-белый, "
+                   "быстрые уверенные контуры и штриховка тенями, без цвета, без заливок, без текста, подписей и стрелок, "
+                   "кадр 16:9, ясная композиция и крупность, фигуры узнаваемы по силуэту, позе и костюму, "
+                   "направление взгляда и движения читается сразу — как лист раскадровки оператора")
 SIZES = ("1K", "2K", "4K")
 RAKURSY = {
     "characters": (("anfas", "Анфас", "портрет анфас, взгляд в камеру, плечи в кадре"),
@@ -81,12 +93,13 @@ def prompt(passport, collection, rakurs, pravka="", style="", has_refs=False):
     return "\n".join(lines)
 
 
-def generate(text, refs=(), size="2K", aspect="16:9", fake=False):
-    """→ (png_bytes, usage_dict, model). refs — список (mime, bytes)."""
+def generate(text, refs=(), size="2K", aspect="16:9", fake=False, model=None):
+    """→ (png_bytes, usage_dict, model). refs — список (mime, bytes). model — из UROVNI, иначе стандартная."""
+    model = model or MODEL
     if size not in SIZES:
         raise KartinkiError(422, "VALIDATION", "Размер — 1K, 2K или 4K.")
     if fake or os.environ.get("NEYRA_ASSISTANT_FAKE") == "1":
-        return FAKE_PNG, {"fake": True}, "fake-image"
+        return FAKE_PNG, {"fake": True}, "fake-" + model
     key = api_key()
     if not key:
         raise KartinkiError(503, "IMAGE_KEY_MISSING", "Картинки ещё не подключены: на сервере нет ключа Google (~/.config/neyra-studio/google-key).")
@@ -95,7 +108,7 @@ def generate(text, refs=(), size="2K", aspect="16:9", fake=False):
         parts.append({"inline_data": {"mime_type": mime or "image/png", "data": base64.b64encode(blob).decode()}})
     body = {"contents": [{"parts": parts}],
             "generationConfig": {"responseModalities": ["IMAGE", "TEXT"], "imageConfig": {"aspectRatio": aspect, "imageSize": size}}}
-    req = urllib.request.Request(f"{GOOGLE_API}/models/{MODEL}:generateContent", data=json.dumps(body).encode("utf-8"),
+    req = urllib.request.Request(f"{GOOGLE_API}/models/{model}:generateContent", data=json.dumps(body).encode("utf-8"),
                                  headers={"x-goog-api-key": key, "Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=300) as resp:
@@ -109,7 +122,7 @@ def generate(text, refs=(), size="2K", aspect="16:9", fake=False):
         for part in cand.get("content", {}).get("parts", []):
             blob = part.get("inlineData") or part.get("inline_data")
             if blob and blob.get("data"):
-                return base64.b64decode(blob["data"]), data.get("usageMetadata", {}), MODEL
+                return base64.b64decode(blob["data"]), data.get("usageMetadata", {}), model
     reason = "; ".join(p.get("text", "")[:200] for c in data.get("candidates", []) for p in c.get("content", {}).get("parts", []) if p.get("text"))
     raise KartinkiError(502, "IMAGE_EMPTY", "Модель не вернула картинку" + (": " + reason if reason else ". Попробуйте изменить формулировку."))
 
