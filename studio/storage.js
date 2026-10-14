@@ -126,7 +126,7 @@ export class StudioServer {
     this.memberIds = new Map();
   }
 
-  async request(method, path, body, { revision } = {}) {
+  async request(method, path, body, { revision, timeout = 4000 } = {}) {
     if (!path.startsWith('/api/') || path.startsWith('//') || path.includes('#')) {
       throw new StudioServerError('Некорректный путь API.', 422, 'INVALID_PATH');
     }
@@ -140,7 +140,7 @@ export class StudioServer {
     }
     const controller = new AbortController();
     options.signal = controller.signal;
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), timeout);
     let response;
     let payload;
     try {
@@ -152,7 +152,7 @@ export class StudioServer {
     } catch (error) {
       if (error instanceof StudioServerError) throw error;
       throw new StudioServerError(controller.signal.aborted ? 'Сервер не ответил за 4 секунды.' : 'Сервер недоступен. Проверьте адрес и подключение.', 0, 'NETWORK_ERROR');
-    } finally { clearTimeout(timeout); }
+    } finally { clearTimeout(timer); }
     if (!response.ok) {
       throw new StudioServerError(payload?.error?.message || `Ошибка сервера (${response.status}).`, response.status, payload?.error?.code || 'SERVER_ERROR');
     }

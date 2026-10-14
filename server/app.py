@@ -804,6 +804,22 @@ KADRY_ROLE = ("Ты — режиссёр-раскадровщик. Разлож�
               "реплики бери дословно; тон и визуал сцены учитывай в крупности и свете. Язык полей — язык сценария.")
 
 
+def wallet_has(wallet, note):
+    return any(h.get("note") == note for h in wallet.get("history", []))
+
+
+def refund_once(store, key_id, amount, note):
+    """Возврат токенов ровно один раз: метка операции в истории кошелька (находка Codex №70.1)."""
+    if not amount:
+        return
+    wallets = store.read_tokeny()
+    wallet = wallets["koshelki"].get(key_id)
+    if wallet is None or wallet.get("unlimited") or wallet_has(wallet, note):
+        return
+    tokeny.grant(wallets, key_id, amount, "system", note)
+    store.save_tokeny(wallets)
+
+
 def local_text(value):
     """Строка из значения, которое может быть переводом {ru, kk}."""
     if isinstance(value, dict):
@@ -845,7 +861,10 @@ def kadry_from_model(project, scene, tier="standard"):
     try:
         data = json.loads(raw[start:end + 1])
         items = data["kadry"] if isinstance(data, dict) else None
-        if not isinstance(items, list) or not items:
+        if not isinstance(items, list):
+            raise ValueError()
+        items = [it for it in items if isinstance(it, dict) and str(it.get("description") or it.get("title") or "").strip()]
+        if not items:
             raise ValueError()
     except (ValueError, TypeError, KeyError):
         raise ApiError(502, "KADRY_BAD_JSON", "Помощник ответил не по форме. Попробуйте ещё раз.") from None
@@ -1278,14 +1297,20 @@ class Handler(SimpleHTTPRequestHandler):
                 continue
             job["polledAt"] = now
             changed = True
-            try:
-                st = video.status(job["taskId"])
-            except video.VideoError as error:
-                job["lastError"] = error.message[:300]
-                continue
-            job["state"] = st["state"]
-            if st.get("error"):
-                job["error"] = str((st["error"] or {}).get("message") or st["error"])[:300]
+            if not job.get("taskId"):
+                # задание создано, но ответ провайдера не успел записаться: через 10 минут — сбой и возврат
+                if now - job.get("createdTs", now) > 600:
+                    job["state"], job["error"] = "failed", "Провайдер не подтвердил задание."
+            else:
+                try:
+                    st = video.status(job["taskId"])
+                except video.VideoError:
+                    job["lastError"] = "Провайдер не ответил, повторим."
+                    continue
+                job["state"] = st["state"]
+                if st.get("error"):
+                    job["error"] = "Генерация не удалась на стороне провайдера."
+                    job["errorRaw"] = str((st["error"] or {}).get("code") or "")[:80]
             if st["state"] == "succeeded" and st.get("video_url"):
                 file_id = breakdown.ulid()
                 path = store.file_path(slug, file_id, "mp4")
@@ -1296,10 +1321,8 @@ class Handler(SimpleHTTPRequestHandler):
                 except (video.VideoError, OSError) as error:
                     job["state"], job["error"] = "failed", "Видео готово, но не скачалось: " + str(getattr(error, "message", error))[:200]
             if job["state"] in ("failed", "cancelled") and job.get("tokeny") and not job.get("vozvrat"):
-                wallets = store.read_tokeny()
                 try:
-                    tokeny.grant(wallets, job["by"], job["tokeny"], "system", "возврат: видео не получилось")
-                    store.save_tokeny(wallets)
+                    refund_once(store, job["by"], job["tokeny"], "vozvrat:" + job["id"])
                     job["vozvrat"] = True
                 except tokeny.TokenyError:
                     pass
@@ -1307,7 +1330,7 @@ class Handler(SimpleHTTPRequestHandler):
             store.save(project)
 
     def public_job(self, slug, job):
-        result = {k: v for k, v in job.items() if k not in ("prompt", "polledAt")}
+        result = {k: v for k, v in job.items() if k not in ("prompt", "polledAt", "errorRaw", "createdTs", "by")}
         if job.get("fileId"):
             result["url"] = self.server.store.file_url(slug, job["fileId"])
         return result
@@ -1317,6 +1340,8 @@ class Handler(SimpleHTTPRequestHandler):
         store = self.server.store
         result = copy.deepcopy(passport)
         for obraz in result.get("obrazy", []):
+            obraz.pop("prompt", None)
+            obraz.pop("model", None)
             if obraz.get("fileId"):
                 obraz["url"] = store.file_url(slug, obraz["fileId"])
         drawn = [o for o in result.get("obrazy", []) if o.get("url")]
@@ -1726,7 +1751,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ApiError(error.status, error.code, error.message) from None
                 except tokeny.TokenyError as error:
                     raise ApiError(error.status, error.code, error.message) from None
-                data = dict(obraz, url=store.file_url(slug, file_id), tokeny=dict(tokeny.summary(wallet), spisano=spent))
+                data = dict({k: v for k, v in obraz.items() if k not in ("prompt", "model")}, url=store.file_url(slug, file_id), tokeny=dict(tokeny.summary(wallet), spisano=spent))
                 status = 201
             elif parts[5] == "obrazy" and len(parts) == 8 and parts[7] == "utverdit" and method == "POST":
                 obraz = get_item(passport["obrazy"], parts[6])
@@ -1969,6 +1994,8 @@ class Handler(SimpleHTTPRequestHandler):
                 duration = int(duration)
             resolution = body.get("resolution", "720p")
             sfx = text(body.get("sfx", ""), "sfx", 1000)
+            if shot.get("needsReview"):
+                raise ApiError(409, "SHOT_NEEDS_REVIEW", "Сценарий сцены изменился после утверждения кадра. Проверьте и утвердите кадр заново в Director.")
             if shot.get("status") != "approved":
                 raise ApiError(409, "SHOT_NOT_APPROVED", "Видео снимается только по утверждённому кадру. Утвердите картинку кадра в Director.")
             first = next((o for o in shot.get("obrazy", []) if o.get("status") == "approved"), None)
@@ -2001,22 +2028,38 @@ class Handler(SimpleHTTPRequestHandler):
                 plain_scene = {k: local_text(scene.get(k)) for k in ("title", "location", "time", "ton", "vizual")}
                 text_prompt = video.prompt(plain_shot, plain_scene, roles, shot.get("dialogue") or "", sfx)
                 body_payload = video.payload(text_prompt, refs, duration, resolution, first_frame=image_ref(first["fileId"]))
-                task_id = video.create(body_payload)
             except video.VideoError as error:
                 raise ApiError(error.status, error.code, error.message) from None
             except OSError:
                 raise ApiError(500, "STORAGE_READ_FAILED", "Не удалось прочитать картинку кадра.") from None
+            # Порядок (находка Codex №70.2): задание с меткой → списание с той же меткой → запись проекта → провайдер → task id.
+            job = {"id": breakdown.ulid(), "shotId": shot["id"], "sceneId": shot.get("sceneId"), "taskId": None, "state": "creating",
+                   "prompt": text_prompt, "duration": duration, "resolution": resolution, "usd": video.usd(duration, resolution),
+                   "tokeny": 0, "by": principal["id"], "createdAt": timestamp(), "createdTs": time.time(), "approved": False,
+                   "sourceVersions": {"projectRevision": project["revision"], "shotImage": first["id"], "sceneStatus": scene.get("status", "draft")}}
             try:
-                wallet, spent = tokeny.spend(wallets, principal, "video", cost, shot.get("title", "")[:60])
+                wallet, spent = tokeny.spend(wallets, principal, "video", cost, "video:" + job["id"])
             except tokeny.TokenyError as error:
                 raise ApiError(error.status, error.code, error.message) from None
             store.save_tokeny(wallets)
-            job = {"id": breakdown.ulid(), "shotId": shot["id"], "sceneId": shot.get("sceneId"), "taskId": task_id, "state": "queued",
-                   "prompt": text_prompt, "duration": duration, "resolution": resolution, "usd": video.usd(duration, resolution),
-                   "tokeny": spent, "by": principal["id"], "createdAt": timestamp(), "approved": False,
-                   "sourceVersions": {"projectRevision": project["revision"], "shotImage": first["id"], "sceneStatus": scene.get("status", "draft")}}
+            job["tokeny"] = spent
             project.setdefault("videoJobs", []).append(job)
-            data = dict(self.public_job(slug, job), tokeny=dict(tokeny.summary(wallet), spisano=spent))
+            try:
+                store.save(project)
+            except ApiError:
+                refund_once(store, principal["id"], spent, "vozvrat:" + job["id"])
+                raise
+            try:
+                job["taskId"] = video.create(body_payload)
+                job["state"] = "queued"
+            except video.VideoError as error:
+                job["state"], job["error"] = "failed", "Провайдер не принял задание."
+                refund_once(store, principal["id"], spent, "vozvrat:" + job["id"])
+                job["vozvrat"] = True
+                store.save(project)
+                raise ApiError(error.status, error.code, error.message) from None
+            store.save(project)
+            data = dict(self.public_job(slug, job), tokeny=dict(tokeny.summary(store.read_tokeny()["koshelki"].get(principal["id"], wallet)), spisano=spent))
             status = 201
         elif parts[3] == "scenes" and len(parts) == 6 and parts[5] == "kadry":
             # Director (ТЗ Ара п.5): утверждённая сцена → кадры с крупностью, камерой, длительностью и репликой
@@ -2106,7 +2149,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ApiError(error.status, error.code, error.message) from None
                 except tokeny.TokenyError as error:
                     raise ApiError(error.status, error.code, error.message) from None
-                data = dict(obraz, url=store.file_url(slug, file_id), tokeny=dict(tokeny.summary(wallet), spisano=spent))
+                data = dict({k: v for k, v in obraz.items() if k not in ("prompt", "model")}, url=store.file_url(slug, file_id), tokeny=dict(tokeny.summary(wallet), spisano=spent))
                 status = 201
             elif parts[5] == "obrazy" and len(parts) == 8 and parts[7] == "utverdit" and method == "POST":
                 obraz = get_item(shot["obrazy"], parts[6])

@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014e';
-import { frameAt, totalDuration } from './timeline.js?v=20261014e';
-import { StudioServer } from './storage.js?v=20261014e';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014e';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014e';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014e';
-import { renderGeroyWorkshop } from './geroy.js?v=20261014e';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014e';
-import { parseCommand, describeCommand } from './golos.js?v=20261014e';
-import { svgPaths as ikonki } from './ikonki.js?v=20261014e';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014g';
+import { frameAt, totalDuration } from './timeline.js?v=20261014g';
+import { StudioServer } from './storage.js?v=20261014g';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014g';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014g';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014g';
+import { renderGeroyWorkshop } from './geroy.js?v=20261014g';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014g';
+import { parseCommand, describeCommand } from './golos.js?v=20261014g';
+import { svgPaths as ikonki } from './ikonki.js?v=20261014g';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -358,11 +358,12 @@ async function reloadProject() {
 async function directorCall(method, path, body, ok) {
   const status = document.querySelector('[data-voice-status]');
   try {
-    const result = await serverClient.request(method, `/api/projects/${encodeURIComponent(state.activeId)}${path}`, body, { revision: serverClient.known.get(state.activeId)?._revision });
+    const result = await serverClient.request(method, `/api/projects/${encodeURIComponent(state.activeId)}${path}`, body, { revision: serverClient.known.get(state.activeId)?._revision, timeout: 180000 });
     const d = result?.data || {};
     if (d.tokeny) { meState.tokeny = d.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
     toast(ok(d)); await reloadProject();
   } catch (error) {
+    if (!error?.status) { toast(t('Ответ не дошёл. Не нажимайте повторно: обновляю — результат мог уже сохраниться.', 'Жауап келмеді. Қайта баспаңыз, жаңартып жатырмын.')); await reloadProject(); return; }
     toast(error?.status === 402 ? t('Токенов не хватает. Откройте «Токены и пополнение» в меню.', 'Токен жетпейді.') : error?.status === 503 ? t('Картинки ещё не подключены на сервере.', 'Суреттер әлі қосылмаған.') : error?.status === 409 && error?.code === 'REVISION_CONFLICT' ? t('Коллега только что внёс правку. Обновите и повторите.', 'Әріптес түзетті.') : (error?.message || t('Не получилось.', 'Болмады.')));
   } finally { if (status) status.textContent = ''; }
 }
@@ -384,19 +385,30 @@ function directorPage() {
   return `${appBar('director', 'Neyra Director · ' + t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар'), printBtn + tabs)}${body}`;
 }
 // Production (ТЗ Ара п.6, установка Александра 13.10 12:53): утверждённые кадры → «В видео» → дубли папками по сценам.
-const videoState = { slug: '', jobs: null, loading: false, at: 0 };
+const videoState = { slug: '', jobs: null, loading: false, at: 0, error: '' };
 async function loadVideoJobs(force = false) {
   if (!serverClient || !project()) return;
-  if (videoState.loading || (!force && videoState.slug === state.activeId && Date.now() - videoState.at < 15000)) return;
+  const client = serverClient, slug = state.activeId;
+  if (videoState.loading || (!force && videoState.slug === slug && Date.now() - videoState.at < 15000)) return;
+  if (videoState.error && videoState.slug === slug && Date.now() - videoState.at < 15000 && !force) return;
   videoState.loading = true;
-  try { const r = await serverClient.request('GET', `/api/projects/${encodeURIComponent(state.activeId)}/video`); videoState.jobs = r?.data || []; videoState.slug = state.activeId; }
-  catch { videoState.jobs = videoState.jobs || []; }
-  finally { videoState.at = Date.now(); videoState.loading = false; if (route() === 'production') render(); }
+  try {
+    const r = await client.request('GET', `/api/projects/${encodeURIComponent(slug)}/video`, undefined, { timeout: 60000 });
+    if (client !== serverClient || slug !== state.activeId) return;
+    videoState.jobs = r?.data || []; videoState.error = '';
+  } catch (error) {
+    if (client !== serverClient || slug !== state.activeId) return;
+    videoState.jobs = videoState.jobs && videoState.slug === slug ? videoState.jobs : []; videoState.error = error?.message || t('Дубли не загрузились.', 'Дубльдер жүктелмеді.');
+  } finally {
+    videoState.loading = false;
+    if (client === serverClient && slug === state.activeId) { videoState.slug = slug; videoState.at = Date.now(); if (route() === 'production') render(); }
+  }
 }
 const videoStateName = st => ({ queued: t('в очереди', 'кезекте'), running: t('снимается…', 'түсірілуде…'), succeeded: t('готово', 'дайын'), failed: t('не получилось', 'болмады'), cancelled: t('отменено', 'тоқтатылды') })[st] || st;
 function videoBoard() {
   const p = project();
-  if (videoState.slug !== state.activeId || videoState.jobs == null) { void loadVideoJobs(true); return `<p class='geroy-note'>${t('Загружаю дубли…', 'Дубльдер жүктелуде…')}</p>`; }
+  if (videoState.slug !== state.activeId || videoState.jobs == null) { if (!videoState.loading) void loadVideoJobs(true); return `<p class='geroy-note'>${t('Загружаю дубли…', 'Дубльдер жүктелуде…')}</p>`; }
+  const errorNote = videoState.error ? `<p class='geroy-note'>${e(videoState.error)} <button type='button' class='btn small' data-video-reload>${t('Обновить', 'Жаңарту')}</button></p>` : '';
   const jobs = videoState.jobs || [];
   if (jobs.some(j => ['queued', 'running'].includes(j.state))) setTimeout(() => { if (route() === 'production') void loadVideoJobs(true); }, 15000);
   const scenes = (p.scenes || []).filter(sc => !sc.deletedAt && sc.n != null).sort((a, b) => a.n - b.n);
@@ -412,7 +424,7 @@ function videoBoard() {
     }).join('');
     return `<section class='kadry-scene'><header class='kadry-scene-head'><div><small class='mono'>${e(String(sc.n))}</small> <b>${e(local(sc.title) || sc.title || '')}</b></div><span class='badge'>${t('папка сцены', 'көрініс қалтасы')}</span></header><div class='prod-list'>${items}</div></section>`;
   }).join('');
-  return folders || `<div class='empty'><h2>${t('Пока нечего снимать.', 'Әзірге түсіретін ештеңе жоқ.')}</h2><p>${t('Утвердите кадры в Director — они появятся здесь по папкам сцен с ценой видео.', 'Director-де кадрларды бекітіңіз.')}</p><a class='btn primary' href='#/studio/director/cex'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`;
+  return errorNote + (folders || `<div class='empty'><h2>${t('Пока нечего снимать.', 'Әзірге түсіретін ештеңе жоқ.')}</h2><p>${t('Утвердите кадры в Director — они появятся здесь по папкам сцен с ценой видео.', 'Director-де кадрларды бекітіңіз.')}</p><a class='btn primary' href='#/studio/director/cex'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`);
 }
 function productionPage() {
   if (serverClient && depApp() === 'production') return `${appBar('production', 'Neyra Production · ' + t('видео по утверждённым кадрам', 'бекітілген кадрлар бойынша бейне'))}${videoBoard()}`;
@@ -1001,7 +1013,7 @@ async function narisovat(rakurs, pravka = '', baseId = '') {
   const base = passportBase(); if (!base) return;
   const status = document.querySelector('[data-voice-status]'); if (status) status.textContent = t('рисую… обычно 10–30 секунд', 'салып жатырмын…');
   try {
-    const result = await serverClient.request('POST', base + '/narisovat', { rakurs, ...(pravka ? { pravka } : {}), ...(baseId ? { baseId } : {}) }, { revision: serverClient.known.get(state.activeId)?._revision });
+    const result = await serverClient.request('POST', base + '/narisovat', { rakurs, ...(pravka ? { pravka } : {}), ...(baseId ? { baseId } : {}) }, { revision: serverClient.known.get(state.activeId)?._revision , timeout: 180000 });
     const d = result?.data || {};
     if (d.tokeny) { meState.tokeny = d.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
     toast(d.tokeny?.spisano ? t(`Готово · списано ${d.tokeny.spisano}`, `Дайын · ${d.tokeny.spisano} алынды`) : t('Готово.', 'Дайын.'));
@@ -1020,7 +1032,7 @@ async function runRazbor(opisanie = '') {
   assistantHistory.push({ role: 'user', content: opisanie || t('Разобрать сценарий на сцены, героев и локации', 'Сценарийді талдау') }); assistantCollapsed = false;
   assistantPending = opisanie ? t('создаю героев по описанию…', 'сипаттама бойынша кейіпкерлер жасап жатырмын…') : t('читаю сценарий, завожу сцены, героев и локации…', 'сценарийді оқып жатырмын…'); refreshThread();
   try {
-    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(slug)}/razbor`, opisanie ? { opisanie } : {}, { revision: known?._revision });
+    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(slug)}/razbor`, opisanie ? { opisanie } : {}, { revision: known?._revision , timeout: 180000 });
     const d = result?.data || {};
     if (d.tokeny) { meState.tokeny = d.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
     const parts = [];
@@ -1076,7 +1088,7 @@ async function askAssistant(question, section = null) {
   assistantHistory.push({ role: 'user', content: question }); assistantCollapsed = false; assistantPending = t('думаю…', 'ойланып тұрмын…'); refreshThread();
   try {
     const page = route();
-    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/assistant`, { question, section: section ?? (page === 'overview' ? '' : page), history: assistantHistory.slice(0, -1).slice(-10) });
+    const result = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/assistant`, { question, section: section ?? (page === 'overview' ? '' : page), history: assistantHistory.slice(0, -1).slice(-10) }, { timeout: 180000 });
     const answer = result?.data?.answer || t('Пустой ответ.', 'Бос жауап.');
     if (result?.data?.tokeny) { meState.tokeny = result.data.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
     assistantHistory.push({ role: 'assistant', content: answer });
@@ -1119,16 +1131,17 @@ app.addEventListener('click', async event => {
   if (udal) { await runOperation(() => obrazAction('DELETE', `/obrazy/${encodeURIComponent(udal.dataset.obrazUdalit)}`, t('Вариант убран.', 'Нұсқа алынды.'))); return; }
   const pravka = event.target.closest('[data-obraz-pravka]');
   if (pravka) { pravkaDialog(pravka.dataset.obrazPravka, pravka.dataset.rakurs); return; }
+  if (event.target.closest('[data-video-reload]')) { videoState.error = ''; await loadVideoJobs(true); return; }
   const videoShot = event.target.closest('[data-video-shot]');
   if (videoShot) {
     const sec = videoShot.dataset.dur, price = videoShot.dataset.price;
     if (!confirm(t(`Снять видео ${sec} с, 720p, со звуком без музыки? Спишется около ${price} токенов.`, `${sec} с бейне түсіру керек пе? Шамамен ${price} токен алынады.`))) return;
     await runOperation(async () => {
       try {
-        const r = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/shots/${encodeURIComponent(videoShot.dataset.videoShot)}/video`, { duration: Number(sec) }, { revision: serverClient.known.get(state.activeId)?._revision });
+        const r = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/shots/${encodeURIComponent(videoShot.dataset.videoShot)}/video`, { duration: Number(sec) }, { revision: serverClient.known.get(state.activeId)?._revision , timeout: 180000 });
         const d = r?.data || {}; if (d.tokeny) { meState.tokeny = d.tokeny; }
         toast(t('Видео в работе. Обычно 1–3 минуты, обновлю сам.', 'Бейне түсірілуде. Әдетте 1–3 минут.'));
-      } catch (error) { toast(error?.status === 402 ? t('Токенов не хватает. Откройте «Токены и пополнение» в меню.', 'Токен жетпейді.') : error?.status === 503 ? t('Видео ещё не подключено на сервере.', 'Бейне әлі қосылмаған.') : (error?.message || t('Не получилось запустить видео.', 'Бейнені іске қосу мүмкін болмады.'))); }
+      } catch (error) { toast(!error?.status ? t('Ответ не дошёл. Не нажимайте повторно — обновляю список дублей.', 'Жауап келмеді. Қайта баспаңыз.') : error?.status === 402 ? t('Токенов не хватает. Откройте «Токены и пополнение» в меню.', 'Токен жетпейді.') : error?.status === 503 ? t('Видео ещё не подключено на сервере.', 'Бейне әлі қосылмаған.') : (error?.message || t('Не получилось запустить видео.', 'Бейнені іске қосу мүмкін болмады.'))); }
       serverClient.known.delete(state.activeId); await loadVideoJobs(true);
     });
     return;

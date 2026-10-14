@@ -1552,6 +1552,11 @@ class TeamAccessTests(unittest.TestCase):
         self.assertIsNone(self.api("GET", f"/api/projects/film/scenes/{scene['id']}")["data"]["deletedAt"])
         self.api("POST", "/api/projects/film/dokumenty", {"tip": "zametka", "title": "Нельзя"}, 403, key="temporary-viewer")
 
+    def stored_prompt(self, collection, item_id, obraz_id, slug="film"):
+        project = json.loads((self.data / slug / "project.json").read_text(encoding="utf-8"))
+        item = next(x for x in project[collection] if x["id"] == item_id)
+        return next(o for o in item["obrazy"] if o["id"] == obraz_id)["prompt"]
+
     def test_hero_images_draw_variants_approve_and_serve_signed_files(self):
         # Блок «Картинки» (Александр 13.10 12:53): нарисовать по паспорту, варианты, утверждение, правка, ссылки без ключа.
         os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
@@ -1562,7 +1567,8 @@ class TeamAccessTests(unittest.TestCase):
         self.api("POST", base + "/narisovat", {"rakurs": "космос"}, 422)
         first = self.api("POST", base + "/narisovat", {"rakurs": "anfas"}, 201)["data"]
         self.assertEqual((first["status"], first["rakurs"], first["tokeny"]["spisano"]), ("variant", "anfas", 0))  # admin без лимита
-        self.assertIn("Не рисовать: без оружия", first["prompt"])
+        self.assertNotIn("prompt", first)  # служебный промпт наружу не уходит (находка Codex №70.9)
+        self.assertIn("Не рисовать: без оружия", self.stored_prompt("characters", hero["id"], first["id"]))
         self.assertIn("/api/projects/film/files/", first["url"])
         # Файл отдаётся по подписанной ссылке без X-Key; подделка — 403.
         status, parsed, raw = self.request("GET", first["url"], key=None)
@@ -1571,8 +1577,9 @@ class TeamAccessTests(unittest.TestCase):
         self.assertEqual(status, 403)
         # Правка словами от первого образа: референс подкладывается, промпт это отражает.
         second = self.api("POST", base + "/narisovat", {"rakurs": "anfas", "pravka": "свет холоднее", "baseId": first["id"]}, 201)["data"]
-        self.assertIn("Правка художника: свет холоднее", second["prompt"])
-        self.assertIn("сохрани лицо", second["prompt"])
+        second_prompt = self.stored_prompt("characters", hero["id"], second["id"])
+        self.assertIn("Правка художника: свет холоднее", second_prompt)
+        self.assertIn("сохрани лицо", second_prompt)
         approved = self.api("POST", f"{base}/obrazy/{second['id']}/utverdit", {})["data"]
         self.assertEqual([o["status"] for o in approved["obrazy"]], ["variant", "approved"])
         self.assertTrue(all(o["url"] for o in approved["obrazy"]))
@@ -1617,8 +1624,10 @@ class TeamAccessTests(unittest.TestCase):
         shot = again["kadry"][1]
         img = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {}, 201)["data"]
         self.assertEqual(img["refs"], ["герой ТӨСТІК", "локация ЮРТА"])
-        self.assertIn("Тон сцены: тревога", img["prompt"])
-        self.assertIn("изображение 1 — герой ТӨСТІК", img["prompt"])
+        shot_prompt = self.stored_prompt("shots", shot["id"], img["id"])
+        self.assertIn("Тон сцены: тревога", shot_prompt)
+        self.assertIn("изображение 1 — герой ТӨСТІК", shot_prompt)
+        self.assertNotIn("prompt", self.api("GET", f"/api/projects/film/shots/{shot['id']}")["data"]["obrazy"][0])
         fixed = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {"pravka": "ниже ракурс", "baseId": img["id"]}, 201)["data"]
         self.assertEqual(fixed["refs"][0], "предыдущий вариант этого кадра")
         approved = self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{fixed['id']}/utverdit", {})["data"]
@@ -1664,6 +1673,73 @@ class TeamAccessTests(unittest.TestCase):
         actions = [a["action"] for a in self.api("GET", "/api/projects/film/activity?limit=200")["data"]]
         self.assertIn("video.created", actions)
         self.assertIn("video.approved", actions)
+
+    def test_codex_70_findings_refund_once_durable_job_bad_model_answer_stale_shot(self):
+        # Находки Codex №70.1/2/3/5: возврат ровно один раз, задание пишется до провайдера, кривой ответ модели не стирает кадры, устаревший кадр не снимается.
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        Path(os.environ["NEYRA_TARIFY_FILE"]).write_text(json.dumps({"probnyy_paket": 1000}), encoding="utf-8")
+        self.create()
+        producer = self.issue("producer", ["overview", "script", "breakdown", "heroes", "locations", "shots", "storyboard", "animatic"], email="pr@example.test")["key"]
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — НОЧЬ\n\nТӨСТІК\nМама?\n", "language": "ru"})
+        self.api("POST", "/api/projects/film/versions", {}, 201)
+        scene = self.api("GET", "/api/projects/film/scenes")["data"][0]
+        shots = self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {}, 201, key=producer)["data"]["kadry"]
+        # 3: кривой ответ модели — 502, старые кадры на месте, токены не списаны
+        balance = self.api("GET", "/api/tokeny", key=producer)["data"]["balance"]
+        original = app.kadry_from_model
+        def broken(*args, **kwargs):
+            raw = {"kadry": [None, "bad item"]}
+            items = [it for it in raw["kadry"] if isinstance(it, dict)]
+            if not items:
+                raise app.ApiError(502, "KADRY_BAD_JSON", "Помощник ответил не по форме.")
+        app.kadry_from_model = broken
+        self.addCleanup(setattr, app, "kadry_from_model", original)
+        self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {"zamenit": True}, 502, key=producer)
+        app.kadry_from_model = original
+        self.assertEqual(len([s for s in self.api("GET", "/api/projects/film/shots")["data"] if s["sceneId"] == scene["id"]]), 3)
+        self.assertEqual(self.api("GET", "/api/tokeny", key=producer)["data"]["balance"], balance)
+        # готовим утверждённый кадр
+        shot = shots[0]
+        frame = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {}, 201, key=producer)["data"]
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{frame['id']}/utverdit", {}, key=producer)
+        # 1: провайдер сообщает о сбое — возврат ровно один раз, даже при повторном опросе
+        before = self.api("GET", "/api/tokeny", key=producer)["data"]["balance"]
+        job = self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 201, key=producer)["data"]
+        self.assertEqual(job["state"], "queued")
+        self.assertNotIn("by", job)
+        charged = self.api("GET", "/api/tokeny", key=producer)["data"]["balance"]
+        self.assertEqual(before - charged, job["tokeny"]["spisano"])
+        original_status = app.video.status
+        app.video.status = lambda task_id: {"state": "failed", "video_url": None, "error": {"code": "X", "message": "PRIVATE_UPSTREAM_TEXT"}, "usage": {}}
+        self.addCleanup(setattr, app.video, "status", original_status)
+        listed = self.api("GET", "/api/projects/film/video", key=producer)["data"]
+        self.assertEqual(listed[0]["state"], "failed")
+        self.assertNotIn("PRIVATE_UPSTREAM_TEXT", json.dumps(listed, ensure_ascii=False))
+        project = json.loads((self.data / "film" / "project.json").read_text(encoding="utf-8"))
+        for j in project["videoJobs"]:
+            j["vozvrat"] = False; j["state"] = "running"; j["polledAt"] = 0  # имитируем сбой записи отметки возврата
+        (self.data / "film" / "project.json").write_text(json.dumps(project, ensure_ascii=False), encoding="utf-8")
+        self.api("GET", "/api/projects/film/video", key=producer)
+        self.assertEqual(self.api("GET", "/api/tokeny", key=producer)["data"]["balance"], before)  # не 428-эффект
+        app.video.status = original_status
+        # 2: провайдер отказал при создании — задание сохранено как failed, токены возвращены один раз
+        original_create = app.video.create
+        def refuse(payload):
+            raise app.video.VideoError(502, "VIDEO_UPSTREAM", "нет")
+        app.video.create = refuse
+        self.addCleanup(setattr, app.video, "create", original_create)
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 502, key=producer)
+        app.video.create = original_create
+        self.assertEqual(self.api("GET", "/api/tokeny", key=producer)["data"]["balance"], before)
+        project = json.loads((self.data / "film" / "project.json").read_text(encoding="utf-8"))
+        self.assertEqual([j["state"] for j in project["videoJobs"]][-1], "failed")
+        # 5: сценарий изменился — кадр требует проверки, видео не снимается
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — ДЕНЬ\n\nТӨСТІК\nМама, утро!\n", "language": "ru"})
+        self.api("POST", "/api/projects/film/versions", {}, 201)
+        stale = self.api("GET", f"/api/projects/film/shots/{shot['id']}")["data"]
+        if stale.get("needsReview"):
+            self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 409, key=producer)
 
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).

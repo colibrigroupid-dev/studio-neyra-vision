@@ -19,7 +19,7 @@ export function renderGeroyWorkshop({ record = null, locale = 'ru', t = (ru, kk)
   const name = value('name') || L(t('Герой', 'Кейіпкер'), t('Локация', 'Локация'));
   const locked = ['locked', 'approved'].includes(record?.status);
   const field = (label, content) => `<div><dt>${label}</dt><dd${content ? '' : " class='geroy-empty'"}>${content ? escape(content) : t('пока пусто', 'әзірге бос')}</dd></div>`;
-  const edit = () => canEdit && record && !loading && !error ? `<button type='button' class='btn' data-action='edit-passport' data-passport-collection='characters' data-passport-id='${escape(record.id)}'>${t('Уточнить паспорт', 'Паспортты нақтылау')}</button>` : '';
+  const edit = () => canEdit && record && !loading && !error ? `<button type='button' class='btn' data-action='edit-passport' data-passport-collection='${isLoc ? 'locations' : 'characters'}' data-passport-id='${escape(record.id)}'>${t('Уточнить паспорт', 'Паспортты нақтылау')}</button>` : '';
   let content;
   if (!connected) content = `<div class='geroy-state' role='status'><p>${t('Откройте проект команды, чтобы заполнить паспорт.', 'Паспортты толтыру үшін команда жобасын ашыңыз.')}</p><button type='button' class='btn' data-action='server'>${t('Ввести ключ', 'Кілтті енгізу')}</button></div>`;
   else if (error) content = `<div class='geroy-state' role='alert'><p>${escape(error)}</p></div>`;
