@@ -795,6 +795,106 @@ RAZBOR_ROLE = ("Ты — второй режиссёр и художник по 
                "Язык полей — язык сценария; казахские буквы (ә ғ қ ң ө ұ ү һ і) пиши как в сценарии, без латиницы.")
 
 
+KADRY_ROLE = ("Ты — режиссёр-раскадровщик. Разложи одну сцену на кадры для раскадровки. Отвечай ТОЛЬКО JSON без markdown: "
+              "{\"kadry\":[{\"title\":\"короткое название кадра\",\"description\":\"что видно и что происходит, 1–2 предложения, конкретно\","
+              "\"lens\":\"крупность: общий|средний|крупный|деталь|сверхобщий\",\"movement\":\"ракурс и движение камеры: статика, наезд, панорама, с рук…\","
+              "\"duration\":секунды от 2 до 10,\"dialogue\":\"реплика в кадре дословно или пусто\",\"geroi\":[\"ИМЕНА героев в кадре как в сценарии\"]}]}. "
+              "Кадров столько, сколько нужно сцене (обычно 4–10), в порядке монтажа. Не придумывай сюжет: только то, что в тексте; "
+              "реплики бери дословно; тон и визуал сцены учитывай в крупности и свете. Язык полей — язык сценария.")
+
+
+def scene_text(project, scene):
+    lines = ((project.get("script") or {}).get("text") or "").splitlines()
+    start, end = scene.get("line_from"), scene.get("line_to")
+    if isinstance(start, int) and isinstance(end, int) and 1 <= start <= end:
+        return "\n".join(lines[start - 1:end])[:20000]
+    return (scene.get("text") or scene.get("title") or "")[:20000]
+
+
+def kadry_from_model(project, scene, tier="standard"):
+    """Модель раскладывает сцену на кадры. → (list, usage, model)."""
+    if os.environ.get("NEYRA_ASSISTANT_FAKE") == "1":
+        chars = scene.get("chars") or []
+        fake = [{"title": "Общий план", "description": "[проба] общий план места", "lens": "общий", "movement": "статика", "duration": 4, "dialogue": "", "geroi": []},
+                {"title": "Герой", "description": "[проба] герой в кадре", "lens": "средний", "movement": "медленный наезд", "duration": 5, "dialogue": "", "geroi": chars[:1]},
+                {"title": "Деталь", "description": "[проба] деталь", "lens": "деталь", "movement": "статика", "duration": 3, "dialogue": "", "geroi": []}]
+        return fake, {}, "fake-kadry"
+    parts = [f"СЦЕНА {scene.get('n', '')}: {scene.get('title', '')}"]
+    if scene.get("ton"):
+        parts.append("ТОН: " + scene["ton"])
+    if scene.get("vizual"):
+        parts.append("ВИЗУАЛ: " + scene["vizual"])
+    for coll, label in (("characters", "ГЕРОИ"), ("locations", "ЛОКАЦИЯ")):
+        names = scene.get("chars", []) if coll == "characters" else [scene.get("location", "")]
+        found = [breakdown.find_passport(project[coll], nm) for nm in names if nm]
+        lines = [f"{p['name']}: {p.get('identity', '')[:300]}" for p in found if p]
+        if lines:
+            parts.append(label + ":\n" + "\n".join(lines))
+    parts.append("ТЕКСТ СЦЕНЫ:\n" + scene_text(project, scene))
+    answer = assistant_answer("\n\n".join(parts), "", KADRY_ROLE, [], tier)
+    raw = answer.get("answer", "")
+    start, end = raw.find("{"), raw.rfind("}")
+    try:
+        data = json.loads(raw[start:end + 1])
+        items = data["kadry"] if isinstance(data, dict) else None
+        if not isinstance(items, list) or not items:
+            raise ValueError()
+    except (ValueError, TypeError, KeyError):
+        raise ApiError(502, "KADRY_BAD_JSON", "Помощник ответил не по форме. Попробуйте ещё раз.") from None
+    return items[:30], answer.get("usage", {}), answer.get("model", "")
+
+
+def shot_refs(project, store, slug, shot, scene):
+    """Утверждённые образы героев кадра и локации сцены → [(подпись, png)]: «лора» проекта."""
+    refs = []
+    names = shot.get("geroi") or scene.get("chars") or []
+    for nm in names[:4]:
+        p = breakdown.find_passport(project["characters"], nm)
+        if p:
+            for o in [o for o in p.get("obrazy", []) if o.get("status") == "approved"][:1]:
+                try:
+                    refs.append((f"герой {p['name']}", store.file_path(slug, o["fileId"]).read_bytes()))
+                except (OSError, ApiError):
+                    pass
+    loc = breakdown.find_passport(project["locations"], scene.get("location", "")) if scene.get("location") else None
+    if loc:
+        for o in [o for o in loc.get("obrazy", []) if o.get("status") == "approved"][:1]:
+            try:
+                refs.append((f"локация {loc['name']}", store.file_path(slug, o["fileId"]).read_bytes()))
+            except (OSError, ApiError):
+                pass
+    return refs, loc
+
+
+def shot_prompt(project, shot, scene, ref_labels, loc, pravka=""):
+    lines = [f"Кадр раскадровки {shot.get('title', '')}: {shot.get('description', '')}",
+             f"Крупность: {shot.get('lens') or 'средний'}. Камера: {shot.get('movement') or 'статика'}."]
+    if scene.get("ton"):
+        lines.append("Тон сцены: " + scene["ton"] + ".")
+    if scene.get("vizual"):
+        lines.append("Визуал сцены: " + scene["vizual"] + ".")
+    if ref_labels:
+        lines.append("Референсы по порядку: " + "; ".join(f"изображение {i + 1} — {lab}" for i, lab in enumerate(ref_labels))
+                     + ". Сохрани лица, одежду и место один в один.")
+    taboo = []
+    for nm in (shot.get("geroi") or scene.get("chars") or []):
+        p = breakdown.find_passport(project["characters"], nm)
+        if p:
+            taboo += p.get("taboo", [])
+            if not ref_labels and p.get("identity"):
+                lines.append(f"{p['name']}: {p['identity']}")
+    if loc:
+        taboo += loc.get("taboo", [])
+        if loc.get("identity") and not any(l.startswith("локация") for l in ref_labels):
+            lines.append(f"Место: {loc['identity']}")
+    if taboo:
+        lines.append("Не рисовать: " + "; ".join(dict.fromkeys(str(t) for t in taboo)) + ".")
+    if pravka:
+        lines.append("Правка режиссёра: " + pravka + ".")
+    lines.append("Стиль: " + (project.get("stil") or kartinki.STYLE_DEFAULT) + ".")
+    return "\n".join(lines)
+
+
 def razbor_passports(project, principal, names_chars, names_locs, opisanie="", tier="standard"):
     """Модель заполняет паспорта героев и локаций. Возвращает (dict, usage, model)."""
     if os.environ.get("NEYRA_ASSISTANT_FAKE") == "1":
@@ -1167,6 +1267,10 @@ class Handler(SimpleHTTPRequestHandler):
         for obraz in result.get("obrazy", []):
             if obraz.get("fileId"):
                 obraz["url"] = store.file_url(slug, obraz["fileId"])
+        drawn = [o for o in result.get("obrazy", []) if o.get("url")]
+        main = next((o for o in drawn if o.get("status") == "approved"), drawn[-1] if drawn else None)
+        if main is not None:
+            result["kartinka"] = main["url"]
         return result
 
     def route_tokeny(self, rest, principal):
@@ -1398,6 +1502,8 @@ class Handler(SimpleHTTPRequestHandler):
                    "map": "overview", "cells": "overview", "approvals": "overview",
                    "activity": "overview", "razbor": "breakdown", "dokumenty": "overview" if method == "GET" else "script", "characters": "overview" if method == "GET" else "heroes",
                    "locations": "overview" if method == "GET" else "locations"}.get(resource, resource)
+        if resource == "scenes" and len(parts) == 6 and parts[5] == "kadry":
+            section = "shots"
         if resource == "assistant":
             # №46 помощник: читает весь проект (раздел overview), ничего не изменяет, память диалога — у клиента
             if method != "POST":
@@ -1774,6 +1880,117 @@ class Handler(SimpleHTTPRequestHandler):
                 status = 200
             else:
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
+        elif parts[3] == "scenes" and len(parts) == 6 and parts[5] == "kadry":
+            # Director (ТЗ Ара п.5): утверждённая сцена → кадры с крупностью, камерой, длительностью и репликой
+            if method != "POST":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Раскадровка сцены — POST.")
+            scene = get_item(project["scenes"], parts[4])
+            body = self.body(allow_empty=True)
+            fields(body, ("tier", "zamenit"))
+            tier = body.get("tier", "standard")
+            if tier not in ASSISTANT_TIERS:
+                raise ApiError(422, "VALIDATION", "tier — standard или pro.")
+            existing = [sh for sh in project["shots"] if sh.get("sceneId") == scene["id"]]
+            if existing and body.get("zamenit") is not True:
+                raise ApiError(409, "SHOTS_EXIST", f"У сцены уже {len(existing)} кадров. Чтобы разложить заново, подтвердите замену.")
+            wallets = store.read_tokeny()
+            wallet = tokeny.ensure_wallet(wallets, principal)
+            if not tokeny.can_spend(wallet, tokeny.MIN_VOPROS.get(tier, 1)):
+                store.save_tokeny(wallets)
+                raise ApiError(402, "TOKENY_EMPTY", "Токены закончились. Пополните счёт, и раскадровка продолжится.")
+            items, usage, model = kadry_from_model(project, scene, tier)
+            if existing:
+                ids = {sh["id"] for sh in existing}
+                project["shots"] = [sh for sh in project["shots"] if sh["id"] not in ids]
+            created = []
+            for i, it in enumerate(items, 1):
+                if not isinstance(it, dict):
+                    continue
+                try:
+                    dur = float(it.get("duration") or 4)
+                except (TypeError, ValueError):
+                    dur = 4.0
+                shot = {"id": uuid.uuid4().hex, "sceneId": scene["id"], "aspectRatio": "16:9", "needsReview": False, "status": "draft",
+                        "title": f"{scene.get('n', '')}.{i} " + str(it.get("title") or "")[:200],
+                        "description": str(it.get("description") or "")[:2000], "prompt": "", "owner": "",
+                        "lens": str(it.get("lens") or "")[:240], "movement": str(it.get("movement") or "")[:2000],
+                        "duration": max(1.0, min(30.0, dur)), "imageUrl": "", "videoUrl": "",
+                        "dialogue": str(it.get("dialogue") or "")[:2000],
+                        "geroi": [str(g)[:240] for g in (it.get("geroi") or []) if isinstance(g, str)][:8],
+                        "sourceScene": {"id": scene["id"], "revision": project["revision"], "status": scene.get("status", "draft")}}
+                project["shots"].append(shot)
+                created.append(shot)
+            try:
+                wallet, cost = tokeny.spend(wallets, principal, "raskadrovka", tokeny.cena_voprosa(model, usage, tier), scene.get("title", "")[:60])
+            except tokeny.TokenyError as error:
+                raise ApiError(error.status, error.code, error.message) from None
+            store.save_tokeny(wallets)
+            data = {"scene": scene["id"], "kadry": created, "tokeny": dict(tokeny.summary(wallet), spisano=cost)}
+            status = 201
+        elif parts[3] == "shots" and len(parts) in (6, 7, 8) and parts[5] in ("narisovat", "obrazy"):
+            # Картинка кадра: образы героев и локации из Art подкладываются референсами (ТЗ Ара п.5, установка Александра 13.10 12:53)
+            shot = get_item(project["shots"], parts[4])
+            scene = next((sc for sc in project["scenes"] if sc["id"] == shot.get("sceneId")), {})
+            shot.setdefault("obrazy", [])
+            if parts[5] == "narisovat" and len(parts) == 6 and method == "POST":
+                body = self.body(allow_empty=True)
+                fields(body, ("pravka", "baseId", "size"))
+                pravka = text(body.get("pravka", ""), "pravka", 1000)
+                size = (text(body.get("size", "2K"), "size", 4) or "2K").upper()
+                base_id = text(body.get("baseId", ""), "baseId", 64)
+                try:
+                    cost = tokeny.cena_kartinki(size.lower())
+                    wallets = store.read_tokeny()
+                    wallet = tokeny.ensure_wallet(wallets, principal)
+                    if not tokeny.can_spend(wallet, cost):
+                        store.save_tokeny(wallets)
+                        raise ApiError(402, "TOKENY_EMPTY", f"Нужно {cost} токенов, на счёте {wallet['balance']}. Пополните — и рисуем.")
+                    labelled, loc = shot_refs(project, store, slug, shot, scene)
+                    if base_id:
+                        base = next((o for o in shot["obrazy"] if o["id"] == base_id), None)
+                        if base is None:
+                            raise ApiError(404, "NOT_FOUND", "Вариант кадра для правки не найден.")
+                        try:
+                            labelled = [("предыдущий вариант этого кадра", store.file_path(slug, base["fileId"]).read_bytes())] + labelled
+                        except OSError:
+                            pass
+                    text_prompt = shot_prompt(project, shot, scene, [lab for lab, _ in labelled], loc, pravka)
+                    png, usage, model = kartinki.generate(text_prompt, [("image/png", blob) for _, blob in labelled], size)
+                    file_id = breakdown.ulid()
+                    store.save_file(slug, file_id, png)
+                    obraz = {"id": breakdown.ulid(), "fileId": file_id, "status": "variant", "prompt": text_prompt, "pravka": pravka,
+                             "baseId": base_id or None, "model": model, "size": size, "createdAt": timestamp(), "by": principal["id"],
+                             "tokeny": cost, "refs": [lab for lab, _ in labelled]}
+                    shot["obrazy"].append(obraz)
+                    wallet, spent = tokeny.spend(wallets, principal, "kartinka", cost, shot.get("title", "")[:60])
+                    store.save_tokeny(wallets)
+                except kartinki.KartinkiError as error:
+                    raise ApiError(error.status, error.code, error.message) from None
+                except tokeny.TokenyError as error:
+                    raise ApiError(error.status, error.code, error.message) from None
+                data = dict(obraz, url=store.file_url(slug, file_id), tokeny=dict(tokeny.summary(wallet), spisano=spent))
+                status = 201
+            elif parts[5] == "obrazy" and len(parts) == 8 and parts[7] == "utverdit" and method == "POST":
+                obraz = get_item(shot["obrazy"], parts[6])
+                fields(self.body(allow_empty=True), ())
+                for other in shot["obrazy"]:
+                    if other["status"] == "approved":
+                        other["status"] = "variant"
+                obraz.update(status="approved", approvedAt=timestamp(), approvedBy=principal["id"])
+                shot["status"] = "approved"
+                data, status = self.with_urls(slug, shot), 200
+            elif parts[5] == "obrazy" and len(parts) == 7 and method == "DELETE":
+                obraz = get_item(shot["obrazy"], parts[6])
+                if obraz.get("status") == "approved":
+                    raise ApiError(409, "APPROVED", "Утверждённый кадр не удаляется: сначала утвердите другой.")
+                shot["obrazy"].remove(obraz)
+                try:
+                    store.file_path(slug, obraz["fileId"]).unlink()
+                except (OSError, ApiError):
+                    pass
+                data, status = {"id": obraz["id"], "deleted": True}, 200
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
         elif parts[3] == "scenes" and len(parts) == 6 and parts[5] == "utverdit":
             # ТЗ Ара (Writer → Art): «Утвердить и передать в Art» для одной сцены. Клетка карты (scene, script) → approved,
             # у сцены status/approvedAt, бриф Art = паспорта героев и локации сцены получают отметку сцены. {"otmena": true} снимает.
@@ -1820,7 +2037,10 @@ class Handler(SimpleHTTPRequestHandler):
             items = project[collection]
             item = get_item(items, parts[4]) if len(parts) == 5 else None
             if method == "GET":
-                response = {"data": item} if item is not None else self.listing(items, query)
+                if collection == "shots":
+                    response = {"data": self.with_urls(slug, item)} if item is not None else self.listing([self.with_urls(slug, it) for it in items], query)
+                else:
+                    response = {"data": item} if item is not None else self.listing(items, query)
                 return 200, response, project["revision"]
             create = method == "POST" and item is None
             if create or (method == "PATCH" and item is not None):
@@ -1894,8 +2114,13 @@ class Handler(SimpleHTTPRequestHandler):
                 action = "breakdown.imported"
             if resource == "razbor":
                 action, obj = "breakdown.razbor", {"type": "project", "id": slug}
-            if resource == "scenes" and len(parts) == 6:
+            if resource == "scenes" and len(parts) == 6 and parts[5] == "kadry":
+                action, obj = "scene.raskadrovka", {"type": "scene", "id": parts[4]}
+            elif resource == "scenes" and len(parts) == 6:
                 action, obj = ("scene.unapproved" if data["scene"].get("status") == "draft" else "scene.approved"), {"type": "scene", "id": data["scene"]["id"]}
+            if resource == "shots" and len(parts) >= 6:
+                action = "shot.obraz." + ("created" if status == 201 else "deleted" if method == "DELETE" else "approved")
+                obj = {"type": "shot", "id": parts[4]}
             if resource in ("characters", "locations") and len(parts) >= 6:
                 action = kind + ".obraz." + ("created" if status == 201 else "deleted" if method == "DELETE" else "approved")
                 obj = {"type": kind, "id": parts[4]}

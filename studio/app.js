@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261013n';
-import { frameAt, totalDuration } from './timeline.js?v=20261013n';
-import { StudioServer } from './storage.js?v=20261013n';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261013n';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261013n';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261013n';
-import { renderGeroyWorkshop } from './geroy.js?v=20261013n';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261013n';
-import { parseCommand, describeCommand } from './golos.js?v=20261013n';
-import { svgPaths as ikonki } from './ikonki.js?v=20261013n';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014a';
+import { frameAt, totalDuration } from './timeline.js?v=20261014a';
+import { StudioServer } from './storage.js?v=20261014a';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014a';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014a';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014a';
+import { renderGeroyWorkshop } from './geroy.js?v=20261014a';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014a';
+import { parseCommand, describeCommand } from './golos.js?v=20261014a';
+import { svgPaths as ikonki } from './ikonki.js?v=20261014a';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -319,6 +319,40 @@ function artPage() {
   const tabs = segmented(t('Арт', 'Арт'), [['heroes', t('Герои', 'Кейіпкерлер')], ['locations', t('Локации', 'Локациялар')], ['breakdown', t('Сцены и бриф', 'Көріністер')]], tab);
   return `${appBar('art', 'Neyra Art · ' + t('герои и локации', 'кейіпкерлер мен локациялар'), tabs)}${cinemaPage(tab)}`;
 }
+function directorBoard() {
+  // Director в серверном режиме (ТЗ Ара п.5): сцены → кадры; картинка кадра с образами героев и локации из Art.
+  const p = project();
+  const scenes = (p.scenes || []).filter(sc => !sc.deletedAt && sc.n != null).sort((a, b) => a.n - b.n);
+  if (!scenes.length) return `<div class='empty'><h2>${t('Сцен пока нет.', 'Көріністер әзірге жоқ.')}</h2><p>${t('Напишите сценарий в Writer и сохраните версию — сцены появятся здесь.', 'Writer-де сценарий жазып, нұсқаны сақтаңыз.')}</p></div>`;
+  const cena = 12;
+  const card = sh => {
+    const variants = (sh.obrazy || []).filter(o => o.url);
+    const img = sh.kartinka ? `<img src='${e(sh.kartinka)}' alt='' width='1600' height='900' loading='lazy'>` : `<span class='kadr-empty'>${t('кадр не нарисован', 'кадр салынбаған')}</span>`;
+    const actions = canOpen(['shots', 'storyboard']) ? `<div class='kadr-actions'><button type='button' class='btn small' data-kadr-narisovat='${e(sh.id)}'>${variants.length ? t('Ещё вариант', 'Тағы нұсқа') : t('Нарисовать', 'Салу')} · ${cena}</button>${variants.length ? `<button type='button' class='btn small' data-kadr-pravka='${e(sh.id)}' data-base='${e(variants[variants.length - 1].id)}'>${t('Правка словами', 'Сөзбен түзету')}</button>` : ''}</div>${variants.length > 1 || (variants.length === 1 && variants[0].status !== 'approved') ? `<div class='kadr-variants'>${variants.map(o => `<button type='button' class='kadr-variant ${o.status === 'approved' ? 'approved' : ''}' data-kadr-utverdit='${e(sh.id)}' data-obraz='${e(o.id)}' title='${t('Утвердить этот вариант', 'Осы нұсқаны бекіту')}'><img src='${e(o.url)}' alt='' width='160' height='90' loading='lazy'></button>`).join('')}</div>` : ''}` : '';
+    return `<article class='kadr ${sh.status === 'approved' ? 'approved' : ''}'><div class='kadr-frame'>${img}${sh.status === 'approved' ? `<span class='geroy-approved'>${t('утверждён', 'бекітілді')}</span>` : ''}</div><div class='kadr-body'><div class='kadr-head'><b>${e(local(sh.title))}</b><small>${e(String(sh.duration || ''))} ${t('с', 'с')}</small></div><p>${e(local(sh.description))}</p><dl><div><dt>${t('Крупность', 'Ірілік')}</dt><dd>${e(sh.lens || '—')}</dd></div><div><dt>${t('Камера', 'Камера')}</dt><dd>${e(local(sh.movement) || '—')}</dd></div></dl>${sh.dialogue ? `<blockquote>${e(sh.dialogue)}</blockquote>` : ''}${sh.needsReview ? `<p class='kadr-warn'>${t('Сцена изменилась — проверьте кадр.', 'Көрініс өзгерді — кадрды тексеріңіз.')}</p>` : ''}${actions}</div></article>`;
+  };
+  return scenes.map(sc => {
+    const shots = (p.shots || []).filter(sh => sh.sceneId === sc.id);
+    const head = `<header class='kadry-scene-head'><div><small class='mono'>${e(String(sc.n))}</small> <b>${e(local(sc.title) || sc.title || '')}</b>${sc.ton ? ` <small>· ${e(sc.ton)}</small>` : ''}</div><div class='row'><span class='badge ${sc.status === 'approved' ? 'approved' : ''}'>${sc.status === 'approved' ? t('сцена утверждена', 'көрініс бекітілді') : t('черновик сцены', 'көрініс жобасы')}</span>${canOpen(['shots', 'storyboard']) ? `<button type='button' class='btn small ${shots.length ? '' : 'primary'}' data-kadry-scene='${e(sc.id)}' data-has='${shots.length ? '1' : ''}'>${shots.length ? t('Разложить заново', 'Қайта бөлу') : t('Разложить на кадры', 'Кадрларға бөлу')}</button>` : ''}</div></header>`;
+    return `<section class='kadry-scene'>${head}${shots.length ? `<div class='kadry-grid'>${shots.map(card).join('')}</div>` : `<p class='geroy-note'>${t('Помощник прочитает сцену и предложит кадры: крупность, камера, длительность, реплика.', 'Көмекші көріністі оқып, кадрларды ұсынады.')}</p>`}</section>`;
+  }).join('');
+}
+async function reloadProject() {
+  const slug = state.activeId; serverClient.known.delete(slug);
+  try { state.projects[slug] = await serverClient.loadProject(slug); } catch (error) { toast(error?.message || t('Не удалось обновить проект.', 'Жобаны жаңарту мүмкін болмады.')); }
+  render();
+}
+async function directorCall(method, path, body, ok) {
+  const status = document.querySelector('[data-voice-status]');
+  try {
+    const result = await serverClient.request(method, `/api/projects/${encodeURIComponent(state.activeId)}${path}`, body, { revision: serverClient.known.get(state.activeId)?._revision });
+    const d = result?.data || {};
+    if (d.tokeny) { meState.tokeny = d.tokeny; for (const node of document.querySelectorAll('[data-tokeny]')) node.textContent = tokenyLabel(); }
+    toast(ok(d)); await reloadProject();
+  } catch (error) {
+    toast(error?.status === 402 ? t('Токенов не хватает. Откройте «Токены и пополнение» в меню.', 'Токен жетпейді.') : error?.status === 503 ? t('Картинки ещё не подключены на сервере.', 'Суреттер әлі қосылмаған.') : error?.status === 409 && error?.code === 'REVISION_CONFLICT' ? t('Коллега только что внёс правку. Обновите и повторите.', 'Әріптес түзетті.') : (error?.message || t('Не получилось.', 'Болмады.')));
+  } finally { if (status) status.textContent = ''; }
+}
 function directorSummary() {
   const p = project();
   const shots = p.shots || [];
@@ -331,7 +365,7 @@ function directorPage() {
   if (!depApp() && !appRoutes.includes(route())) return directorSummary();
   const tab = directorRoute();
   const tabs = segmented(t('Режиссёр', 'Режиссер'), [['storyboard', t('Раскадровка', 'Кадрлық жоспар')], ['shots', t('Кадры', 'Кадрлар')], ['animatic', t('ИИматик', 'ЖИ-аниматик')]], tab);
-  const body = tab === 'animatic' ? animaticPage() : shotsPage(tab);
+  const body = tab === 'animatic' ? animaticPage() : (serverClient && tab === 'storyboard') ? directorBoard() : shotsPage(tab);
   return `${appBar('director', 'Neyra Director · ' + t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар'), tabs)}${body}`;
 }
 function productionPage() {
@@ -1036,6 +1070,23 @@ app.addEventListener('click', async event => {
   if (udal) { await runOperation(() => obrazAction('DELETE', `/obrazy/${encodeURIComponent(udal.dataset.obrazUdalit)}`, t('Вариант убран.', 'Нұсқа алынды.'))); return; }
   const pravka = event.target.closest('[data-obraz-pravka]');
   if (pravka) { pravkaDialog(pravka.dataset.obrazPravka, pravka.dataset.rakurs); return; }
+  const kadryScene = event.target.closest('[data-kadry-scene]');
+  if (kadryScene) {
+    if (kadryScene.dataset.has && !confirm(t('Разложить сцену заново? Текущие кадры этой сцены заменятся.', 'Көріністі қайта бөлу керек пе? Қазіргі кадрлар ауыстырылады.'))) return;
+    const st = document.querySelector('[data-voice-status]'); if (st) st.textContent = t('читаю сцену, раскладываю на кадры…', 'көріністі оқып жатырмын…');
+    await runOperation(() => directorCall('POST', `/scenes/${encodeURIComponent(kadryScene.dataset.kadryScene)}/kadry`, kadryScene.dataset.has ? { zamenit: true } : {}, d => t(`Кадров: ${(d.kadry || []).length}`, `Кадр: ${(d.kadry || []).length}`) + (d.tokeny?.spisano ? t(` · списано ${d.tokeny.spisano}`, ` · ${d.tokeny.spisano} алынды`) : '')));
+    return;
+  }
+  const kadrDraw = event.target.closest('[data-kadr-narisovat]');
+  if (kadrDraw) {
+    const st = document.querySelector('[data-voice-status]'); if (st) st.textContent = t('рисую кадр… обычно 10–30 секунд', 'кадр салып жатырмын…');
+    await runOperation(() => directorCall('POST', `/shots/${encodeURIComponent(kadrDraw.dataset.kadrNarisovat)}/narisovat`, {}, d => d.tokeny?.spisano ? t(`Кадр готов · списано ${d.tokeny.spisano}`, `Кадр дайын · ${d.tokeny.spisano} алынды`) : t('Кадр готов.', 'Кадр дайын.')));
+    return;
+  }
+  const kadrOk = event.target.closest('[data-kadr-utverdit]');
+  if (kadrOk) { await runOperation(() => directorCall('POST', `/shots/${encodeURIComponent(kadrOk.dataset.kadrUtverdit)}/obrazy/${encodeURIComponent(kadrOk.dataset.obraz)}/utverdit`, {}, () => t('Кадр утверждён.', 'Кадр бекітілді.'))); return; }
+  const kadrFix = event.target.closest('[data-kadr-pravka]');
+  if (kadrFix) { openDialog(`${dialogHead(t('Правка кадра словами', 'Кадрды сөзбен түзету'), t('Скажите, что изменить: ракурс, свет, позу. Герои и место останутся теми же.', 'Не өзгерту керектігін айтыңыз.'))}<form id='kadr-pravka-form' data-shot='${e(kadrFix.dataset.kadrPravka)}' data-base='${e(kadrFix.dataset.base)}'><label for='kadr-pravka-text'>${t('Что изменить', 'Не өзгерту керек')}</label><input id='kadr-pravka-text' name='pravka' required maxlength='1000' placeholder='${t('ниже ракурс, тёплый свет от очага', 'төменірек ракурс')}'>${dialogActions(t('Нарисовать вариант', 'Нұсқа салу'))}</form>`); return; }
   const depTab = event.target.closest('[data-dep-tab]');
   if (depTab) { const id = depTab.dataset.depTab; const art = ['heroes', 'locations', 'breakdown'].includes(id); if (art) { artTab = id; try { localStorage.setItem('nv-art-tab', id); } catch { /* optional */ } } else { directorTab = id; try { localStorage.setItem('nv-director-tab', id); } catch { /* optional */ } } go(art ? 'art' : 'director'); if (art) void refreshCinema(); return; }
   const helperToggle = event.target.closest('[data-helper-toggle]');
@@ -1248,6 +1299,12 @@ dialog.addEventListener('submit', async event => {
     await runOperation(() => submitMapApproval(form, data, event.submitter?.value || data.get('verdict'))); return;
   }
   await runOperation(async () => {
+    if (form.id === 'kadr-pravka-form') {
+      const text = String(data.get('pravka') || '').trim(); if (!text) return;
+      dialog.close();
+      await directorCall('POST', `/shots/${encodeURIComponent(form.dataset.shot)}/narisovat`, { pravka: text, baseId: form.dataset.base }, d => d.tokeny?.spisano ? t(`Вариант готов · списано ${d.tokeny.spisano}`, `Нұсқа дайын · ${d.tokeny.spisano} алынды`) : t('Вариант готов.', 'Нұсқа дайын.'));
+      return;
+    }
     if (form.id === 'pravka-form') {
       const text = String(data.get('pravka') || '').trim(); if (!text) return;
       dialog.close(); await narisovat(form.dataset.rakurs, text, form.dataset.obraz); return;

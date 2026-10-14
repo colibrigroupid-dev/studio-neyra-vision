@@ -45,3 +45,29 @@
 .legacy-editor[open]>summary::before{transform:rotate(90deg)}
 .dep-head.app{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin-bottom:16px}
 .workspace.cex .work-main{max-width:1600px}
+/* Director: доска кадров по сценам */
+.kadry-scene{margin:0 0 32px}
+.kadry-scene-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line-soft);margin-bottom:14px}
+.kadry-scene-head small.mono{color:var(--dim);margin-right:6px}
+.kadry-scene-head small{color:var(--dim)}
+.kadry-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.kadr{background:var(--surface,#212121);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.kadr.approved{outline:2px solid var(--text)}
+.kadr-frame{position:relative;aspect-ratio:16/9;background:var(--surface2);display:grid;place-items:center}
+.kadr-frame img{width:100%;height:100%;object-fit:cover;display:block}
+.kadr-empty{color:var(--dim);font-size:13px}
+.kadr-body{padding:12px 14px 14px;display:grid;gap:8px}
+.kadr-head{display:flex;justify-content:space-between;gap:8px}
+.kadr-head small{color:var(--dim)}
+.kadr-body p{margin:0;font-size:14px;color:var(--muted)}
+.kadr-body dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0}
+.kadr-body dt{font-size:12px;color:var(--dim)}
+.kadr-body dd{margin:0;font-size:14px}
+.kadr-body blockquote{margin:0;padding:6px 10px;border-left:2px solid var(--line);color:var(--text);font-size:14px}
+.kadr-warn{color:var(--text)!important;font-size:13px}
+.kadr-actions{display:flex;gap:6px;flex-wrap:wrap}
+.kadr-variants{display:flex;gap:6px;flex-wrap:wrap}
+.kadr-variant{border:0;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:none;outline-offset:2px}
+.kadr-variant.approved{outline:2px solid var(--text)}
+.kadr-variant img{width:96px;height:54px;object-fit:cover;display:block}
+@media (max-width:768px){.kadry-grid{grid-template-columns:1fr}}

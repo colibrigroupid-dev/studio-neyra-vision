@@ -1594,6 +1594,42 @@ class TeamAccessTests(unittest.TestCase):
         plate = self.api("POST", f"/api/projects/film/locations/{loc['id']}/narisovat", {"rakurs": "master", "size": "4K"}, 201)["data"]
         self.assertEqual((plate["size"], plate["rakurs"]), ("4K", "master"))
 
+    def test_director_breaks_scene_into_shots_and_draws_with_art_references(self):
+        # Director (ТЗ Ара п.5): сцена → кадры; картинка кадра с утверждёнными образами героя и локации.
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        self.create()
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — НОЧЬ\n= Тон: тревога\n\nТӨСТІК\nМама?\n", "language": "ru"})
+        self.api("POST", "/api/projects/film/versions", {}, 201)
+        scene = self.api("GET", "/api/projects/film/scenes")["data"][0]
+        hero = self.api("GET", "/api/projects/film/characters")["data"][0]
+        loc = self.api("GET", "/api/projects/film/locations")["data"][0]
+        h_img = self.api("POST", f"/api/projects/film/characters/{hero['id']}/narisovat", {"rakurs": "anfas"}, 201)["data"]
+        self.api("POST", f"/api/projects/film/characters/{hero['id']}/obrazy/{h_img['id']}/utverdit", {})
+        l_img = self.api("POST", f"/api/projects/film/locations/{loc['id']}/narisovat", {"rakurs": "master"}, 201)["data"]
+        self.api("POST", f"/api/projects/film/locations/{loc['id']}/obrazy/{l_img['id']}/utverdit", {})
+        made = self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {}, 201)["data"]
+        self.assertEqual([k["title"] for k in made["kadry"]], ["1.1 Общий план", "1.2 Герой", "1.3 Деталь"])
+        self.assertEqual(made["kadry"][1]["geroi"], ["ТӨСТІК"])
+        self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {}, 409)  # кадры уже есть
+        again = self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {"zamenit": True}, 201)["data"]
+        self.assertEqual(len([s for s in self.api("GET", "/api/projects/film/shots")["data"] if s["sceneId"] == scene["id"]]), 3)
+        shot = again["kadry"][1]
+        img = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {}, 201)["data"]
+        self.assertEqual(img["refs"], ["герой ТӨСТІК", "локация ЮРТА"])
+        self.assertIn("Тон сцены: тревога", img["prompt"])
+        self.assertIn("изображение 1 — герой ТӨСТІК", img["prompt"])
+        fixed = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {"pravka": "ниже ракурс", "baseId": img["id"]}, 201)["data"]
+        self.assertEqual(fixed["refs"][0], "предыдущий вариант этого кадра")
+        approved = self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{fixed['id']}/utverdit", {})["data"]
+        self.assertEqual((approved["status"], approved["kartinka"]), ("approved", next(o["url"] for o in approved["obrazy"] if o["id"] == fixed["id"])))
+        listed = next(s for s in self.api("GET", "/api/projects/film/shots")["data"] if s["id"] == shot["id"])
+        self.assertTrue(listed["kartinka"].startswith("/api/projects/film/files/"))
+        self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {"zamenit": True}, 403, key="temporary-viewer")
+        actions = [a["action"] for a in self.api("GET", "/api/projects/film/activity?limit=200")["data"]]
+        self.assertIn("scene.raskadrovka", actions)
+        self.assertIn("shot.obraz.approved", actions)
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

@@ -1072,3 +1072,10 @@ UTF-8, `ensure_ascii=False`, `sort_keys=True`, `separators=(',', ':')`.
 - `POST …/obrazy/<obrazId>/utverdit` — утвердить (прежний утверждённый того же ракурса становится вариантом); `DELETE …/obrazy/<obrazId>` — удалить вариант (утверждённый — `409`).
 - Паспорта в GET отдают `obrazy[]` с `url` — подписанная ссылка `/api/projects/<slug>/files/<fileId>?e=…&t=…` на 7 дней, открывается без `X-Key` (для `<img>` и страницы проекта). Файлы — `<data>/<slug>/files/<fileId>.png`, секрет подписи — `<data>/secret.txt`.
 - Ключ модели: `GOOGLE_API_KEY` или `~/.config/neyra-studio/google-key` (деплой копирует `~/.config/nano-banana/key`); модель `NEYRA_IMAGE_MODEL` (по умолчанию Nano Banana 2). Без ключа — `503 IMAGE_KEY_MISSING`. Проба: `NEYRA_ASSISTANT_FAKE=1` отдаёт 1×1 PNG.
+
+## Director: сцена → кадры, картинка кадра (14.10.2026)
+
+- `POST /api/projects/<slug>/scenes/<id>/kadry` — право записи в `shots`, `If-Match`. Тело `{}` или `{zamenit: true, tier?}`. Помощник читает текст сцены (строки `line_from…line_to` сценария), тон/визуал, паспорта героев и локации и создаёт кадры: `title` («<n>.<i> …»), `description`, `lens` (крупность), `movement` (камера), `duration`, `dialogue` (дословно), `geroi`, `sourceScene {id, revision, status}`. Если у сцены уже есть кадры — `409 SHOTS_EXIST`, с `zamenit: true` старые кадры сцены заменяются. Списание — по расходу модели, причина `raskadrovka`.
+- `POST /api/projects/<slug>/shots/<id>/narisovat` — `{pravka?, baseId?, size?}`; референсы — утверждённые образы героев кадра (до 4) и локации сцены, при правке первым идёт выбранный вариант кадра. Промпт: действие, крупность, камера, тон/визуал сцены, «изображение N — герой/локация …», табу героев и места, стиль проекта. Ответ `201` образ с `refs`, `prompt`, `url`, `tokeny`.
+- `POST …/shots/<id>/obrazy/<obrazId>/utverdit` — утвердить вариант (кадр получает `status: approved`); `DELETE …/obrazy/<obrazId>` — убрать вариант.
+- `GET /shots` отдаёт у каждого кадра `obrazy[].url` и `kartinka` — ссылку на утверждённый или последний вариант.
