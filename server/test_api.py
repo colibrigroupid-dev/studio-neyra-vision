@@ -1770,6 +1770,26 @@ class TeamAccessTests(unittest.TestCase):
         ceny = self.api("GET", "/api/tokeny")["data"]["ceny"]
         self.assertEqual((ceny["kartinka_karandash"], ceny["kartinka_2k"], ceny["kartinka_pro"]), (4, 12, 15))
 
+    def test_image_model_without_size_support_gets_one_retry(self):
+        # Lite может не принять imageSize: бесплатный отказ 400 → один повтор без размера, второй отказ — ошибка.
+        import urllib.error
+        from server.blocks import kartinki
+        sent = []
+        ok = json.dumps({"candidates": [{"content": {"parts": [{"inlineData": {"data": "AAAA"}}]}}]}).encode()
+        class Resp(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        def fake(req, timeout=0):
+            body = json.loads(req.data)
+            sent.append(body["generationConfig"]["imageConfig"])
+            if "imageSize" in sent[-1]:
+                raise urllib.error.HTTPError(req.full_url, 400, "bad", {}, io.BytesIO(b'{"error":{"message":"imageSize is not supported"}}'))
+            return Resp(ok)
+        env = {k: v for k, v in os.environ.items() if k != "NEYRA_ASSISTANT_FAKE"}
+        with patch.dict(os.environ, env, clear=True), patch.object(kartinki, "api_key", return_value="k"), patch.object(kartinki.urllib.request, "urlopen", fake):
+            png, _, model = kartinki.generate("x", size="1K", model="lite")
+        self.assertEqual((png, model, len(sent), "imageSize" in sent[1]), (b"\x00\x00\x00", "lite", 2, False))
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

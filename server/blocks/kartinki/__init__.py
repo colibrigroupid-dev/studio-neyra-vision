@@ -108,16 +108,23 @@ def generate(text, refs=(), size="2K", aspect="16:9", fake=False, model=None):
         parts.append({"inline_data": {"mime_type": mime or "image/png", "data": base64.b64encode(blob).decode()}})
     body = {"contents": [{"parts": parts}],
             "generationConfig": {"responseModalities": ["IMAGE", "TEXT"], "imageConfig": {"aspectRatio": aspect, "imageSize": size}}}
-    req = urllib.request.Request(f"{GOOGLE_API}/models/{model}:generateContent", data=json.dumps(body).encode("utf-8"),
-                                 headers={"x-goog-api-key": key, "Content-Type": "application/json"}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as error:
-        detail = error.read().decode("utf-8", "replace")[:300]
-        raise KartinkiError(502, "IMAGE_UPSTREAM", f"Модель картинок ответила ошибкой {error.code}: {detail}") from None
-    except (OSError, ValueError) as error:
-        raise KartinkiError(502, "IMAGE_UPSTREAM", f"Модель картинок недоступна: {error}") from None
+    data = None
+    for attempt in (0, 1):
+        req = urllib.request.Request(f"{GOOGLE_API}/models/{model}:generateContent", data=json.dumps(body).encode("utf-8"),
+                                     headers={"x-goog-api-key": key, "Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", "replace")[:300]
+            # Не каждая модель принимает imageSize (Lite): отказ 400 бесплатный — повторяем один раз без размера.
+            if attempt == 0 and error.code == 400 and "image" in detail.lower() and "size" in detail.lower():
+                body["generationConfig"]["imageConfig"].pop("imageSize", None)
+                continue
+            raise KartinkiError(502, "IMAGE_UPSTREAM", f"Модель картинок ответила ошибкой {error.code}: {detail}") from None
+        except (OSError, ValueError) as error:
+            raise KartinkiError(502, "IMAGE_UPSTREAM", f"Модель картинок недоступна: {error}") from None
     for cand in data.get("candidates", []):
         for part in cand.get("content", {}).get("parts", []):
             blob = part.get("inlineData") or part.get("inline_data")
