@@ -1630,6 +1630,41 @@ class TeamAccessTests(unittest.TestCase):
         self.assertIn("scene.raskadrovka", actions)
         self.assertIn("shot.obraz.approved", actions)
 
+    def test_production_video_from_approved_shot_takes_and_approval(self):
+        # Production (ТЗ Ара п.6): видео только по утверждённому кадру, дубль, утверждение, возврат токенов при сбое.
+        os.environ["NEYRA_ASSISTANT_FAKE"] = "1"
+        self.addCleanup(os.environ.pop, "NEYRA_ASSISTANT_FAKE", None)
+        self.create()
+        self.api("PUT", "/api/projects/film/script", {"text": "ИНТ. ЮРТА — НОЧЬ\n\nТӨСТІК\nМама?\n", "language": "ru"})
+        self.api("POST", "/api/projects/film/versions", {}, 201)
+        scene = self.api("GET", "/api/projects/film/scenes")["data"][0]
+        hero = self.api("GET", "/api/projects/film/characters")["data"][0]
+        img = self.api("POST", f"/api/projects/film/characters/{hero['id']}/narisovat", {"rakurs": "anfas"}, 201)["data"]
+        self.api("POST", f"/api/projects/film/characters/{hero['id']}/obrazy/{img['id']}/utverdit", {})
+        shot = self.api("POST", f"/api/projects/film/scenes/{scene['id']}/kadry", {}, 201)["data"]["kadry"][1]
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {}, 409)  # кадр не утверждён
+        frame = self.api("POST", f"/api/projects/film/shots/{shot['id']}/narisovat", {}, 201)["data"]
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/obrazy/{frame['id']}/utverdit", {})
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 3}, 422)
+        job = self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {"duration": 5}, 201)["data"]
+        self.assertEqual((job["state"], job["duration"], job["resolution"], job["shotId"]), ("queued", 5, "720p", shot["id"]))
+        self.assertTrue(job["taskId"].startswith("fake-"))
+        self.assertNotIn("prompt", job)
+        stored = self.stored_project() if hasattr(self, "stored_project") else json.loads((self.data / "film" / "project.json").read_text(encoding="utf-8"))
+        prompt = next(j for j in stored["videoJobs"] if j["id"] == job["id"])["prompt"]
+        self.assertIn("@Image1 — это первый кадр", prompt)
+        self.assertIn("@Image2 — это герой ТӨСТІК", prompt)
+        self.assertIn("no music", prompt)
+        listed = self.api("GET", "/api/projects/film/video")["data"]
+        self.assertEqual(listed[0]["state"], "succeeded")
+        approved = self.api("POST", f"/api/projects/film/video/{job['id']}/utverdit", {})["data"]
+        self.assertTrue(approved["approved"])
+        self.assertEqual(self.api("GET", f"/api/projects/film/shots/{shot['id']}")["data"]["videoTake"], job["id"])
+        self.api("POST", f"/api/projects/film/shots/{shot['id']}/video", {}, 403, key="temporary-viewer")
+        actions = [a["action"] for a in self.api("GET", "/api/projects/film/activity?limit=200")["data"]]
+        self.assertIn("video.created", actions)
+        self.assertIn("video.approved", actions)
+
     def test_tokeny_prices_follow_cost_plus_margin(self):
         # Токен = 1 цент, наценка 10 %: вопрос по реальному расходу, картинка/видео по тарифу (13.10.2026).
         tokeny = app.tokeny

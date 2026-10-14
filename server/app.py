@@ -2,6 +2,7 @@
 """Хранение Neyra Vision Studio: только стандартная библиотека Python 3.9+."""
 
 import argparse
+import base64
 import copy
 from datetime import datetime, timezone
 import hashlib
@@ -19,10 +20,10 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 import uuid
 
 if __package__:
-    from .blocks import breakdown, tokeny, kartinki
+    from .blocks import breakdown, tokeny, kartinki, video
     from .blocks.breakdown import parser as razbivka
 else:
-    from blocks import breakdown, tokeny, kartinki
+    from blocks import breakdown, tokeny, kartinki, video
     from blocks.breakdown import parser as razbivka
 import time
 
@@ -803,6 +804,13 @@ KADRY_ROLE = ("Ты — режиссёр-раскадровщик. Разлож�
               "реплики бери дословно; тон и визуал сцены учитывай в крупности и свете. Язык полей — язык сценария.")
 
 
+def local_text(value):
+    """Строка из значения, которое может быть переводом {ru, kk}."""
+    if isinstance(value, dict):
+        return str(value.get("ru") or value.get("kk") or next(iter(value.values()), "") or "")
+    return "" if value is None else str(value)
+
+
 def scene_text(project, scene):
     lines = ((project.get("script") or {}).get("text") or "").splitlines()
     start, end = scene.get("line_from"), scene.get("line_to")
@@ -1052,11 +1060,11 @@ class Store:
         atomic_write(self.path(project["slug"]), project)
 
     # Блок «Картинки»: файлы проекта лежат в <data>/<slug>/files/, ссылки подписываются секретом студии.
-    def file_path(self, slug, file_id):
+    def file_path(self, slug, file_id, ext="png"):
         identifier(slug, slug=True)
-        if not re.fullmatch(r"[0-9A-Z]{26}", file_id or ""):
+        if not re.fullmatch(r"[0-9A-Z]{26}", file_id or "") or ext not in ("png", "mp4"):
             raise ApiError(404, "NOT_FOUND", "Файл не найден.")
-        return self.root / slug / "files" / (file_id + ".png")
+        return self.root / slug / "files" / (file_id + "." + ext)
 
     def save_file(self, slug, file_id, data):
         path = self.file_path(slug, file_id)
@@ -1245,13 +1253,15 @@ class Handler(SimpleHTTPRequestHandler):
         store = self.server.store
         if not kartinki.check(store.secret(), slug, file_id, (params.get("e") or [""])[0], (params.get("t") or [""])[0], int(time.time())):
             raise ApiError(403, "FORBIDDEN", "Ссылка на файл устарела или неверна.")
-        path = store.file_path(slug, file_id)
+        path, mime = store.file_path(slug, file_id), "image/png"
+        if not path.exists():
+            path, mime = store.file_path(slug, file_id, "mp4"), "video/mp4"
         try:
             data = path.read_bytes()
         except OSError:
             raise ApiError(404, "NOT_FOUND", "Файл не найден.") from None
         self.send_response(200)
-        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "private, max-age=3600")
         self.send_header("Content-Security-Policy", "default-src 'none'")
@@ -1259,6 +1269,48 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         if not head:
             self.wfile.write(data)
+
+    def poll_video(self, project, slug):
+        """Опрос незавершённых видеозаданий (не чаще раза в 10 с на задание); готовые дубли скачиваются в files/."""
+        store, changed, now = self.server.store, False, time.time()
+        for job in project.get("videoJobs", []):
+            if job.get("state") not in ("queued", "running") or now - job.get("polledAt", 0) < 10:
+                continue
+            job["polledAt"] = now
+            changed = True
+            try:
+                st = video.status(job["taskId"])
+            except video.VideoError as error:
+                job["lastError"] = error.message[:300]
+                continue
+            job["state"] = st["state"]
+            if st.get("error"):
+                job["error"] = str((st["error"] or {}).get("message") or st["error"])[:300]
+            if st["state"] == "succeeded" and st.get("video_url"):
+                file_id = breakdown.ulid()
+                path = store.file_path(slug, file_id, "mp4")
+                try:
+                    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    video.download(st["video_url"], path)
+                    job["fileId"] = file_id
+                except (video.VideoError, OSError) as error:
+                    job["state"], job["error"] = "failed", "Видео готово, но не скачалось: " + str(getattr(error, "message", error))[:200]
+            if job["state"] in ("failed", "cancelled") and job.get("tokeny") and not job.get("vozvrat"):
+                wallets = store.read_tokeny()
+                try:
+                    tokeny.grant(wallets, job["by"], job["tokeny"], "system", "возврат: видео не получилось")
+                    store.save_tokeny(wallets)
+                    job["vozvrat"] = True
+                except tokeny.TokenyError:
+                    pass
+        if changed:
+            store.save(project)
+
+    def public_job(self, slug, job):
+        result = {k: v for k, v in job.items() if k not in ("prompt", "polledAt")}
+        if job.get("fileId"):
+            result["url"] = self.server.store.file_url(slug, job["fileId"])
+        return result
 
     def with_urls(self, slug, passport):
         """Копия паспорта, где у каждого образа есть url (подписанная ссылка на файл)."""
@@ -1504,6 +1556,10 @@ class Handler(SimpleHTTPRequestHandler):
                    "locations": "overview" if method == "GET" else "locations"}.get(resource, resource)
         if resource == "scenes" and len(parts) == 6 and parts[5] == "kadry":
             section = "shots"
+        if (resource == "shots" and len(parts) == 6 and parts[5] == "video") or (resource == "video" and method != "GET"):
+            section = "animatic"  # Production (ТЗ Ара п.6)
+        if resource == "video" and method == "GET":
+            section = "overview"
         if resource == "assistant":
             # №46 помощник: читает весь проект (раздел overview), ничего не изменяет, память диалога — у клиента
             if method != "POST":
@@ -1880,6 +1936,88 @@ class Handler(SimpleHTTPRequestHandler):
                 status = 200
             else:
                 raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
+        elif parts[3] == "video" and len(parts) in (4, 6):
+            jobs = project.setdefault("videoJobs", [])
+            if method == "GET" and len(parts) == 4:
+                self.poll_video(project, slug)
+                return 200, {"data": [self.public_job(slug, j) for j in jobs]}, project["revision"]
+            if method == "POST" and len(parts) == 6 and parts[5] == "utverdit":
+                job = get_item(jobs, parts[4])
+                fields(self.body(allow_empty=True), ())
+                if job.get("state") != "succeeded":
+                    raise ApiError(409, "VIDEO_NOT_READY", "Утвердить можно только готовый дубль.")
+                for other in jobs:
+                    if other.get("shotId") == job["shotId"]:
+                        other["approved"] = False
+                job.update(approved=True, approvedAt=timestamp(), approvedBy=principal["id"])
+                shot = next((sh for sh in project["shots"] if sh["id"] == job["shotId"]), None)
+                if shot is not None:
+                    shot["videoTake"] = job["id"]
+                data, status = self.public_job(slug, job), 200
+            else:
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается.")
+        elif parts[3] == "shots" and len(parts) == 6 and parts[5] == "video":
+            # Production (ТЗ Ара п.6): видео только по утверждённому кадру; первый кадр — утверждённая картинка, референсы — образы героев.
+            if method != "POST":
+                raise ApiError(405, "METHOD_NOT_ALLOWED", "Видео запускается методом POST.")
+            shot = get_item(project["shots"], parts[4])
+            scene = next((sc for sc in project["scenes"] if sc["id"] == shot.get("sceneId")), {})
+            body = self.body(allow_empty=True)
+            fields(body, ("duration", "resolution", "sfx"))
+            duration = body.get("duration", round(shot.get("duration") or 5))
+            if isinstance(duration, float) and duration.is_integer():
+                duration = int(duration)
+            resolution = body.get("resolution", "720p")
+            sfx = text(body.get("sfx", ""), "sfx", 1000)
+            if shot.get("status") != "approved":
+                raise ApiError(409, "SHOT_NOT_APPROVED", "Видео снимается только по утверждённому кадру. Утвердите картинку кадра в Director.")
+            first = next((o for o in shot.get("obrazy", []) if o.get("status") == "approved"), None)
+            if first is None:
+                raise ApiError(409, "SHOT_NO_IMAGE", "У кадра нет утверждённой картинки — она станет первым кадром видео.")
+            try:
+                if resolution not in video.RESOLUTIONS or isinstance(duration, bool) or not isinstance(duration, int) or not 4 <= duration <= 15:
+                    raise video.VideoError(422, "VALIDATION", "Длительность — целое от 4 до 15 секунд, разрешение — 480p, 720p или 1080p.")
+                cost = tokeny.cena_video(duration, resolution)
+                wallets = store.read_tokeny()
+                wallet = tokeny.ensure_wallet(wallets, principal)
+                if not tokeny.can_spend(wallet, cost):
+                    store.save_tokeny(wallets)
+                    raise ApiError(402, "TOKENY_EMPTY", f"Нужно {cost} токенов, на счёте {wallet['balance']}. Пополните — и снимаем.")
+                public = os.environ.get("NEYRA_PUBLIC_URL", "").rstrip("/")
+                def image_ref(file_id):
+                    if public:
+                        return public + store.file_url(slug, file_id, ttl=24 * 3600)
+                    return "data:image/png;base64," + base64.b64encode(store.file_path(slug, file_id).read_bytes()).decode()
+                roles, refs = [{"role": "first_frame", "name": local_text(shot.get("title"))}], []
+                for nm in (shot.get("geroi") or [])[:4]:
+                    p = breakdown.find_passport(project["characters"], nm)
+                    o = next((o for o in (p or {}).get("obrazy", []) if o.get("status") == "approved"), None)
+                    if p and o:
+                        roles.append({"role": "character", "name": p["name"]})
+                        refs.append(image_ref(o["fileId"]))
+                lang = "kazakh" if project.get("language") == "kk" else "russian"
+                plain_shot = {k: local_text(shot.get(k)) for k in ("title", "description", "prompt", "movement", "lens")}
+                plain_shot["dialogueLanguage"] = lang
+                plain_scene = {k: local_text(scene.get(k)) for k in ("title", "location", "time", "ton", "vizual")}
+                text_prompt = video.prompt(plain_shot, plain_scene, roles, shot.get("dialogue") or "", sfx)
+                body_payload = video.payload(text_prompt, refs, duration, resolution, first_frame=image_ref(first["fileId"]))
+                task_id = video.create(body_payload)
+            except video.VideoError as error:
+                raise ApiError(error.status, error.code, error.message) from None
+            except OSError:
+                raise ApiError(500, "STORAGE_READ_FAILED", "Не удалось прочитать картинку кадра.") from None
+            try:
+                wallet, spent = tokeny.spend(wallets, principal, "video", cost, shot.get("title", "")[:60])
+            except tokeny.TokenyError as error:
+                raise ApiError(error.status, error.code, error.message) from None
+            store.save_tokeny(wallets)
+            job = {"id": breakdown.ulid(), "shotId": shot["id"], "sceneId": shot.get("sceneId"), "taskId": task_id, "state": "queued",
+                   "prompt": text_prompt, "duration": duration, "resolution": resolution, "usd": video.usd(duration, resolution),
+                   "tokeny": spent, "by": principal["id"], "createdAt": timestamp(), "approved": False,
+                   "sourceVersions": {"projectRevision": project["revision"], "shotImage": first["id"], "sceneStatus": scene.get("status", "draft")}}
+            project.setdefault("videoJobs", []).append(job)
+            data = dict(self.public_job(slug, job), tokeny=dict(tokeny.summary(wallet), spisano=spent))
+            status = 201
         elif parts[3] == "scenes" and len(parts) == 6 and parts[5] == "kadry":
             # Director (ТЗ Ара п.5): утверждённая сцена → кадры с крупностью, камерой, длительностью и репликой
             if method != "POST":
@@ -2118,7 +2256,11 @@ class Handler(SimpleHTTPRequestHandler):
                 action, obj = "scene.raskadrovka", {"type": "scene", "id": parts[4]}
             elif resource == "scenes" and len(parts) == 6:
                 action, obj = ("scene.unapproved" if data["scene"].get("status") == "draft" else "scene.approved"), {"type": "scene", "id": data["scene"]["id"]}
-            if resource == "shots" and len(parts) >= 6:
+            if resource == "shots" and len(parts) == 6 and parts[5] == "video":
+                action, obj = "video.created", {"type": "shot", "id": parts[4]}
+            elif resource == "video":
+                action, obj = "video.approved", {"type": "shot", "id": data.get("shotId", "")}
+            elif resource == "shots" and len(parts) >= 6:
                 action = "shot.obraz." + ("created" if status == 201 else "deleted" if method == "DELETE" else "approved")
                 obj = {"type": "shot", "id": parts[4]}
             if resource in ("characters", "locations") and len(parts) >= 6:

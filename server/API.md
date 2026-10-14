@@ -1079,3 +1079,10 @@ UTF-8, `ensure_ascii=False`, `sort_keys=True`, `separators=(',', ':')`.
 - `POST /api/projects/<slug>/shots/<id>/narisovat` — `{pravka?, baseId?, size?}`; референсы — утверждённые образы героев кадра (до 4) и локации сцены, при правке первым идёт выбранный вариант кадра. Промпт: действие, крупность, камера, тон/визуал сцены, «изображение N — герой/локация …», табу героев и места, стиль проекта. Ответ `201` образ с `refs`, `prompt`, `url`, `tokeny`.
 - `POST …/shots/<id>/obrazy/<obrazId>/utverdit` — утвердить вариант (кадр получает `status: approved`); `DELETE …/obrazy/<obrazId>` — убрать вариант.
 - `GET /shots` отдаёт у каждого кадра `obrazy[].url` и `kartinka` — ссылку на утверждённый или последний вариант.
+
+## Production: видео по утверждённому кадру (14.10.2026)
+
+- `POST /api/projects/<slug>/shots/<id>/video` — право записи в `animatic` (Production), `If-Match`. Тело `{duration?: 4–15, resolution?: "480p"|"720p"|"1080p", sfx?}`. Только для кадра со `status: approved` и утверждённой картинкой (`409 SHOT_NOT_APPROVED` / `SHOT_NO_IMAGE`). Первый кадр видео — утверждённая картинка кадра, референсы — утверждённые образы героев кадра (блок `server/blocks/video/`, промпт без музыки, реплика дословно). Ссылки на картинки: `NEYRA_PUBLIC_URL` + подписанный путь (на сервере), иначе base64. Цена `video_<с>_<разрешение>` из тарифов списывается при запуске, при сбое возвращается. Ответ `201` задание `{id, shotId, sceneId, taskId, state, duration, resolution, usd, tokeny, sourceVersions}`.
+- `GET /api/projects/<slug>/video` — список заданий; незавершённые опрашиваются не чаще раза в 10 с, готовый дубль скачивается в `files/<fileId>.mp4` и получает `url`.
+- `POST …/video/<jobId>/utverdit` — утвердить дубль (только `succeeded`); кадр получает `videoTake`.
+- Ключ BytePlus: `ARK_API_KEY` или `~/.config/neyra-studio/ark-key` (деплой копирует из `welluma-art/.env`).

@@ -96,3 +96,18 @@
   .work-grid{display:block!important}.work-main{padding:0!important;max-width:none!important}
   .print-grid{grid-template-columns:repeat(3,1fr)}
 }
+/* Production: папки сцен, дубли */
+.prod-list{display:grid;gap:12px}
+.prod-shot{display:grid;grid-template-columns:240px 1fr;gap:14px;background:var(--surface,#212121);border-radius:16px;padding:10px}
+.prod-thumb{aspect-ratio:16/9;background:var(--surface2);border-radius:10px;overflow:hidden}
+.prod-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.prod-body{display:grid;gap:8px;align-content:start}
+.prod-body p{margin:0;color:var(--muted);font-size:14px}
+.takes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.take{background:var(--surface2);border-radius:10px;overflow:hidden}
+.take.approved{outline:2px solid var(--text)}
+.take video{width:100%;aspect-ratio:16/9;display:block;background:#000}
+.take-wait{aspect-ratio:16/9;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.take-meta{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;font-size:12px;color:var(--muted)}
+@media (max-width:768px){.prod-shot{grid-template-columns:1fr}}
+.prod-body>.btn,.kadr-body .kadr-actions .btn{justify-self:start;width:auto}

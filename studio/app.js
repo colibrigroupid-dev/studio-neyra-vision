@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014d';
-import { frameAt, totalDuration } from './timeline.js?v=20261014d';
-import { StudioServer } from './storage.js?v=20261014d';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014d';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014d';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014d';
-import { renderGeroyWorkshop } from './geroy.js?v=20261014d';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014d';
-import { parseCommand, describeCommand } from './golos.js?v=20261014d';
-import { svgPaths as ikonki } from './ikonki.js?v=20261014d';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014e';
+import { frameAt, totalDuration } from './timeline.js?v=20261014e';
+import { StudioServer } from './storage.js?v=20261014e';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014e';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014e';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014e';
+import { renderGeroyWorkshop } from './geroy.js?v=20261014e';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014e';
+import { parseCommand, describeCommand } from './golos.js?v=20261014e';
+import { svgPaths as ikonki } from './ikonki.js?v=20261014e';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -383,11 +383,43 @@ function directorPage() {
   const printBtn = serverClient && tab === 'storyboard' ? `<a class='btn small' href='#/studio/director/pechat'>${icon('download')}${t('PDF для съёмки', 'Түсірілімге PDF')}</a>` : '';
   return `${appBar('director', 'Neyra Director · ' + t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар'), printBtn + tabs)}${body}`;
 }
+// Production (ТЗ Ара п.6, установка Александра 13.10 12:53): утверждённые кадры → «В видео» → дубли папками по сценам.
+const videoState = { slug: '', jobs: null, loading: false, at: 0 };
+async function loadVideoJobs(force = false) {
+  if (!serverClient || !project()) return;
+  if (videoState.loading || (!force && videoState.slug === state.activeId && Date.now() - videoState.at < 15000)) return;
+  videoState.loading = true;
+  try { const r = await serverClient.request('GET', `/api/projects/${encodeURIComponent(state.activeId)}/video`); videoState.jobs = r?.data || []; videoState.slug = state.activeId; }
+  catch { videoState.jobs = videoState.jobs || []; }
+  finally { videoState.at = Date.now(); videoState.loading = false; if (route() === 'production') render(); }
+}
+const videoStateName = st => ({ queued: t('в очереди', 'кезекте'), running: t('снимается…', 'түсірілуде…'), succeeded: t('готово', 'дайын'), failed: t('не получилось', 'болмады'), cancelled: t('отменено', 'тоқтатылды') })[st] || st;
+function videoBoard() {
+  const p = project();
+  if (videoState.slug !== state.activeId || videoState.jobs == null) { void loadVideoJobs(true); return `<p class='geroy-note'>${t('Загружаю дубли…', 'Дубльдер жүктелуде…')}</p>`; }
+  const jobs = videoState.jobs || [];
+  if (jobs.some(j => ['queued', 'running'].includes(j.state))) setTimeout(() => { if (route() === 'production') void loadVideoJobs(true); }, 15000);
+  const scenes = (p.scenes || []).filter(sc => !sc.deletedAt && sc.n != null).sort((a, b) => a.n - b.n);
+  const folders = scenes.map(sc => {
+    const shots = (p.shots || []).filter(sh => sh.sceneId === sc.id && sh.status === 'approved');
+    if (!shots.length) return '';
+    const items = shots.map(sh => {
+      const mine = jobs.filter(j => j.shotId === sh.id);
+      const dur = Math.max(4, Math.min(15, Math.round(sh.duration || 5)));
+      const price = Math.ceil(dur * 0.231 * 1.1 / 0.01);
+      const takes = mine.map(j => `<div class='take ${j.approved ? 'approved' : ''}'>${j.url ? `<video src='${e(j.url)}' controls preload='metadata' playsinline></video>` : `<div class='take-wait'>${e(videoStateName(j.state))}${j.error ? ` · ${e(j.error)}` : ''}</div>`}<div class='take-meta'><span>${e(videoStateName(j.state))} · ${e(String(j.duration || dur))} ${t('с', 'с')}</span>${j.state === 'succeeded' && !j.approved && canOpen(['animatic', 'post']) ? `<button type='button' class='btn small primary' data-take-utverdit='${e(j.id)}'>${t('Утвердить дубль', 'Дубльді бекіту')}</button>` : j.approved ? `<b>${t('утверждён', 'бекітілді')}</b>` : ''}</div></div>`).join('');
+      return `<article class='prod-shot'><div class='prod-thumb'>${sh.kartinka ? `<img src='${e(sh.kartinka)}' alt='' loading='lazy'>` : ''}</div><div class='prod-body'><div class='kadr-head'><b>${e(local(sh.title))}</b><small>${dur} ${t('с', 'с')} · 720p</small></div><p>${e(local(sh.description))}</p>${canOpen(['animatic', 'post']) ? `<button type='button' class='btn small' data-video-shot='${e(sh.id)}' data-dur='${dur}' data-price='${price}'>${mine.length ? t('Ещё дубль', 'Тағы дубль') : t('В видео', 'Бейнеге')} · ${price}</button>` : ''}${takes ? `<div class='takes'>${takes}</div>` : ''}</div></article>`;
+    }).join('');
+    return `<section class='kadry-scene'><header class='kadry-scene-head'><div><small class='mono'>${e(String(sc.n))}</small> <b>${e(local(sc.title) || sc.title || '')}</b></div><span class='badge'>${t('папка сцены', 'көрініс қалтасы')}</span></header><div class='prod-list'>${items}</div></section>`;
+  }).join('');
+  return folders || `<div class='empty'><h2>${t('Пока нечего снимать.', 'Әзірге түсіретін ештеңе жоқ.')}</h2><p>${t('Утвердите кадры в Director — они появятся здесь по папкам сцен с ценой видео.', 'Director-де кадрларды бекітіңіз.')}</p><a class='btn primary' href='#/studio/director/cex'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`;
+}
 function productionPage() {
+  if (serverClient && depApp() === 'production') return `${appBar('production', 'Neyra Production · ' + t('видео по утверждённым кадрам', 'бекітілген кадрлар бойынша бейне'))}${videoBoard()}`;
   const p = project();
   const approved = p.shots.filter(s => s.status === 'approved');
   const total = p.shots.length;
-  return `${depApp() ? appBar('production', 'Neyra Production · ' + t('видео', 'бейне')) : `<div class='dep-head'><div class='dep-kicker'>Neyra Production · ${t('видео', 'бейне')}</div></div>`}${pageHeading(t('Видео', 'Бейне'), t('Генерация идёт только по утверждённым кадрам Director: описание действия, камера, образы героев и локаций из Art. Перед запуском вы видите объём и цену.', 'Генерация тек Director бекіткен кадрлар бойынша жүреді.'))}<div class='sheet'><div class='row'><span>${t('Кадров в проекте', 'Жобадағы кадрлар')}</span><b>${e(String(total))}</b></div><div class='row'><span>${t('Утверждено для видео', 'Бейнеге бекітілген')}</span><b>${e(String(approved.length))}</b></div><div class='row'><span>${t('Движок', 'Қозғалтқыш')}</span><b>${t('технология NEYRA · 5 с 720p ≈ 128 токенов', 'NEYRA технологиясы · 5 с 720p ≈ 128 токен')}</b></div></div>${approved.length ? `<div class='post-list'>${approved.map(sh => `<div class='post-task'><label>${e(local(sh.title))}<p>${e(String(sh.duration || 5))} ${t('с', 'с')} · ${t('ждёт вашего «да» на запуск', 'іске қосуға «иә» күтеді')}</p></label></div>`).join('')}</div>` : `<div class='empty'><h2>${t('Пока нечего генерировать.', 'Әзірге генерациялайтын ештеңе жоқ.')}</h2><p>${t('Утвердите последовательность кадров в Director — они появятся здесь списком с ценой.', 'Director-де кадрлар тізбегін бекітіңіз — олар мұнда бағасымен пайда болады.')}</p><a class='btn primary' href='#/studio/director'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`}`;
+  return `${depApp() ? appBar('production', 'Neyra Production · ' + t('видео', 'бейне')) : `<div class='dep-head'><div class='dep-kicker'>Neyra Production · ${t('видео', 'бейне')}</div></div>`}${pageHeading(t('Видео', 'Бейне'), t('Генерация идёт только по утверждённым кадрам Director: описание действия, камера, образы героев и локаций из Art. Перед запуском вы видите объём и цену.', 'Генерация тек Director бекіткен кадрлар бойынша жүреді.'), openBtn('production', t('Открыть Production', 'Production ашу'), canOpen(['animatic', 'post'])))}<div class='sheet'><div class='row'><span>${t('Кадров в проекте', 'Жобадағы кадрлар')}</span><b>${e(String(total))}</b></div><div class='row'><span>${t('Утверждено для видео', 'Бейнеге бекітілген')}</span><b>${e(String(approved.length))}</b></div><div class='row'><span>${t('Движок', 'Қозғалтқыш')}</span><b>${t('технология NEYRA · 5 с 720p ≈ 128 токенов', 'NEYRA технологиясы · 5 с 720p ≈ 128 токен')}</b></div></div>${approved.length ? `<div class='post-list'>${approved.map(sh => `<div class='post-task'><label>${e(local(sh.title))}<p>${e(String(sh.duration || 5))} ${t('с', 'с')} · ${t('ждёт вашего «да» на запуск', 'іске қосуға «иә» күтеді')}</p></label></div>`).join('')}</div>` : `<div class='empty'><h2>${t('Пока нечего генерировать.', 'Әзірге генерациялайтын ештеңе жоқ.')}</h2><p>${t('Утвердите последовательность кадров в Director — они появятся здесь списком с ценой.', 'Director-де кадрлар тізбегін бекітіңіз — олар мұнда бағасымен пайда болады.')}</p><a class='btn primary' href='#/studio/director'>${t('К раскадровке', 'Кадрлық жоспарға')}${icon('arrow')}</a></div>`}`;
 }
 function writerSummary() {
   // Установка Александра 13.10 13:00: в окне — только итог по сценарию; работа — в Сценарной (Writer) на весь экран.
@@ -1087,6 +1119,22 @@ app.addEventListener('click', async event => {
   if (udal) { await runOperation(() => obrazAction('DELETE', `/obrazy/${encodeURIComponent(udal.dataset.obrazUdalit)}`, t('Вариант убран.', 'Нұсқа алынды.'))); return; }
   const pravka = event.target.closest('[data-obraz-pravka]');
   if (pravka) { pravkaDialog(pravka.dataset.obrazPravka, pravka.dataset.rakurs); return; }
+  const videoShot = event.target.closest('[data-video-shot]');
+  if (videoShot) {
+    const sec = videoShot.dataset.dur, price = videoShot.dataset.price;
+    if (!confirm(t(`Снять видео ${sec} с, 720p, со звуком без музыки? Спишется около ${price} токенов.`, `${sec} с бейне түсіру керек пе? Шамамен ${price} токен алынады.`))) return;
+    await runOperation(async () => {
+      try {
+        const r = await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/shots/${encodeURIComponent(videoShot.dataset.videoShot)}/video`, { duration: Number(sec) }, { revision: serverClient.known.get(state.activeId)?._revision });
+        const d = r?.data || {}; if (d.tokeny) { meState.tokeny = d.tokeny; }
+        toast(t('Видео в работе. Обычно 1–3 минуты, обновлю сам.', 'Бейне түсірілуде. Әдетте 1–3 минут.'));
+      } catch (error) { toast(error?.status === 402 ? t('Токенов не хватает. Откройте «Токены и пополнение» в меню.', 'Токен жетпейді.') : error?.status === 503 ? t('Видео ещё не подключено на сервере.', 'Бейне әлі қосылмаған.') : (error?.message || t('Не получилось запустить видео.', 'Бейнені іске қосу мүмкін болмады.'))); }
+      serverClient.known.delete(state.activeId); await loadVideoJobs(true);
+    });
+    return;
+  }
+  const takeOk = event.target.closest('[data-take-utverdit]');
+  if (takeOk) { await runOperation(async () => { try { await serverClient.request('POST', `/api/projects/${encodeURIComponent(state.activeId)}/video/${encodeURIComponent(takeOk.dataset.takeUtverdit)}/utverdit`, {}, { revision: serverClient.known.get(state.activeId)?._revision }); toast(t('Дубль утверждён.', 'Дубль бекітілді.')); } catch (error) { toast(error?.message || t('Не получилось.', 'Болмады.')); } serverClient.known.delete(state.activeId); await loadVideoJobs(true); }); return; }
   const kadryScene = event.target.closest('[data-kadry-scene]');
   if (kadryScene) {
     if (kadryScene.dataset.has && !confirm(t('Разложить сцену заново? Текущие кадры этой сцены заменятся.', 'Көріністі қайта бөлу керек пе? Қазіргі кадрлар ауыстырылады.'))) return;

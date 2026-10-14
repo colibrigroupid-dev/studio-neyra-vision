@@ -24,6 +24,13 @@ if [ -f "$MODELKEY" ]; then ssh -o BatchMode=yes "$HOST" 'mkdir -p /root/.config
 # ключ Google для картинок (блок kartinki): ~/.config/nano-banana/key → /root/.config/neyra-studio/google-key
 GKEY="$HOME/.config/nano-banana/key"
 if [ -f "$GKEY" ]; then ssh -o BatchMode=yes "$HOST" 'mkdir -p /root/.config/neyra-studio'; scp -q "$GKEY" "$HOST:/root/.config/neyra-studio/google-key"; ssh -o BatchMode=yes "$HOST" 'chmod 600 /root/.config/neyra-studio/google-key'; echo "ключ Google для картинок скопирован"; else echo "ключа Google нет (~/.config/nano-banana/key) — картинки ответят 503"; fi
+# ключ BytePlus для видео (блок video): ARK_API_KEY из ~/Documents/CODE/welluma-art/.env → /root/.config/neyra-studio/ark-key
+ARKENV="$HOME/Documents/CODE/welluma-art/.env"
+ARK=$( [ -f "$ARKENV" ] && grep -m1 '^ARK_API_KEY' "$ARKENV" | cut -d= -f2- | tr -d "\"' " )
+if [ -n "$ARK" ]; then ssh -o BatchMode=yes "$HOST" 'mkdir -p /root/.config/neyra-studio; umask 077; cat > /root/.config/neyra-studio/ark-key' <<ARKEOF
+$ARK
+ARKEOF
+echo "ключ BytePlus для видео скопирован"; else echo "ключа BytePlus нет — видео ответит 503"; fi
 # тарифы и способы оплаты (№60): если лежат на маке — уезжают на сервер
 for F in tarify.json oplata.json; do if [ -f "$HOME/.config/neyra-studio/$F" ]; then ssh -o BatchMode=yes "$HOST" 'mkdir -p /root/.config/neyra-studio'; scp -q "$HOME/.config/neyra-studio/$F" "$HOST:/root/.config/neyra-studio/$F"; echo "$F скопирован"; fi; done
 ssh -o BatchMode=yes "$HOST" 'chmod 600 /opt/neyra-studio/keys.json
@@ -32,6 +39,7 @@ cat > /etc/systemd/system/neyra-studio.service <<UNIT
 Description=Neyra Studio — сервер хранения проектов (studio.neyra.vision)
 After=network.target
 [Service]
+Environment=NEYRA_PUBLIC_URL=https://api.studio.neyra.vision
 ExecStart=/usr/bin/python3 /opt/neyra-studio/server/app.py --host 127.0.0.1 --port 8770 --data-dir /opt/neyra-studio/data --keys-file /opt/neyra-studio/keys.json
 WorkingDirectory=/opt/neyra-studio
 Restart=always
