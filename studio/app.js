@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014a';
-import { frameAt, totalDuration } from './timeline.js?v=20261014a';
-import { StudioServer } from './storage.js?v=20261014a';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014a';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014a';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014a';
-import { renderGeroyWorkshop } from './geroy.js?v=20261014a';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014a';
-import { parseCommand, describeCommand } from './golos.js?v=20261014a';
-import { svgPaths as ikonki } from './ikonki.js?v=20261014a';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014c';
+import { frameAt, totalDuration } from './timeline.js?v=20261014c';
+import { StudioServer } from './storage.js?v=20261014c';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014c';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014c';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014c';
+import { renderGeroyWorkshop } from './geroy.js?v=20261014c';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014c';
+import { parseCommand, describeCommand } from './golos.js?v=20261014c';
+import { svgPaths as ikonki } from './ikonki.js?v=20261014c';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -270,8 +270,9 @@ function go(page) { const hash = `#/studio/${page}`; if (location.hash === hash)
 function route() { return location.hash.startsWith('#/studio/') ? location.hash.split('/')[2] || 'overview' : 'home'; }
 const depApp = () => /^#\/studio\/(art|director|production)\/cex\/?$/.exec(location.hash)?.[1] || '';
 const appRoutes = ['heroes', 'locations', 'breakdown', 'storyboard', 'shots', 'animatic'];
+const passportCollection = () => /^#\/studio\/locations\//.test(location.hash) ? 'locations' : 'characters';
 function heroRouteId() {
-  const match = /^#\/studio\/heroes\/([^/]+)\/?$/.exec(location.hash);
+  const match = /^#\/studio\/(?:heroes|locations)\/([^/]+)\/?$/.exec(location.hash);
   if (!match) return '';
   try { return decodeURIComponent(match[1]); } catch { return match[1]; }
 }
@@ -576,10 +577,11 @@ function ensureCinemaState() {
 }
 function geroyPage() {
   ensureCinemaState();
-  return renderGeroyWorkshop({ record: cinemaState.snapshot?.characters?.find(item => item.id === heroRouteId()), t,
+  const coll = passportCollection();
+  return renderGeroyWorkshop({ record: cinemaState.snapshot?.[coll]?.find(item => item.id === heroRouteId()), t, collection: coll,
     locale: state.locale, mode: paperMode(), connected: Boolean(serverClient),
     loading: cinemaState.loading || Boolean(serverClient && !cinemaState.ready && !cinemaState.error), error: cinemaState.error,
-    canEdit: cinemaState.ready && !cinemaState.loading && !cinemaState.error && canWriteBreakdownSection(project(), 'heroes') });
+    canEdit: cinemaState.ready && !cinemaState.loading && !cinemaState.error && canWriteBreakdownSection(project(), coll === 'locations' ? 'locations' : 'heroes') });
 }
 function cinemaPage(section) {
   ensureCinemaState();
@@ -615,8 +617,9 @@ async function refreshCinema() {
     let snapshot, record, isolated;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if (passportId) {
-        const result = await new BreakdownApi(client).loadPassport(slug, 'characters', passportId);
-        snapshot = { characters: [result.passport], denied: [], principal: result.principal, revision: result.revision };
+        const coll = passportCollection();
+        const result = await new BreakdownApi(client).loadPassport(slug, coll, passportId);
+        snapshot = { characters: [], locations: [], [coll]: [result.passport], denied: [], principal: result.principal, revision: result.revision };
       } else snapshot = await new BreakdownApi(client).load(slug);
       if (!current()) return false;
       record = state.projects[slug];
@@ -652,7 +655,7 @@ async function passportDialog(collection, id) {
   const section = collection === 'characters' ? 'heroes' : collection === 'locations' ? 'locations' : '';
   const hash = location.hash;
   if (!serverClient || !section || route() !== section || !canWriteBreakdownSection(project(), section)) return;
-  if (heroRouteId() && (collection !== 'characters' || heroRouteId() !== id)) return;
+  if (heroRouteId() && (collection !== passportCollection() || heroRouteId() !== id)) return;
   if (!await refreshCinema() || !canWriteBreakdownSection(project(), section) || location.hash !== hash) return;
   const record = cinemaState.snapshot?.[collection]?.find(item => item.id === id);
   if (!record) return;
@@ -750,8 +753,8 @@ async function submitBreakdownImport(data) {
 }
 function workspace(page) {
   const p = project();
-  const cex = (page === 'heroes' && Boolean(heroRouteId())) || Boolean(depApp()) || appRoutes.includes(page);
-  const pages = { overview, map: productionMapPage, art: artPage, heroes: () => heroRouteId() ? geroyPage() : artPage(), locations: artPage, breakdown: artPage, script: scriptPage, director: directorPage, storyboard: directorPage, animatic: directorPage, shots: directorPage, production: productionPage, team: teamPage, post: postPage };
+  const cex = (['heroes', 'locations'].includes(page) && Boolean(heroRouteId())) || Boolean(depApp()) || appRoutes.includes(page);
+  const pages = { overview, map: productionMapPage, art: artPage, heroes: () => heroRouteId() ? geroyPage() : artPage(), locations: () => heroRouteId() ? geroyPage() : artPage(), breakdown: artPage, script: scriptPage, director: directorPage, storyboard: directorPage, animatic: directorPage, shots: directorPage, production: productionPage, team: teamPage, post: postPage };
   if (!pages[page]) page = 'overview';
   const section = ['map', 'heroes', 'locations', 'art', 'breakdown'].includes(page) ? 'overview' : ['storyboard', 'shots', 'animatic', 'director'].includes(page) ? 'shots' : page === 'production' ? 'animatic' : page === 'team' ? 'team' : page === 'script' ? 'script' : page;
   const denied = !cinemaPages.includes(page) && page !== 'art' && p?._denied?.includes(section);
@@ -939,7 +942,7 @@ function persistPreferences() {
 }
 function passportBase() {
   const id = heroRouteId(); if (!serverClient || !project() || !id) return '';
-  return `/api/projects/${encodeURIComponent(state.activeId)}/characters/${encodeURIComponent(id)}`;
+  return `/api/projects/${encodeURIComponent(state.activeId)}/${passportCollection()}/${encodeURIComponent(id)}`;
 }
 async function obrazAction(method, tail, okText, body = {}) {
   const base = passportBase(); if (!base) return;
@@ -1088,7 +1091,7 @@ app.addEventListener('click', async event => {
   const kadrFix = event.target.closest('[data-kadr-pravka]');
   if (kadrFix) { openDialog(`${dialogHead(t('Правка кадра словами', 'Кадрды сөзбен түзету'), t('Скажите, что изменить: ракурс, свет, позу. Герои и место останутся теми же.', 'Не өзгерту керектігін айтыңыз.'))}<form id='kadr-pravka-form' data-shot='${e(kadrFix.dataset.kadrPravka)}' data-base='${e(kadrFix.dataset.base)}'><label for='kadr-pravka-text'>${t('Что изменить', 'Не өзгерту керек')}</label><input id='kadr-pravka-text' name='pravka' required maxlength='1000' placeholder='${t('ниже ракурс, тёплый свет от очага', 'төменірек ракурс')}'>${dialogActions(t('Нарисовать вариант', 'Нұсқа салу'))}</form>`); return; }
   const depTab = event.target.closest('[data-dep-tab]');
-  if (depTab) { const id = depTab.dataset.depTab; const art = ['heroes', 'locations', 'breakdown'].includes(id); if (art) { artTab = id; try { localStorage.setItem('nv-art-tab', id); } catch { /* optional */ } } else { directorTab = id; try { localStorage.setItem('nv-director-tab', id); } catch { /* optional */ } } go(art ? 'art' : 'director'); if (art) void refreshCinema(); return; }
+  if (depTab) { const id = depTab.dataset.depTab; const art = ['heroes', 'locations', 'breakdown'].includes(id); if (art) { artTab = id; try { localStorage.setItem('nv-art-tab', id); } catch { /* optional */ } } else { directorTab = id; try { localStorage.setItem('nv-director-tab', id); } catch { /* optional */ } } go(art ? 'art/cex' : 'director/cex'); if (art) void refreshCinema(); return; }
   const helperToggle = event.target.closest('[data-helper-toggle]');
   if (helperToggle) { helperOpen = !helperOpen; try { localStorage.setItem('nv-helper-open', helperOpen ? '1' : '0'); } catch { /* optional */ } render(); if (helperOpen) document.querySelector('#voice-input')?.focus(); return; }
   const lang = event.target.closest('[data-lang]');
@@ -1129,8 +1132,10 @@ app.addEventListener('click', async event => {
     await runOperation(() => narisovat(control.dataset.rakurs));
   }
   else if (action === 'fill-hero-passport') {
-    const record = cinemaState.snapshot?.characters?.find(item => item.id === heroRouteId());
-    if (record && cinemaState.ready && !cinemaState.loading && !cinemaState.error && !assistantPending) {
+    const coll = passportCollection(); const record = cinemaState.snapshot?.[coll]?.find(item => item.id === heroRouteId());
+    if (record && coll === 'locations' && cinemaState.ready && !cinemaState.loading && !cinemaState.error && !assistantPending) {
+      await askAssistant(`Составь паспорт локации ${record.name} по сценарию: что это за место в истории, как выглядит (пространство, свет, фактуры, время года), что важно сохранить в каждом кадре, табу. Ответь коротко по пунктам`);
+    } else if (record && cinemaState.ready && !cinemaState.loading && !cinemaState.error && !assistantPending) {
       await askAssistant(`Составь паспорт героя ${record.name} по сценарию: роль, характер, внешность (лицо, волосы, телосложение, одежда), табу. Ответь коротко по пунктам`, 'heroes');
     }
   }
