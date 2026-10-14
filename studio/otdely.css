@@ -71,3 +71,28 @@
 .kadr-variant.approved{outline:2px solid var(--text)}
 .kadr-variant img{width:96px;height:54px;object-fit:cover;display:block}
 @media (max-width:768px){.kadry-grid{grid-template-columns:1fr}}
+/* Печать раскадровки (ТЗ Ара п.5) */
+.print-board{max-width:1100px;margin:0 auto}
+.print-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}
+.print-head h1{margin:0;font-size:28px}
+.print-head p{margin:4px 0 0;color:var(--muted)}
+.print-scene{margin:0 0 24px;break-inside:avoid-page}
+.print-scene h2{font-size:18px;margin:0 0 4px}
+.print-ton{margin:0 0 10px;color:var(--muted);font-size:13px}
+.print-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.print-shot{break-inside:avoid;display:grid;gap:4px;font-size:12px}
+.print-frame{aspect-ratio:16/9;background:var(--surface2);border:1px solid var(--line)}
+.print-frame img{width:100%;height:100%;object-fit:cover;display:block}
+.print-meta{display:flex;justify-content:space-between;gap:6px}
+.print-meta span{color:var(--muted)}
+.print-shot p{margin:0}
+.print-dialogue{font-style:italic}
+.print-notes{border-top:1px solid var(--line);margin-top:4px;padding-top:2px;min-height:28px;color:var(--dim)}
+@media print{
+  @page{size:A4 landscape;margin:12mm}
+  :root{--bg:#fff;--text:#000;--muted:#333;--dim:#555;--line:#999;--surface2:#eee}
+  body,.workspace,.work-main{background:#fff!important;color:#000!important}
+  .work-header,.sidebar,.tabbar,.helper-stub,.no-print,.dep-head,.slate,.storage-error{display:none!important}
+  .work-grid{display:block!important}.work-main{padding:0!important;max-width:none!important}
+  .print-grid{grid-template-columns:repeat(3,1fr)}
+}

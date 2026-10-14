@@ -1,13 +1,13 @@
-import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014c';
-import { frameAt, totalDuration } from './timeline.js?v=20261014c';
-import { StudioServer } from './storage.js?v=20261014c';
-import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014c';
-import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014c';
-import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014c';
-import { renderGeroyWorkshop } from './geroy.js?v=20261014c';
-import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014c';
-import { parseCommand, describeCommand } from './golos.js?v=20261014c';
-import { svgPaths as ikonki } from './ikonki.js?v=20261014c';
+import { makeDemo, DEFAULT_SERVER_URL } from './data.js?v=20261014d';
+import { frameAt, totalDuration } from './timeline.js?v=20261014d';
+import { StudioServer } from './storage.js?v=20261014d';
+import { ProductionMapApi, canApproveCell } from './production-map-api.js?v=20261014d';
+import { BreakdownApi, canWriteBreakdownSection } from './breakdown-api.js?v=20261014d';
+import { renderBreakdownSection, renderPassportEditor } from './breakdown.js?v=20261014d';
+import { renderGeroyWorkshop } from './geroy.js?v=20261014d';
+import { renderProductionMap, renderProductionCell, productionObjectLabel, productionStageName } from './production-map.js?v=20261014d';
+import { parseCommand, describeCommand } from './golos.js?v=20261014d';
+import { svgPaths as ikonki } from './ikonki.js?v=20261014d';
 
 const storeKey = 'neyra-vision-prototype-v1';
 const fresh = () => ({ locale: 'ru', scriptLang: 'ru', activeId: 'demo', projects: { demo: makeDemo() } });
@@ -268,7 +268,8 @@ function download(name, value, type = 'text/plain;charset=utf-8') { const url = 
 function demoOpen() { if (!serverClient && state.projects.demo) state.activeId = 'demo'; go('overview'); }
 function go(page) { const hash = `#/studio/${page}`; if (location.hash === hash) render(); else location.hash = hash; }
 function route() { return location.hash.startsWith('#/studio/') ? location.hash.split('/')[2] || 'overview' : 'home'; }
-const depApp = () => /^#\/studio\/(art|director|production)\/cex\/?$/.exec(location.hash)?.[1] || '';
+const depApp = () => /^#\/studio\/(art|director|production)\/(?:cex|pechat)\/?$/.exec(location.hash)?.[1] || '';
+const printRoute = () => /^#\/studio\/director\/pechat\/?$/.test(location.hash);
 const appRoutes = ['heroes', 'locations', 'breakdown', 'storyboard', 'shots', 'animatic'];
 const passportCollection = () => /^#\/studio\/locations\//.test(location.hash) ? 'locations' : 'characters';
 function heroRouteId() {
@@ -338,6 +339,17 @@ function directorBoard() {
     return `<section class='kadry-scene'>${head}${shots.length ? `<div class='kadry-grid'>${shots.map(card).join('')}</div>` : `<p class='geroy-note'>${t('Помощник прочитает сцену и предложит кадры: крупность, камера, длительность, реплика.', 'Көмекші көріністі оқып, кадрларды ұсынады.')}</p>`}</section>`;
   }).join('');
 }
+function printBoard() {
+  // ТЗ Ара п.5: раскадровка для традиционной съёмки — PDF через печать браузера, без генерации видео.
+  const p = project();
+  const scenes = (p.scenes || []).filter(sc => !sc.deletedAt && sc.n != null).sort((a, b) => a.n - b.n);
+  const rows = scenes.map(sc => {
+    const shots = (p.shots || []).filter(sh => sh.sceneId === sc.id);
+    if (!shots.length) return '';
+    return `<section class='print-scene'><h2>${e(String(sc.n))}. ${e(local(sc.title) || sc.title || '')}</h2>${sc.ton ? `<p class='print-ton'>${t('Тон', 'Реңк')}: ${e(sc.ton)}${sc.vizual ? ` · ${t('визуал', 'визуал')}: ${e(sc.vizual)}` : ''}</p>` : ''}<div class='print-grid'>${shots.map(sh => `<article class='print-shot'><div class='print-frame'>${sh.kartinka ? `<img src='${e(sh.kartinka)}' alt=''>` : ''}</div><div class='print-meta'><b>${e(local(sh.title))}</b><span>${e(sh.lens || '')}${sh.movement ? ` · ${e(local(sh.movement))}` : ''}${sh.duration ? ` · ${e(String(sh.duration))} ${t('с', 'с')}` : ''}</span></div><p>${e(local(sh.description))}</p>${sh.dialogue ? `<p class='print-dialogue'>${e(sh.dialogue)}</p>` : ''}<div class='print-notes'>${t('Заметки', 'Ескертпелер')}:</div></article>`).join('')}</div></section>`;
+  }).join('');
+  return `<div class='print-board'><div class='print-head'><div><h1>${e(local(p.title))}</h1><p>${t('Раскадровка', 'Кадрлық жоспар')} · v${e(String(p.version ?? 0))} · ${e(new Date().toLocaleDateString(state.locale === 'kk' ? 'kk-KZ' : 'ru-RU'))}</p></div><div class='row no-print'><a class='btn' href='#/studio/director/cex'>${t('← Назад', '← Артқа')}</a><button type='button' class='btn primary' data-action='print'>${t('Печать / PDF', 'Басып шығару / PDF')}</button></div></div>${rows || `<p>${t('Кадров пока нет: разложите сцены в Director.', 'Кадрлар әзірге жоқ.')}</p>`}</div>`;
+}
 async function reloadProject() {
   const slug = state.activeId; serverClient.known.delete(slug);
   try { state.projects[slug] = await serverClient.loadProject(slug); } catch (error) { toast(error?.message || t('Не удалось обновить проект.', 'Жобаны жаңарту мүмкін болмады.')); }
@@ -363,11 +375,13 @@ function directorSummary() {
   return `<div class='dep-head'><div class='dep-kicker'>Neyra Director · ${t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар')}</div></div>${pageHeading(t('Раскадровка', 'Кадрлық жоспар'), t('Итог по кадрам. Собирать кадры, ставить камеру и утверждать — в приложении Director.', 'Кадрлар бойынша қорытынды. Жинау мен бекіту — Director қосымшасында.'), openBtn('director', t('Открыть Director', 'Director ашу'), canOpen(['shots', 'storyboard'])))}<div class='sheet'>${row(t('Кадров', 'Кадр'), shots.length)}${row(t('Утверждено', 'Бекітілді'), approved)}${row(t('Требуют проверки после правки сценария', 'Сценарий түзетілгеннен кейін тексеру керек'), review)}</div>`;
 }
 function directorPage() {
+  if (printRoute()) return printBoard();
   if (!depApp() && !appRoutes.includes(route())) return directorSummary();
   const tab = directorRoute();
   const tabs = segmented(t('Режиссёр', 'Режиссер'), [['storyboard', t('Раскадровка', 'Кадрлық жоспар')], ['shots', t('Кадры', 'Кадрлар')], ['animatic', t('ИИматик', 'ЖИ-аниматик')]], tab);
   const body = tab === 'animatic' ? animaticPage() : (serverClient && tab === 'storyboard') ? directorBoard() : shotsPage(tab);
-  return `${appBar('director', 'Neyra Director · ' + t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар'), tabs)}${body}`;
+  const printBtn = serverClient && tab === 'storyboard' ? `<a class='btn small' href='#/studio/director/pechat'>${icon('download')}${t('PDF для съёмки', 'Түсірілімге PDF')}</a>` : '';
+  return `${appBar('director', 'Neyra Director · ' + t('раскадровка и кадры', 'кадрлық жоспар мен кадрлар'), printBtn + tabs)}${body}`;
 }
 function productionPage() {
   const p = project();
@@ -1117,6 +1131,7 @@ app.addEventListener('click', async event => {
   if (seek && project()) { playTime = project().shots.slice(0, Number(seek.dataset.seekShot)).reduce((n, s) => n + s.duration, 0); updatePlayer(); }
   const action = event.target.closest('[data-action]')?.dataset.action;
   const p = project();
+  if (action === 'print') { window.print(); return; }
   if (action === 'server') serverDialog();
   else if (action === 'tokeny') await runOperation(() => tokenyDialog());
   else if (action === 'refresh-map') await refreshProductionMap();
