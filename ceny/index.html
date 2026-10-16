@@ -238,7 +238,7 @@ footer a:hover{color:var(--text)}
           <div class="offers" role="radiogroup" aria-labelledby="offer-lbl">
             <label class="offer" for="o-none"><input type="radio" name="offer" id="o-none" value="none"><span><b>Без скидки</b><small>Платите по этапам и решаете после каждого.</small></span></label>
             <label class="offer" for="o-pack"><input type="radio" name="offer" id="o-pack" value="pack" checked><span><b>Под ключ — минус 10 %</b><small>Этапы 1–5 одним договором: от сценария до мастера для кинотеатра.</small></span></label>
-            <label class="offer" for="o-copro"><input type="radio" name="offer" id="o-copro" value="copro"><span><b>Сопродюсирование — минус 15 %</b><small>На этапы 2–8 в обмен на 10 % чистых поступлений продюсера от фильма. Для проектов с высокой оценкой на скрининге.</small></span></label>
+            <label class="offer" for="o-copro"><input type="radio" name="offer" id="o-copro" value="copro"><span><b>Сопродюсирование — минус 15 %</b><small>На этапы 2–8 в обмен на 10 % чистых поступлений продюсера от фильма. Для проектов с высокой оценкой на скрининге, которые мы производим.</small></span></label>
           </div>
         </div>
         <details class="more" id="more">
@@ -286,7 +286,7 @@ footer a:hover{color:var(--text)}
     </div>
     <div class="cols">
       <div class="card"><span class="mono">Под ключ</span><b class="big">−10 %</b><h3>Весь путь одним договором</h3><p>Скидка на этапы 1–5 — от скрининга до мастера для кинотеатра. Оплата всё равно по этапам.</p></div>
-      <div class="card"><span class="mono">Сопродюсирование</span><b class="big">−15 %</b><h3>Работаем как сопродюсер</h3><p>Скидка на этапы 2–8 в обмен на 10 % чистых поступлений продюсера от фильма. Срок и порядок расчётов — в договоре сопродюсирования. Предлагаем проектам, которые высоко оценены на скрининге.</p></div>
+      <div class="card"><span class="mono">Сопродюсирование</span><b class="big">−15 %</b><h3>Работаем как сопродюсер</h3><p>Скидка на этапы 2–8 в обмен на 10 % чистых поступлений продюсера от фильма. Срок и порядок расчётов — в договоре сопродюсирования. Предлагаем проектам, которые высоко оценены на скрининге и которые мы производим.</p></div>
       <div class="card"><span class="mono">Портфель</span><b class="big">−20 %</b><h3>Фондам и студиям</h3><p>От 10 сценариев на скрининге. Та же скидка — для лучших сценариев на этапах 2 и 3.</p></div>
     </div>
   </div>
@@ -430,9 +430,9 @@ footer a:hover{color:var(--text)}
     const M = st.M, ty = T();
     document.getElementById('len-out').textContent = M + ' мин';
     document.getElementById('lang-out').textContent = st.langs;
-    // «под ключ» — только когда выбраны этапы 1–5; сопродюсирование — когда выбрано что-то из этапов 2–8
+    // «под ключ» — только когда выбраны этапы 1–5; сопродюсирование — только для фильмов, которые мы производим (этап 4)
     const packOk = st.on.slice(0,5).every(Boolean);
-    const coproOk = st.on.slice(1).some(Boolean) || st.langs > 0;
+    const coproOk = st.on[3];
     document.getElementById('o-pack').disabled = !packOk;
     document.getElementById('o-copro').disabled = !coproOk;
     let offer = st.want;
