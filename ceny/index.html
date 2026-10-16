@@ -227,6 +227,13 @@ footer a:hover{color:var(--text)}
           <div class="chips" role="group" aria-label="Быстрый выбор длины" id="formats"></div>
         </div>
         <div class="field">
+          <span class="lbl" id="speed-lbl">Срок</span>
+          <div class="seg" role="group" aria-labelledby="speed-lbl" id="speeds">
+            <button type="button" data-fast="0" aria-pressed="true">Стандарт</button>
+            <button type="button" data-fast="1" aria-pressed="false">Экспресс · +20 %</button>
+          </div>
+        </div>
+        <div class="field">
           <span class="lbl" id="offer-lbl">Скидка</span>
           <div class="offers" role="radiogroup" aria-labelledby="offer-lbl">
             <label class="offer" for="o-none"><input type="radio" name="offer" id="o-none" value="none"><span><b>Без скидки</b><small>Платите по этапам и решаете после каждого.</small></span></label>
@@ -357,16 +364,16 @@ footer a:hover{color:var(--text)}
   const PACK = 0.10, COPRO = 0.15, FUND = 0.20;
   const r100 = x => Math.round(x / 100) * 100;
   // Рыночные цены в $ от длины M (минуты). Игровой фильм на 90 минутах совпадает с внутренним расчётом экономики.
-  // prod: $ за минуту продакшна; pace: минут готового фильма в месяц.
+  // prod: $ за минуту продакшна; pace: минут готового фильма в месяц в стандарте (экспресс — вдвое быстрее, +20 % к этапам 1–5).
   const TYPES = {
-    film:{l:'Игровой фильм', prod:2200, pace:20, s4:'Фотореалистичные чистовые кадры 1080p по утверждённому черновому фильму: одни и те же лица во всех сценах, синхрон губ, апскейл до 4K. Снимать актёров не обязательно.'},
-    anim:{l:'Мультфильм', prod:1600, pace:30, s4:'Анимация кинокачества 1080p по утверждённому черновому фильму: все кадры, герои и миры в одном стиле. Голоса — живые актёры озвучания.'}
+    film:{l:'Игровой фильм', prod:2200, pace:30, s4:'Фотореалистичные чистовые кадры 1080p по утверждённому черновому фильму: одни и те же лица во всех сценах, синхрон губ, апскейл до 4K. Снимать актёров не обязательно.'},
+    anim:{l:'Мультфильм', prod:1600, pace:40, s4:'Анимация кинокачества 1080p по утверждённому черновому фильму: все кадры, герои и миры в одном стиле. Голоса — живые актёры озвучания.'}
   };
   const STAGES = [
     {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и прогноз зрителя по каждой минуте, риски и рынок, отчёт с выводом. 3D-аниматик всего фильма: его можно посмотреть от начала до конца.', time:'ориентир 3–7 дней', classic:'', f:M=>r100(2750+25*M), weeks:()=>1},
     {n:2, t:'Улучшение и картинки', w:'Лечение сценария по актам вместе с автором. Герои и локации с закреплённым обликом. Фильм в картинках: кадр на каждый план.', time:'1–2 недели', classic:'', f:M=>r100(7000+55*M), weeks:()=>2},
     {n:3, t:'Черновой фильм', w:'Весь фильм в движении в черновом качестве, с монтажом и временным звуком. Видно ритм и что править до продакшна.', time:'2–3 недели', classic:'', f:M=>r100(4000+122*M), weeks:()=>3},
-    {n:4, t:'Продакшн', w:null, time:'ориентир — 20 минут фильма в месяц, мультфильма — 30', classic:'', f:(M,T)=>T.prod*M, weeks:(M,T)=>Math.ceil(M/T.pace*4.3)},
+    {n:4, t:'Продакшн', w:null, time:'ориентир: фильм — 30 минут в месяц, мультфильм — 40; экспресс — вдвое быстрее', classic:'', f:(M,T)=>T.prod*M, weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
     {n:5, t:'Звук и выпуск', w:'Музыка, шумы и эффекты, сведение 5.1, цвет, мастер 4K и DCP для кинотеатра.', time:'2–4 недели', classic:'', f:M=>r100(1450+295*M), weeks:()=>3},
     {n:6, t:'Маркетинг', w:'Три тизера, 20 вертикальных роликов, постер и презентация для прокатчиков. Можно заказать на любом этапе.', time:'1 неделя', classic:'', f:M=>r100(4000+22*M), weeks:()=>0},
     {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн по миру и героям фильма.', time:'2–3 недели', classic:'', f:()=>9000, weeks:()=>0},
@@ -374,7 +381,8 @@ footer a:hover{color:var(--text)}
   ];
   const FORMATS = [{l:'Короткий, 15',m:15},{l:'Серия, 45',m:45},{l:'Полный метр, 90',m:90},{l:'Эпос, 120',m:120}];
   // по умолчанию — «весь фильм»: этапы 1–6, без IP и языков
-  const st = {M:90, type:'film', on:[true,true,true,true,true,true,false], langs:0, offer:'pack'};
+  const EXPRESS = 0.20;
+  const st = {M:90, type:'film', on:[true,true,true,true,true,true,false], langs:0, offer:'pack', fast:false};
 
   const tenge = usd => {
     const t = usd * RATE;
@@ -407,6 +415,8 @@ footer a:hover{color:var(--text)}
 
   // скидка
   document.querySelectorAll('input[name=offer]').forEach(r => r.addEventListener('change', e => { st.offer = e.target.value; render(); }));
+  const speeds = document.getElementById('speeds');
+  speeds.addEventListener('click', e => { const b = e.target.closest('button'); if(!b) return; st.fast = b.dataset.fast === '1'; speeds.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed', String(x===b))); render(); });
 
   // этапы и языки
   const cBox = document.getElementById('checks');
@@ -425,7 +435,7 @@ footer a:hover{color:var(--text)}
     pack.disabled = !packOk;
     if (!packOk && st.offer === 'pack') { st.offer = 'none'; document.getElementById('o-none').checked = true; }
 
-    let gross = 0, disc = 0, weeks = 0, side = false; const lines = [];
+    let gross = 0, disc = 0, extra = 0, side = false; const lines = [];
     STAGES.forEach((s,i)=>{
       const one = s.f(M, ty);
       if (!s.lang) document.getElementById('cp'+i).textContent = tenge(one);
@@ -435,23 +445,36 @@ footer a:hover{color:var(--text)}
       gross += price;
       if (st.offer === 'pack' && s.n <= 5) disc += price * PACK;
       if (st.offer === 'copro' && s.n >= 2) disc += price * COPRO;
-      if (s.n <= 5) weeks += s.weeks(M, ty); else side = true;
+      if (st.fast && s.n <= 5) extra += price * EXPRESS;
+      if (s.n >= 6) side = true;
       lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t}</span><b>${tenge(price)}</b></li>`);
     });
+    if (extra > 0) lines.push(`<li><span>Экспресс, +20 % на этапы 1–5</span><b>+${tenge(extra)}</b></li>`);
     if (disc > 0) lines.push(`<li class="disc"><span>${st.offer==='pack' ? 'Скидка под ключ, 10 % на этапы 1–5' : 'Скидка сопродюсера, 15 % на этапы 2–8'}</span><b>−${tenge(disc)}</b></li>`);
-    if (side && !st.on[4]) weeks += 2;
-    const total = gross - disc;
+    // срок: картинки и черновой фильм частично идут вместе, звук и цвет — параллельно продакшну
+    const on = st.on, k = st.fast ? 2 : 1;
+    let pre = (on[0]?1:0) + (on[1]?2:0) + (on[2]?3:0);
+    if (on[1] && on[2]) pre -= 1;
+    if (st.fast && pre >= 4) pre -= 1;
+    const prod = on[3] ? STAGES[3].weeks(M, ty, k) : 0;
+    const post = on[4] ? (on[3] ? 2 : 3) : 0;
+    let weeks = pre + prod + post;
+    if (side && !on[3] && !on[4]) weeks += 2;
+    const total = gross + extra - disc;
     const allCore = st.on.slice(0,6).every(Boolean);
     document.getElementById('total-lbl').textContent = allCore ? ty.l + ' под ключ' : 'Выбранные этапы';
     document.getElementById('sum').textContent = total ? tenge(total) : '—';
     document.getElementById('sum-usd').textContent = total ? usd(total) : 'Выберите хотя бы один этап';
     document.getElementById('per-min').textContent = total ? `≈ ${tenge(total / M)} за минуту готового фильма` : '';
     document.getElementById('lines').innerHTML = lines.join('');
-    document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}` : '';
+    document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}${weeks >= 6 ? ' · ≈ ' + months(weeks) : ''}${st.fast ? ' · экспресс' : ''}` : '';
     document.getElementById('fine').textContent = 'Без НДС. Точную смету называем после скрининга, под NDA. Оплата по этапам.' + (st.offer==='copro' ? ' Доля 10 % — по отдельному договору сопродюсирования.' : '');
   }
   // «около N недель / недели»: родительный падеж
   function nedel(n){ return (n%10===1 && n%100!==11) ? 'недели' : 'недель'; }
+  function months(w){ const m = Math.round(w/4.33*2)/2; const t = m.toLocaleString('ru-RU');
+    if (m % 1) return t + ' месяца';
+    const a = m%10, b = m%100; return t + ' ' + (a===1&&b!==11 ? 'месяц' : (a>=2&&a<=4&&(b<10||b>=20) ? 'месяца' : 'месяцев')); }
 
   // фонды: 20 сценариев на скрининге, 6 — в картинки, 3 — в черновой фильм, скидка за портфель
   const F = {a:20,b:6,c:3,M:90};
