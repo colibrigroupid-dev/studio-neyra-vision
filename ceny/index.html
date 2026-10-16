@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Цены — Neyra Vision Studio</title>
+<meta name="description" content="Фильм по этапам: скрининг сценария, картинки, черновой фильм, продакшн, звук, маркетинг, IP, перевод. Цена каждого шага видна заранее. Калькулятор для вашего проекта.">
+<meta property="og:title" content="Цены — Neyra Vision Studio">
+<meta property="og:description" content="Восемь этапов от сценария до проката. Цена каждого шага видна заранее.">
+<meta property="og:image" content="https://studio.neyra.vision/v2/media/og-v2.jpg">
+<link rel="icon" href="../assets/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0b0b0b; --ink-2:#121212; --ink-3:#1b1b1b; --ink-4:#262626;
+  --line:#2a2a2a; --line-2:#3a3a3a;
+  --text:#f2f2f0; --muted:#a3a3a0; --dim:#7a7a76;
+  --disp:'Geologica',system-ui,sans-serif; --body:'Onest',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --gut:max(16px,env(safe-area-inset-left,0px));
+  --step-0:clamp(1rem,.96rem + .2vw,1.125rem);
+  --step-1:clamp(1.2rem,1.08rem + .5vw,1.5rem);
+  --step-3:clamp(1.9rem,1.4rem + 2.2vw,3.2rem);
+  --step-5:clamp(2.6rem,1.6rem + 5vw,6rem);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--ink);color:var(--text);font:400 var(--step-0)/1.6 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img{display:block;max-width:100%}
+a{color:inherit}
+::selection{background:var(--text);color:var(--ink)}
+:focus-visible{outline:2px solid var(--text);outline-offset:3px;border-radius:4px}
+.wrap{width:min(1240px,100%);margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:700px){.wrap{padding-left:max(40px,env(safe-area-inset-left,0px));padding-right:max(40px,env(safe-area-inset-right,0px))}}
+h1,h2,h3{font-family:var(--disp);font-weight:600;letter-spacing:-.03em;line-height:1.04;margin:0;text-wrap:balance}
+p{margin:0}
+.mono{font-family:var(--mono);font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.btn{display:inline-flex;align-items:center;gap:.55em;min-height:48px;padding:0 1.35em;border-radius:999px;border:1px solid transparent;font:500 1rem/1 var(--body);text-decoration:none;cursor:pointer;transition:transform .25s var(--ease),background-color .2s,border-color .2s}
+.btn:active{transform:scale(.97)}
+.btn--main{background:var(--text);color:var(--ink)}
+.btn--main:hover{background:#fff}
+.btn--ghost{background:transparent;color:var(--text);border-color:var(--line-2)}
+.btn--ghost:hover{border-color:var(--text)}
+
+/* шапка */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in oklab,var(--ink) 88%,transparent);backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px}
+.brand{display:inline-flex;align-items:center;gap:10px;min-height:44px;text-decoration:none;font:600 1rem/1 var(--disp);letter-spacing:-.02em}
+.brand img{width:34px;height:34px}
+.nav{display:flex;align-items:center;gap:clamp(10px,2vw,26px)}
+.nav a.link{font-size:.95rem;color:var(--muted);text-decoration:none;padding:10px 4px}
+.nav a.link:hover,.nav a.link[aria-current]{color:var(--text)}
+.nav .btn{min-height:42px;font-size:.95rem}
+@media (max-width:860px){.nav a.link{display:none}}
+.nav .btn{white-space:nowrap}
+@media (max-width:480px){.brand span{display:none}}
+
+/* первый экран */
+.hero{position:relative;padding:clamp(64px,10vw,140px) 0 clamp(48px,7vw,96px);overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__bg{position:absolute;inset:0;background:url("../v2/media/konnica.jpg") center/cover no-repeat;filter:grayscale(1) brightness(.42)}
+.hero__bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,11,11,.95) 0%,rgba(11,11,11,.7) 55%,rgba(11,11,11,.35) 100%)}
+.hero .wrap{position:relative}
+.hero h1{font-size:var(--step-5);font-weight:600;max-width:14ch;margin-top:16px}
+.hero h1 em{font-style:normal;font-weight:300;color:var(--muted)}
+.hero p.lead{max-width:600px;margin-top:24px;font-size:var(--step-1);line-height:1.4;color:#d7d7d3}
+.hero__cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+.facts{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:40px;color:var(--muted);font-size:.95rem}
+.facts b{color:var(--text);font-weight:500}
+
+section.block{padding:clamp(64px,9vw,120px) 0;border-bottom:1px solid var(--line)}
+.block__head{display:flex;flex-direction:column;gap:14px;margin-bottom:clamp(28px,4vw,48px);max-width:760px}
+.block__head h2{font-size:var(--step-3)}
+.block__head p{color:var(--muted);font-size:var(--step-1);line-height:1.45}
+
+/* лестница этапов */
+.stages{display:grid;border-top:1px solid var(--line)}
+.stage{display:grid;grid-template-columns:72px minmax(0,1fr) minmax(0,220px);gap:12px 28px;padding:26px 0;border-bottom:1px solid var(--line);align-items:start}
+.stage__n{font:500 1.6rem/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.stage h3{font-size:clamp(1.25rem,1.05rem + .8vw,1.75rem);letter-spacing:-.02em}
+.stage__what{color:var(--muted);margin-top:8px;max-width:62ch}
+.stage__meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:.88rem;color:var(--dim)}
+.stage__meta span b{color:var(--muted);font-weight:500}
+.stage__price{text-align:right}
+.stage__price b{display:block;font:500 clamp(1.25rem,1rem + .9vw,1.7rem)/1.1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stage__price small{display:block;color:var(--dim);font-size:.85rem;margin-top:6px}
+.stage__price .unit{color:var(--dim);font:400 .85rem/1.3 var(--body);margin-top:4px;display:block}
+@media (max-width:760px){
+  .stage{grid-template-columns:44px minmax(0,1fr)}
+  .stage__n{font-size:1.2rem}
+  .stage__price{grid-column:2;text-align:left}
+}
+.note{color:var(--dim);font-size:.9rem;margin-top:18px;max-width:80ch}
+
+/* калькулятор */
+.calc{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(24px,4vw,56px);align-items:start}
+@media (max-width:900px){.calc{grid-template-columns:1fr}}
+.panel{background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:clamp(18px,3vw,30px);display:flex;flex-direction:column;gap:22px;min-width:0}
+.field{display:flex;flex-direction:column;gap:10px}
+.field > label,.field > .lbl{font-size:.95rem;color:var(--muted)}
+.len{display:flex;align-items:center;gap:14px}
+.len input[type=range]{flex:1;min-width:0;accent-color:var(--text);height:28px}
+.len output{font:500 1.25rem/1 var(--mono);min-width:6.5ch;text-align:right;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line-2);background:transparent;color:var(--text);border-radius:999px;padding:9px 14px;font:500 .9rem/1 var(--body);cursor:pointer;min-height:40px}
+.chip[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
+.checks{display:grid;gap:2px}
+.check{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.check:last-child{border-bottom:0}
+.check input{width:20px;height:20px;accent-color:var(--text);margin:0}
+.check span{min-width:0}
+.check em{font-style:normal;font:500 .92rem/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.step-in{display:flex;align-items:center;gap:10px}
+.step-in button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--text);font:500 1.2rem/1 var(--body);cursor:pointer}
+.step-in output{font:500 1.2rem/1 var(--mono);min-width:2ch;text-align:center}
+.toggle{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.toggle input{width:20px;height:20px;accent-color:var(--text);margin-top:3px;flex:none}
+.toggle small{display:block;color:var(--dim);font-size:.85rem;margin-top:2px}
+.total{position:sticky;top:84px;background:var(--text);color:var(--ink);border-radius:18px;padding:clamp(20px,3vw,32px);display:flex;flex-direction:column;gap:16px;min-width:0}
+.total .mono{color:#55554f}
+.total__sum{font:500 clamp(2rem,1.4rem + 2.6vw,3.2rem)/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums;word-break:break-word}
+.total__usd{font:500 1.05rem/1 var(--mono);color:#55554f;margin-top:10px}
+.total ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:.92rem}
+.total li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #d6d6d0;padding-bottom:8px}
+.total li b{font:500 .92rem/1.3 var(--mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+.total__time{font-size:.95rem}
+.total .btn{background:var(--ink);color:var(--text);justify-content:center}
+.total .btn:hover{background:#222}
+.total__fine{font-size:.8rem;color:#55554f;line-height:1.45}
+
+/* фонды, условия */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px}
+.card{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card b.big{font:500 clamp(1.5rem,1.2rem + 1vw,2rem)/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.card p{color:var(--muted)}
+.terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:0 40px}
+.terms div{padding:18px 0;border-bottom:1px solid var(--line)}
+.terms h3{font-size:1.15rem;letter-spacing:-.01em}
+.terms p{color:var(--muted);margin-top:6px}
+
+.final{padding:clamp(72px,10vw,140px) 0}
+.final h2{font-size:var(--step-5);max-width:12ch}
+.final p{color:#d7d7d3;max-width:560px;margin-top:22px;font-size:var(--step-1);line-height:1.4}
+footer{padding:40px 0 calc(48px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);color:var(--dim);font-size:.9rem}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px 32px}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../v2/" aria-label="Neyra Vision Studio — на главную"><img src="../assets/znak-nv.png" width="34" height="34" alt=""><span>Neyra Vision</span></a>
+    <nav class="nav" aria-label="Разделы">
+      <a class="link" href="#etapy">Этапы</a>
+      <a class="link" href="#kalkulyator">Калькулятор</a>
+      <a class="link" href="#fondam">Фондам</a>
+      <a class="link" href="../studio/">Войти</a>
+      <a class="btn btn--main" href="https://t.me/mis_ter_bro">Прислать сценарий</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero__bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="mono">Цены · технология NEYRA · Казахстан</div>
+    <h1 id="hero-title">Ваш фильм по&nbsp;этапам. <em>Цена каждого шага — заранее.</em></h1>
+    <p class="lead">Начните с проверки сценария и остановитесь на любом этапе. Каждый этап заканчивается готовым результатом, который остаётся у вас.</p>
+    <div class="hero__cta">
+      <a class="btn btn--main" href="#kalkulyator">Посчитать мой фильм</a>
+      <a class="btn btn--ghost" href="#etapy">Смотреть этапы</a>
+    </div>
+    <div class="facts">
+      <span><b>3–7 дней</b> — 3D-аниматик всего фильма</span>
+      <span><b>Под NDA</b> — сценарий не уходит третьим лицам</span>
+      <span><b>Права</b> — у вас после оплаты</span>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="etapy" aria-labelledby="etapy-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Восемь этапов</div>
+      <h2 id="etapy-title">От сценария до проката</h2>
+      <p>Цены — для полного метра 90 минут. Для другой длины посчитайте в калькуляторе ниже.</p>
+    </div>
+    <div class="stages" id="stages"></div>
+    <p class="note">Цены без НДС, ориентир для обсуждения; точную смету называем после скрининга. Курс 1 $ = 450 ₸.</p>
+  </div>
+</section>
+
+<section class="block" id="kalkulyator" aria-labelledby="calc-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Калькулятор</div>
+      <h2 id="calc-title">Сколько будет стоить ваш проект</h2>
+      <p>Выберите длину и этапы — сумма и срок пересчитаются сразу.</p>
+    </div>
+    <div class="calc">
+      <div class="panel">
+        <div class="field">
+          <span class="lbl" id="fmt-lbl">Формат</span>
+          <div class="chips" role="group" aria-labelledby="fmt-lbl" id="formats"></div>
+        </div>
+        <div class="field">
+          <label for="len">Длина, минут</label>
+          <div class="len"><input type="range" id="len" min="3" max="150" step="1" value="90"><output id="len-out" for="len">90 мин</output></div>
+        </div>
+        <div class="field">
+          <span class="lbl">Этапы</span>
+          <div class="checks" id="checks"></div>
+        </div>
+        <div class="field">
+          <span class="lbl" id="lang-lbl">Языковые версии с синхроном губ</span>
+          <div class="step-in" role="group" aria-labelledby="lang-lbl"><button type="button" id="lang-minus" aria-label="Меньше языков">−</button><output id="lang-out">0</output><button type="button" id="lang-plus" aria-label="Больше языков">+</button></div>
+        </div>
+        <label class="toggle" for="copro"><input type="checkbox" id="copro"><span>Сопродюсирование: скидка 15 % на этапы 2–8<small>Neyra Vision входит сопродюсером с долей 10 % в доходах фильма. Только для проектов с высокой оценкой на скрининге.</small></span></label>
+      </div>
+      <aside class="total" aria-live="polite">
+        <div class="mono">Ориентир для вашего проекта</div>
+        <div><div class="total__sum" id="sum">—</div><div class="total__usd" id="sum-usd"></div></div>
+        <ul id="lines"></ul>
+        <p class="total__time" id="time"></p>
+        <a class="btn" href="https://t.me/mis_ter_bro">Прислать сценарий на скрининг</a>
+        <p class="total__fine">Без НДС. Точную смету называем после скрининга, под NDA. Оплата по этапам.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="fondam" aria-labelledby="fond-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Фондам и студиям</div>
+      <h2 id="fond-title">Проверьте весь портфель до того, как вкладывать</h2>
+      <p>Фонд отправляет все сценарии на скрининг, лучшие доводит до картинок и чернового фильма. Деньги идут в проекты, которые соберут зрителя.</p>
+    </div>
+    <div class="cols" id="fund"></div>
+  </div>
+</section>
+
+<section class="block" aria-labelledby="terms-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Условия</div>
+      <h2 id="terms-title">Как мы работаем</h2>
+    </div>
+    <div class="terms">
+      <div><h3>Оплата по этапам</h3><p>50 % до начала этапа, 50 % при сдаче. Следующий этап — только после вашего «да».</p></div>
+      <div><h3>Два раунда правок</h3><p>На каждый этап, по сводному списку от одного представителя. Брак исправляем всегда.</p></div>
+      <div><h3>Права у вас</h3><p>Все материалы и права переходят вам после оплаты этапа.</p></div>
+      <div><h3>NDA с первого файла</h3><p>Сценарий видит только команда проекта. Ваши материалы не используются для обучения моделей.</p></div>
+      <div><h3>Ваша группа на площадке</h3><p>Если снимаете сами, даём книгу стейджинга: камера, объектив, дистанция для каждого кадра.</p></div>
+      <div><h3>Режиссёр решает</h3><p>Режиссёр и оператор смотрят, комментируют и утверждают каждый кадр на общей доске.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-title">
+  <div class="wrap">
+    <h2 id="final-title">Начните со&nbsp;сценария.</h2>
+    <p>Пришлите сценарий — ответим в течение суток и назовём точную смету первого этапа.</p>
+    <div class="hero__cta">
+      <a class="btn btn--main" href="https://t.me/mis_ter_bro">Прислать сценарий</a>
+      <a class="btn btn--ghost" href="../v2/">Как работает платформа</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>Neyra Vision Studio · технология NEYRA<br>Digital Taurus Asia · Алматы, Казахстан</div>
+    <nav aria-label="Ссылки">
+      <a href="../v2/">Главная</a>
+      <a href="../studio/">Окно проекта</a>
+      <a href="https://play.neyra.vision/">Neyra Play</a>
+      <a href="https://t.me/mis_ter_bro">Telegram</a>
+      <span>alex@neyra.ai</span>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const RATE = 450;               // ₸ за $
+  const r100 = x => Math.round(x / 100) * 100;
+  // Рыночные цены в $ от длины M (минуты). На 90 минутах совпадают с внутренним расчётом.
+  const STAGES = [
+    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и прогноз зрителя по каждой минуте, риски и рынок, отчёт с выводом. 3D-аниматик всего фильма: можно посмотреть от начала до конца.', time:'3–7 дней', classic:'в классике — месяцы и отдельный превиз', f:M=>r100(2750+25*M), weeks:M=>1, on:true},
+    {n:2, t:'Улучшение и картинки', w:'Лечение сценария по актам вместе с автором. Герои и локации с закреплённым обликом. Фильм в картинках: кадр на каждый план.', time:'1–2 недели', classic:'раскадровка в классике — 9–20 млн ₸', f:M=>r100(7000+55*M), weeks:M=>2, on:true},
+    {n:3, t:'Черновой фильм', w:'Весь фильм в движении в черновом качестве, с монтажом и временным звуком. Видно ритм и что править до продакшна.', time:'2–3 недели', classic:'превиз полного метра — от 120 млн ₸', f:M=>r100(4000+122*M), weeks:M=>3, on:true},
+    {n:4, t:'Продакшн', w:'Чистовые кадры в 1080p по утверждённому черновику. Если снимаете актёров сами — переносим игру в нужный мир и масштаб.', time:'около 30 минут фильма в месяц', classic:'VFX — 4,5–13,5 млн ₸ за минуту', f:M=>3500*M, unit:'за минуту — 1,58 млн ₸ · $3 500', weeks:M=>Math.ceil(M/30*4.3), on:false},
+    {n:5, t:'Звук и выпуск', w:'Музыка, шумы и эффекты, сведение 5.1, цвет, мастер 4K и DCP для кинотеатра.', time:'2–4 недели', classic:'', f:M=>r100(1450+295*M), weeks:M=>3, on:false},
+    {n:6, t:'Маркетинг', w:'Три тизера, 20 вертикальных роликов, постер и презентация для прокатчиков. Можно заказать на любом этапе.', time:'1 неделя', classic:'в классике — 4,5–9 млн ₸', f:M=>r100(4000+22*M), weeks:M=>0, on:false},
+    {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн по миру и героям фильма.', time:'2–3 недели', classic:'', f:M=>9000, weeks:M=>0, on:false},
+    {n:8, t:'Перевод на другой язык', w:'Перевод, голоса, синхрон губ и сведение. Казахский, русский, английский и другие языки.', time:'2–3 недели на язык', classic:'дубляж без синхрона губ — около 6,75 млн ₸', f:M=>Math.max(1500,r100(111*M)), unit:'за один язык', weeks:M=>0, lang:true}
+  ];
+  const FORMATS = [{l:'Тизер, 3 мин',m:3},{l:'Короткий метр, 15 мин',m:15},{l:'Серия, 45 мин',m:45},{l:'Полный метр, 90 мин',m:90},{l:'Эпос, 120 мин',m:120}];
+  const st = {M:90, on:STAGES.map(s=>!!s.on), langs:0, copro:false};
+
+  const tenge = usd => {
+    const t = usd * RATE;
+    if (t >= 1e9) return (t/1e9).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' млрд ₸';
+    if (t >= 1e6) return (t/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' млн ₸';
+    return Math.round(t/1000).toLocaleString('ru-RU') + ' тыс ₸';
+  };
+  const usd = x => '$' + Math.round(x).toLocaleString('ru-RU');
+
+  // лестница этапов (90 минут)
+  document.getElementById('stages').innerHTML = STAGES.map(s => {
+    const p = s.f(90);
+    return `<div class="stage"><div class="stage__n">0${s.n}</div><div><h3>${s.t}</h3><p class="stage__what">${s.w}</p><div class="stage__meta"><span>Срок: <b>${s.time}</b></span>${s.classic?`<span>${s.classic}</span>`:''}</div></div><div class="stage__price"><b>${tenge(p)}</b><small>${usd(p)}</small>${s.unit?`<span class="unit">${s.unit}</span>`:''}</div></div>`;
+  }).join('');
+
+  // форматы
+  const fBox = document.getElementById('formats');
+  fBox.innerHTML = FORMATS.map((f,i)=>`<button type="button" class="chip" data-m="${f.m}" aria-pressed="${f.m===90}">${f.l}</button>`).join('');
+  fBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; setM(+b.dataset.m); });
+
+  // этапы-галочки
+  const cBox = document.getElementById('checks');
+  cBox.innerHTML = STAGES.filter(s=>!s.lang).map((s,i)=>`<label class="check" for="c${i}"><input type="checkbox" id="c${i}" ${st.on[i]?'checked':''}><span>${s.n}. ${s.t}</span><em id="cp${i}"></em></label>`).join('');
+  STAGES.forEach((s,i)=>{ if(s.lang) return; document.getElementById('c'+i).addEventListener('change',e=>{st.on[i]=e.target.checked; render();}); });
+
+  const len = document.getElementById('len');
+  len.addEventListener('input', e => setM(+e.target.value));
+  function setM(m){ st.M = m; len.value = m; fBox.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.m===m))); render(); }
+
+  document.getElementById('lang-minus').addEventListener('click',()=>{ st.langs=Math.max(0,st.langs-1); render(); });
+  document.getElementById('lang-plus').addEventListener('click',()=>{ st.langs=Math.min(10,st.langs+1); render(); });
+  document.getElementById('copro').addEventListener('change',e=>{ st.copro=e.target.checked; render(); });
+
+  function render(){
+    const M = st.M;
+    document.getElementById('len-out').textContent = M + ' мин';
+    document.getElementById('lang-out').textContent = st.langs;
+    let total = 0, weeks = 0, side = false; const lines = [];
+    STAGES.forEach((s,i)=>{
+      const base = s.lang ? s.f(M) * st.langs : s.f(M);
+      if (!s.lang) document.getElementById('cp'+i).textContent = tenge(s.f(M));
+      const on = s.lang ? st.langs > 0 : st.on[i];
+      if (!on) return;
+      const price = (st.copro && s.n >= 2) ? base * 0.85 : base;
+      total += price;
+      if (s.n <= 5) weeks += s.weeks(M); else side = true;
+      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t}</span><b>${tenge(price)}</b></li>`);
+    });
+    if (side && !st.on[4]) weeks += 2;
+    document.getElementById('sum').textContent = total ? tenge(total) : '—';
+    document.getElementById('sum-usd').textContent = total ? usd(total) + (st.copro ? ' · со скидкой сопродюсера' : '') : 'Выберите хотя бы один этап';
+    document.getElementById('lines').innerHTML = lines.join('');
+    document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}` : '';
+  }
+  // «около N недель / недели»: родительный падеж
+  function nedel(n){ return (n%10===1 && n%100!==11) ? 'недели' : 'недель'; }
+
+  // фонды: 20 сценариев на скрининге, 6 — в картинки, 3 — в черновой фильм, скидка 20 % за объём
+  const F = {a:20,b:6,c:3,d:.2,M:90};
+  const fa = STAGES[0].f(F.M)*F.a*(1-F.d), fb = STAGES[1].f(F.M)*F.b*(1-F.d), fc = STAGES[2].f(F.M)*F.c*(1-F.d);
+  document.getElementById('fund').innerHTML =
+    `<div class="card"><span class="mono">${F.a} сценариев · скрининг</span><b class="big">${tenge(fa)}</b><p>${usd(fa)} · по ${tenge(fa/F.a)} за сценарий со скидкой ${F.d*100} % за объём</p></div>`+
+    `<div class="card"><span class="mono">лучшие ${F.b} · в картинки</span><b class="big">${tenge(fb)}</b><p>${usd(fb)} · сценарий улучшен, фильм виден по кадрам</p></div>`+
+    `<div class="card"><span class="mono">лучшие ${F.c} · черновой фильм</span><b class="big">${tenge(fc)}</b><p>${usd(fc)} · весь фильм в движении до продакшна</p></div>`+
+    `<div class="card"><span class="mono">весь портфель</span><b class="big">${tenge(fa+fb+fc)}</b><p>${usd(fa+fb+fc)} · решение по ${F.a} фильмам за 1–2 месяца</p></div>`;
+
+  render();
+})();
+</script>
+</body>
+</html>
