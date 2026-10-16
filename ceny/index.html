@@ -278,7 +278,7 @@ footer a:hover{color:var(--text)}
             <button type="button" data-fast="0" aria-pressed="true">Стандарт</button>
             <button type="button" data-fast="1" aria-pressed="false">Экспресс · +20&nbsp;%</button>
           </div>
-          <p class="offer-note" id="speed-note" hidden>Экспресс ускоряет продакшн, картинки и черновой фильм — добавьте их в расчёт.</p>
+          <p class="offer-note" id="speed-note" hidden>Экспресс включается, только когда сокращает срок. Здесь срок уже минимальный.</p>
         </div>
         <div class="field">
           <span class="lbl" id="offer-lbl">Скидка</span>
@@ -539,9 +539,28 @@ footer a:hover{color:var(--text)}
   tBox.innerHTML = `<button type="button" class="chip" data-t="0" aria-pressed="true">Нет</button>` + TEASER_LENS.map(L=>`<button type="button" class="chip" data-t="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('');
   tBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; const L = +b.dataset.t; if (L) { st.teaserLen = L; st.teaserOn = true; } else st.teaserOn = false; render(); });
 
+  // срок в неделях для выбранного набора: картинки и черновой фильм частично идут вместе; звук и цвет — параллельно продакшну;
+  // маркетинг и IP — параллельно; языки — после мастера, до трёх языков одновременно; сценарий с нуля — до всего
+  function weeksFor(fast, ty){
+    const M = st.M, on = st.on, k = fast ? 2 : 1;
+    let pre = (on[0]?1:0) + (on[1]?2:0) + (on[2]?3:0);
+    if (on[1] && on[2]) pre -= 1;
+    if (fast && pre >= 4) pre -= 1;
+    const prod = on[3] ? STAGES[3].weeks(M, ty, k) : 0;
+    const post = on[4] ? (on[3] ? 2 : 3) : 0;
+    const langW = st.langs > 0 ? 1 + Math.ceil(st.langs / 3) : 0;
+    const filmOn = on.slice(0,6).some(Boolean);
+    // тизер вместе с фильмом идёт параллельно после разработки героев; отдельно — 1–2 недели
+    const sideW = Math.max(on[5] ? 1 : 0, on[6] ? 3 : 0, langW, (st.teaserOn && !filmOn) ? 2 : 0);
+    const scriptW = st.script ? Math.ceil(writerMonths(M) * 4.33) : 0;
+    return scriptW + pre + prod + post + ((on[3] || on[4]) ? langW : sideW);
+  }
+  // экспресс +20 % — только когда срок на экране становится короче; у кино и мультфильма темп разный
+  const fastFor = ty => st.fast && weeksFor(true, ty) < weeksFor(false, ty);
+
   // расчёт под один тип: выбранные этапы и продукты; скидка и экспресс — только на этапы 1–6
   function quote(ty){
-    const M = st.M; let gross = 0, disc = 0, extra = 0; const lines = [];
+    const M = st.M, fastOn = fastFor(ty); let gross = 0, disc = 0, extra = 0; const lines = [];
     STAGES.forEach((s,i)=>{
       const on = s.lang ? st.langs > 0 : st.on[i];
       if (!on) return;
@@ -550,7 +569,7 @@ footer a:hover{color:var(--text)}
       if (s.n <= 6) {
         if (st.offer === 'pack') disc += price * PACK;
         if (st.offer === 'copro') disc += price * COPRO;
-        if (st.fastOn) extra += price * EXPRESS;
+        if (fastOn) extra += price * EXPRESS;
       }
       lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t}</span><b>${tgx(price)}</b></li>`);
     });
@@ -576,27 +595,14 @@ footer a:hover{color:var(--text)}
     st.offer = film ? st.want : 'none';
     document.getElementById('o-' + st.offer).checked = true;
 
-    // экспресс сокращает срок, только если в расчёте продакшн или картинки вместе с черновым фильмом
-    const expressOk = st.on[3] || (st.on[1] && st.on[2]);
+    // экспресс доступен, только когда срок выбранного типа на экране становится короче
+    const expressOk = weeksFor(true, ty) < weeksFor(false, ty);
     st.fastOn = st.fast && expressOk;
     speeds.querySelector('[data-fast="1"]').disabled = !expressOk;
     speeds.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.fast === '1') === st.fastOn)));
     document.getElementById('speed-note').hidden = expressOk;
     const q = quote(ty), qa = quote(TYPES.anim), qf = quote(TYPES.film), total = q.total;
-    // срок: картинки и черновой фильм частично идут вместе; звук и цвет — параллельно продакшну;
-    // маркетинг и IP — параллельно; языки — после мастера, до трёх языков одновременно
-    const on = st.on, k = st.fastOn ? 2 : 1;
-    let pre = (on[0]?1:0) + (on[1]?2:0) + (on[2]?3:0);
-    if (on[1] && on[2]) pre -= 1;
-    if (st.fastOn && pre >= 4) pre -= 1;
-    const prod = on[3] ? STAGES[3].weeks(M, ty, k) : 0;
-    const post = on[4] ? (on[3] ? 2 : 3) : 0;
-    const langW = st.langs > 0 ? 1 + Math.ceil(st.langs / 3) : 0;
-    const filmOn = on.slice(0,6).some(Boolean);
-    // тизер вместе с фильмом идёт параллельно после разработки героев; отдельно — 1–2 недели; сценарий с нуля — до всего
-    const sideW = Math.max(on[5] ? 1 : 0, on[6] ? 3 : 0, langW, (st.teaserOn && !filmOn) ? 2 : 0);
-    const scriptW = st.script ? Math.ceil(writerMonths(M) * 4.33) : 0;
-    const weeks = scriptW + pre + prod + post + ((on[3] || on[4]) ? langW : sideW);
+    const weeks = weeksFor(st.fastOn, ty), filmOn = st.on.slice(0,6).some(Boolean);
     const extras = st.on[6] || st.langs > 0 || st.script || st.teaserOn;
     const kind = teaserOnly ? 'тизер ' + (st.type === 'anim' ? 'мультфильма' : 'игрового фильма') + ', ' + fmtLen(st.teaserLen)
       : film ? ty.l.toLowerCase() + ' под ключ' + (extras ? ' + дополнения' : '') : 'выбранные этапы';
