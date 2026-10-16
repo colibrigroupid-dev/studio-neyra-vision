@@ -127,42 +127,54 @@ details.more .inner{display:flex;flex-direction:column;gap:18px;margin-top:14px}
 .total .btn:hover{background:#222}
 .total__fine{font-size:.8rem;color:#55554f;line-height:1.45}
 
-/* лестница этапов */
+/* лестница этапов: слева что входит, справа две колонки цен — мультфильм и кино */
 .stages{display:grid;border-top:1px solid var(--line)}
-.stage{display:grid;grid-template-columns:72px minmax(0,1fr) minmax(0,220px);gap:12px 28px;padding:26px 0;border-bottom:1px solid var(--line);align-items:start}
-.stage__n{font:500 1.6rem/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
-.stage h3{font-size:clamp(1.25rem,1.05rem + .8vw,1.75rem);letter-spacing:-.02em}
-.stage__what{color:var(--muted);margin-top:8px;max-width:62ch}
-.stage__meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:.88rem;color:var(--dim)}
+.stage{display:grid;grid-template-columns:56px minmax(0,1fr) 150px 150px;gap:10px 24px;padding:22px 0;border-bottom:1px solid var(--line);align-items:start}
+.stage__n{font:500 1.4rem/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.stage h3{font-size:clamp(1.2rem,1.05rem + .6vw,1.55rem);letter-spacing:-.02em}
+.stage__what{color:var(--muted);margin-top:6px;max-width:58ch}
+.stage__meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:.88rem;color:var(--dim)}
 .stage__meta b{color:var(--muted);font-weight:500}
-.stage__price{text-align:right}
-.stage__price b{display:block;font:500 clamp(1.25rem,1rem + .9vw,1.7rem)/1.1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.stage__price small{display:block;color:var(--dim);font-size:.85rem;margin-top:6px}
-.stage__price .unit{color:var(--dim);font:400 .85rem/1.3 var(--body);margin-top:4px;display:block}
+.stage__p{text-align:right;min-width:0}
+.stage__p::before{content:attr(data-l);display:none;font:500 .7rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.stage__p b{display:block;font:500 clamp(1.05rem,.95rem + .45vw,1.35rem)/1.15 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--muted)}
+.stage__p small{display:block;color:var(--dim);font-size:.8rem;margin-top:4px}
+.stages[data-sel="anim"] .stage__p[data-t="anim"] b,.stages[data-sel="film"] .stage__p[data-t="film"] b{color:var(--text)}
+.stage__p--wide{grid-column:3 / 5}
+.stage__p--wide b{font:500 1rem/1.3 var(--body);color:var(--muted)}
 @media (max-width:760px){
-  .stage{grid-template-columns:44px minmax(0,1fr)}
-  .stage__n{font-size:1.2rem}
-  .stage__price{grid-column:2;text-align:left}
+  .stage{grid-template-columns:32px minmax(0,1fr) minmax(0,1fr);gap:10px 16px;padding:20px 0}
+  .stage__n{font-size:1.1rem}
+  .stage__t{grid-column:2 / 4}
+  .stage__p{text-align:left}
+  .stage__p::before{display:block}
+  .stage__p[data-t="anim"]{grid-column:2}
+  .stage__p[data-t="film"]{grid-column:3}
+  .stage__p--wide{grid-column:2 / 4}
 }
 .note{color:var(--dim);font-size:.9rem;margin-top:18px;max-width:80ch}
 .pick{margin-top:12px;border:1px solid var(--line-2);background:transparent;color:var(--text);border-radius:999px;padding:9px 14px;font:500 .88rem/1 var(--body);cursor:pointer;min-height:40px;white-space:nowrap}
 .pick:hover{border-color:var(--text)}
 .pick[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
 .stage--dist .stage__n{color:var(--text)}
-.stage--dist .stage__price b{font:500 1rem/1.3 var(--body);color:var(--muted)}
 .offer-note{font-size:.85rem;color:var(--dim)}
-.sumbar{position:sticky;top:calc(65px + env(safe-area-inset-top,0px));z-index:20;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;padding:14px 0;margin-bottom:6px;background:color-mix(in oklab,var(--ink) 92%,transparent);backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--line)}
-.sumbar__l{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;min-width:0}
-.sumbar__r{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;min-width:0}
-.sumbar__r b{font:500 clamp(1.25rem,1rem + .9vw,1.7rem)/1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.sumbar__r span{color:var(--muted);font-size:.9rem}
-.sumbar__r a{color:var(--text);font-size:.9rem}
-.seg--sm{display:inline-grid;grid-template-columns:auto auto;padding:4px;border-radius:12px}
-.seg--sm button{min-height:38px;padding:8px 14px;font-size:.92rem}
-@media (max-width:600px){
-  .sumbar{padding:8px 0;gap:6px 12px}
-  .sumbar__r span{display:none}
-  .seg--sm button{min-height:34px;padding:6px 10px;font-size:.85rem}
+.sumbar{position:sticky;top:calc(65px + env(safe-area-inset-top,0px));z-index:20;display:grid;grid-template-columns:56px minmax(0,1fr) 150px 150px;gap:6px 24px;align-items:end;padding:12px 0;margin-bottom:6px;background:color-mix(in oklab,var(--ink) 92%,transparent);backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--line)}
+.sumbar__l{grid-column:1 / 3;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;min-width:0;color:var(--muted);font-size:.9rem}
+.sumbar__l .mono{color:var(--text)}
+.sumbar__l a{color:var(--text)}
+.sumbar__c{appearance:none;background:none;border:0;margin:0;padding:4px 0;color:inherit;font:inherit;text-align:right;cursor:pointer;min-width:0;border-radius:8px}
+.sumbar__c:focus-visible{outline:2px solid var(--text);outline-offset:4px}
+.sumbar__c span{display:block;font:500 .72rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.sumbar__c b{display:block;margin-top:6px;font:500 clamp(1.05rem,.95rem + .45vw,1.35rem)/1.1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--muted)}
+.sumbar__c small{display:block;margin-top:3px;color:var(--dim);font-size:.8rem}
+.sumbar__c[aria-pressed="true"] span,.sumbar__c[aria-pressed="true"] b{color:var(--text)}
+@media (max-width:760px){
+  .sumbar{grid-template-columns:32px minmax(0,1fr) minmax(0,1fr);gap:4px 16px;padding:8px 0}
+  .sumbar__l{grid-column:1 / 4}
+  .sumbar__c{text-align:left}
+  .sumbar__c[data-type="anim"]{grid-column:2}
+  .sumbar__c[data-type="film"]{grid-column:3}
+  .sumbar__c small{display:none}
 }
 .stage--extra .stage__n{color:var(--text)}
 .stage .chips{margin-top:12px}
@@ -186,7 +198,6 @@ details.more .inner{display:flex;flex-direction:column;gap:18px;margin-top:14px}
 .tech a:hover{border-color:var(--line-2)}
 .tech b{font:500 1.02rem/1.2 var(--mono);overflow-wrap:anywhere}
 .tech span{color:var(--muted);font-size:.92rem}
-.card h3 a{color:inherit;text-decoration-thickness:1px;text-underline-offset:3px}
 .who{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
 
 .final{padding:clamp(72px,10vw,140px) 0}
@@ -310,14 +321,12 @@ footer a:hover{color:var(--text)}
     <div class="block__head">
       <div class="mono">Этапы и отдельные продукты</div>
       <h2 id="etapy-title">Из чего складывается цена</h2>
-      <p id="et-fmt">Цены — для игрового фильма на 90 минут. Каждый этап заканчивается готовым результатом. Отмечайте нужные — расчёт обновится сразу.</p>
+      <p id="et-fmt">Цены для длины 90 мин. Каждый этап заканчивается готовым результатом — отмечайте нужные, расчёт обновится сразу.</p>
     </div>
     <div class="sumbar" id="sumbar">
-      <div class="sumbar__l">
-        <div class="seg seg--sm" role="group" aria-label="Что делаем" id="types2"><button type="button" data-type="film" aria-pressed="true">Игровой фильм</button><button type="button" data-type="anim" aria-pressed="false">Мультфильм</button></div>
-        <span class="mono" id="sb-len">90 мин</span>
-      </div>
-      <div class="sumbar__r"><b id="sb-sum">—</b><span id="sb-lbl"></span><a href="#kalkulyator">Изменить</a></div>
+      <div class="sumbar__l"><span class="mono" id="sb-len">90 мин</span><span id="sb-lbl"></span><a href="#kalkulyator">Изменить</a></div>
+      <button type="button" class="sumbar__c" data-type="anim" aria-pressed="false"><span>Мультфильм</span><b id="sb-anim">—</b><small id="sb-anim-usd"></small></button>
+      <button type="button" class="sumbar__c" data-type="film" aria-pressed="true"><span>Кино</span><b id="sb-film">—</b><small id="sb-film-usd"></small></button>
     </div>
     <div class="stages" id="stages"></div>
     <p class="note">Цены и сроки — ориентир. Без НДС; если НДС применяется, он добавляется к цене. Счёт в тенге по курсу на дату договора (в расчёте 1 $ = 450 ₸). Точную смету называем после скрининга.</p>
@@ -375,7 +384,7 @@ footer a:hover{color:var(--text)}
       <div class="card"><span class="mono">ДНК фильма</span><h3>Паспорт фильма</h3><p>По каждому герою, локации, кадру, музыке и звуку: кто и когда сделал, из каких исходников, что изменил человек. Там же согласия актёров и лицензии. Паспорт передаём вместе с фильмом.</p></div>
       <div class="card"><span class="mono">Авторское право</span><h3>Права переходят вам</h3><p>Закон охраняет творческий вклад человека — паспорт его доказывает. Исключительные права на картинки, видео, музыку и звук переходят продюсеру по договору.</p></div>
       <div class="card"><span class="mono">Конфиденциально</span><h3>Секретно и безопасно</h3><p>Сценарий, кадры, лица и голоса не используются для обучения публичных моделей ИИ. NDA — с первого файла, материалы видит только команда проекта.</p></div>
-      <div class="card"><span class="mono">Хранилище</span><h3><a href="https://www.ghostdrive.com/" target="_blank" rel="noopener">GhostDrive</a></h3><p>Весь проект хранится в децентрализованном хранилище. Файлы шифруются до загрузки, прочитать их может только команда проекта.</p></div>
+      <div class="card"><span class="mono">Хранилище</span><h3>GhostDrive</h3><p>Храните все файлы проекта в одном месте: сценарий, кадры, видео и звук. Файлы шифруются ещё до загрузки, доступ — только у вас как владельца проекта и у тех, кому вы его откроете.</p></div>
     </div>
     <div class="tech" aria-label="Технология NEYRA">
       <a href="https://neyra.ai/" target="_blank" rel="noopener"><b>neyra.ai ↗</b><span>Технология NEYRA: сценарий, раскадровка, превиз</span></a>
@@ -435,32 +444,36 @@ footer a:hover{color:var(--text)}
   const PACK = 0.10, COPRO = 0.15, FUND = 0.20;
   const r100 = x => Math.round(x / 100) * 100;
   // Рыночные цены в $ от длины M (минуты). Игровой фильм на 90 минутах совпадает с внутренним расчётом экономики.
+  // Короткий формат: постоянная часть этапа (разбор, разработка героев и локаций, сборка, пакет маркетинга) растёт с длиной до 45 минут, дальше постоянна.
+  const g = M => Math.min(1, Math.pow(M / 45, 0.75));
   // prod: $ за минуту продакшна; pace: минут готового фильма в месяц в стандарте (экспресс — вдвое быстрее).
+  // k: цена мультфильма к цене кино по этапам — стилизованный мир проще фотореализма, нет внешности и согласий живых актёров, дубляж проще.
+  // teaser: [постоянная часть, $ за минуту] — тизер в темпе трейлера: до 3 героев и 2 локаций, 1080p, музыка и звук.
   // «Весь фильм» = этапы 1–6: на него считаются скидки «под ключ», «сопродюсирование» и надбавка за экспресс; IP и языки — по своей цене.
   const TYPES = {
-    film:{l:'Игровой фильм', prod:2200, pace:30, s4:'Фотореалистичные чистовые кадры 1080p по утверждённому черновому фильму: одни и те же лица во всех сценах, синхрон губ, апскейл до 4K. Снимать актёров не обязательно.'},
-    anim:{l:'Мультфильм', prod:1600, pace:45, s4:'Анимация кинокачества 1080p по утверждённому черновому фильму: все кадры, герои и миры в одном стиле. Голоса — живые актёры озвучания.'}
+    film:{l:'Игровой фильм', prod:2200, pace:30, k:{1:1, 2:1, 3:1, 5:1, 6:1, 7:1, 8:1, script:1}, teaser:[1800, 1400]},
+    anim:{l:'Мультфильм', prod:1700, pace:45, k:{1:.9, 2:.85, 3:.8, 5:.9, 6:.85, 7:.9, 8:.85, script:.95}, teaser:[1700, 1100]}
   };
   const STAGES = [
-    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя по ходу фильма, риски и рынок, отчёт с выводом. 3D-аниматик всего фильма: его можно посмотреть от начала до конца.', time:'ориентир 3–7 дней', classic:'', f:M=>r100(2750+25*M), weeks:()=>1},
-    {n:2, t:'Улучшение и картинки', w:'Лечение сценария по актам вместе с автором. Герои и локации с закреплённым обликом. Фильм в картинках: кадр на каждый план.', time:'1–2 недели', classic:'', f:M=>r100(7000+55*M), weeks:()=>2},
-    {n:3, t:'Черновой фильм', w:'Весь фильм в движении в черновом качестве, с монтажом и временным звуком. Видно ритм и что править до продакшна.', time:'2–3 недели', classic:'', f:M=>r100(4000+122*M), weeks:()=>3},
-    {n:4, t:'Продакшн', w:null, time:'ориентир: фильм — 30 минут в месяц, мультфильм — 45; в экспрессе продакшн вдвое быстрее', classic:'', f:(M,T)=>T.prod*M, weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
-    {n:5, t:'Звук и выпуск', w:'Музыка, шумы и эффекты, сведение 5.1, цвет, мастер 4K и DCP для кинотеатра.', time:'2–4 недели', classic:'', f:M=>r100(1450+295*M), weeks:()=>3},
-    {n:6, t:'Маркетинг', w:'Три тизера, 20 вертикальных роликов, постер и презентация для прокатчиков. Можно заказать на любом этапе.', time:'1 неделя', classic:'', f:M=>Math.max(4200,r100(4000+22*M)), weeks:()=>0},
-    {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн по миру и героям фильма.', time:'2–3 недели', classic:'', f:()=>9000, weeks:()=>0},
-    {n:8, t:'Перевод на другой язык', w:'Перевод, голоса, синхрон губ и сведение. Казахский, русский, английский и другие языки.', time:'2–3 недели, языки параллельно', classic:'', f:M=>Math.max(1500,r100(111*M)), weeks:()=>0, lang:true}
+    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>r100(T.k[1]*(2750*g(M) + 25*M)), weeks:()=>1},
+    {n:2, t:'Улучшение и картинки', w:'Лечение сценария с автором, герои и локации с закреплённым обликом, кадр на каждый план.', time:'1–2 недели', f:(M,T)=>r100(T.k[2]*(7000*g(M) + 55*M)), weeks:()=>2},
+    {n:3, t:'Черновой фильм', w:'Весь фильм в движении: черновое качество, монтаж, временный звук.', time:'2–3 недели', f:(M,T)=>r100(T.k[3]*(4000*g(M) + 122*M)), weeks:()=>3},
+    {n:4, t:'Продакшн', w:'Чистовые кадры 1080p, апскейл до 4K. Кино — фотореализм и синхрон губ, мультфильм — единый стиль и живые голоса.', time:'ориентир: кино — 30 минут в месяц, мультфильм — 45; в экспрессе вдвое быстрее', f:(M,T)=>T.prod*M, weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
+    {n:5, t:'Звук и выпуск', w:'Музыка, шумы, сведение 5.1, цвет, мастер 4K и DCP.', time:'2–4 недели', f:(M,T)=>r100(T.k[5]*(1450*g(M) + 295*M)), weeks:()=>3},
+    {n:6, t:'Маркетинг', w:'Тизеры, вертикальные ролики, постер и презентация для прокатчиков.', time:'1 неделя', f:(M,T)=>r100(T.k[6]*(4000*g(M) + 22*M)), weeks:()=>0},
+    {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн.', time:'2–3 недели', f:(M,T)=>r100(9000*T.k[7]), weeks:()=>0},
+    {n:8, t:'Перевод на другой язык', w:'Перевод, голоса, синхрон губ и сведение — на любой язык.', time:'2–3 недели, языки параллельно', f:(M,T)=>r100(T.k[8]*Math.max(1500, 111*M)), weeks:()=>0, lang:true}
   ];
-  const FORMATS = [{l:'Короткий, 15',m:15},{l:'Серия, 45',m:45},{l:'Полный метр, 90',m:90},{l:'Эпос, 120',m:120}];
-  // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1–3 мин)
-  const writerMonths = M => Math.min(3, 1 + M/60);
-  const SCRIPT_F = M => r100(7000 + 140*M);
-  const TEASER_F = L => r100(4000 + 3600*L);
-  const TEASER_LENS = [1, 1.5, 2, 3];
+  const FORMATS = [{l:'Тизер, 3',m:3,teaser:true},{l:'Короткий, 15',m:15},{l:'Серия, 45',m:45},{l:'Полный метр, 90',m:90},{l:'Эпос, 120',m:120}];
+  // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1,5–3 мин)
+  const writerMonths = M => Math.min(3, g(M) + M/60);
+  const SCRIPT_F = (M,T) => r100(T.k.script*(7000*g(M) + 140*M));
+  const TEASER_F = (L,T) => r100(T.teaser[0] + T.teaser[1]*L);
+  const TEASER_LENS = [1.5, 2, 3];
   const fmtLen = L => L.toLocaleString('ru-RU') + ' мин';
   // по умолчанию — «весь фильм»: этапы 1–6, без IP и языков
   const EXPRESS = 0.20;
-  const st = {M:90, type:'film', on:[true,true,true,true,true,true,false], langs:0, offer:'pack', want:'pack', fast:false, script:false, teaserOn:false, teaserLen:2};
+  const st = {M:90, type:'film', on:[true,true,true,true,true,true,false], langs:0, offer:'pack', want:'pack', fast:false, script:false, teaserOn:false, teaserLen:2, preset:null};
 
   const tenge = usd => {
     const t = usd * RATE;
@@ -471,13 +484,15 @@ footer a:hover{color:var(--text)}
   const usd = x => '$' + Math.round(x).toLocaleString('ru-RU');
   const T = () => TYPES[st.type];
 
-  // этапы — цены пересчитываются под выбранный формат и длину; у каждого кнопка «Добавить в расчёт»
+  // этапы: слева что входит, справа две колонки цен — мультфильм и кино; у каждого кнопка «Добавить в расчёт»
   const stagesBox = document.getElementById('stages');
+  const cells = id => `<div class="stage__p" data-t="anim" data-l="Мультфильм"><b id="pa-${id}"></b><small id="pa-${id}-u"></small></div><div class="stage__p" data-t="film" data-l="Кино"><b id="pf-${id}"></b><small id="pf-${id}-u"></small></div>`;
+  const pickBtn = v => `<button type="button" class="pick" data-pick="${v}" aria-pressed="false">Добавить в расчёт</button>`;
   stagesBox.innerHTML =
-    `<div class="stage"><div class="stage__n">00</div><div><h3>Сценарий с нуля</h3><p class="stage__what">Если сценария ещё нет: идея, синопсис, поэпизодный план и сценарий с двумя редакциями. Пишет живой сценарист, NEYRA по ходу проверяет структуру и реакцию зрителя.</p><div class="stage__meta"><span>Срок: <b id="st-script">1,5–3 месяца</b></span></div></div><div class="stage__price"><b id="sp-script"></b><small id="spu-script"></small><button type="button" class="pick" data-pick="script" aria-pressed="false">Добавить в расчёт</button></div></div>` +
-    STAGES.map((s,i) => `<div class="stage"><div class="stage__n">0${s.n}</div><div><h3>${s.t}</h3><p class="stage__what" id="sw-${i}">${s.w || ''}</p><div class="stage__meta"><span>Срок: <b>${s.time}</b></span>${s.classic?`<span>${s.classic}</span>`:''}</div></div><div class="stage__price"><b id="sp-${i}"></b><small id="spu-${i}"></small><span class="unit" id="spx-${i}"></span><button type="button" class="pick" data-pick="${i}" aria-pressed="false">Добавить в расчёт</button></div></div>`).join('') +
-    `<div class="stage stage--dist"><div class="stage__n">+</div><div><h3>Дистрибуция</h3><p class="stage__what">Фестивали, продажи в другие страны, стриминги и Neyra Play — вместе с вами, в рамках сопродюсирования. Взамен — 10 % чистых поступлений продюсера от фильма.</p></div><div class="stage__price"><b>в сопродюсировании</b><button type="button" class="pick" data-pick="copro" aria-pressed="false">Выбрать сопродюсирование</button></div></div>` +
-    `<div class="stage stage--extra"><div class="stage__n">+</div><div><h3>Тизер в кинокачестве</h3><p class="stage__what">Отдельный продукт до фильма — для питча, фонда и инвесторов: проверка идеи, разработка главных героев и локаций, от 1 до 3 минут в кинокачестве с музыкой и звуком.</p><div class="stage__meta"><span>Срок: <b>3–4 недели</b></span></div><div class="chips" role="group" aria-label="Длина тизера" id="teaser-chips2">${TEASER_LENS.map(L=>`<button type="button" class="chip" data-tlen="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('')}</div></div><div class="stage__price"><b id="sp-teaser"></b><small id="spu-teaser"></small><button type="button" class="pick" data-pick="teaser" aria-pressed="false">Добавить в расчёт</button></div></div>`;
+    `<div class="stage"><div class="stage__n">00</div><div class="stage__t"><h3>Сценарий с нуля</h3><p class="stage__what">Идея, синопсис, поэпизодный план и сценарий. Пишет живой сценарист, NEYRA проверяет структуру.</p><div class="stage__meta"><span>Срок: <b id="st-script"></b></span></div>${pickBtn('script')}</div>${cells('script')}</div>` +
+    STAGES.map((s,i) => `<div class="stage"><div class="stage__n">0${s.n}</div><div class="stage__t"><h3>${s.t}</h3><p class="stage__what">${s.w}</p><div class="stage__meta"><span>Срок: <b>${s.time}</b></span></div>${pickBtn(i)}</div>${cells(i)}</div>`).join('') +
+    `<div class="stage stage--dist"><div class="stage__n">+</div><div class="stage__t"><h3>Дистрибуция</h3><p class="stage__what">Фестивали, другие страны, стриминги и Neyra Play — вместе с вами. Взамен — 10 % чистых поступлений продюсера.</p><button type="button" class="pick" data-pick="copro" aria-pressed="false">Выбрать сопродюсирование</button></div><div class="stage__p stage__p--wide"><b>в сопродюсировании</b></div></div>` +
+    `<div class="stage stage--extra"><div class="stage__n">+</div><div class="stage__t"><h3>Тизер в кинокачестве</h3><p class="stage__what">Для питча, фонда и инвестора: до 3 героев и 2 локаций, монтаж в темпе трейлера, 1080p, музыка и звук.</p><div class="stage__meta"><span>Срок: <b>1–2 недели</b></span></div><div class="chips" role="group" aria-label="Длина тизера" id="teaser-chips2">${TEASER_LENS.map(L=>`<button type="button" class="chip" data-tlen="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('')}</div>${pickBtn('teaser')}</div>${cells('teaser')}</div>`;
   stagesBox.addEventListener('click', e => {
     const c = e.target.closest('[data-tlen]');
     if (c) { st.teaserLen = +c.dataset.tlen; st.teaserOn = true; render(); return; }
@@ -490,16 +505,19 @@ footer a:hover{color:var(--text)}
     render();
   });
 
-  // тип
-  ['types','types2'].forEach(id => document.getElementById(id).addEventListener('click', e => { const b = e.target.closest('button[data-type]'); if(!b) return; st.type = b.dataset.type; render(); }));
+  // тип: в калькуляторе и в шапке колонок над этапами
+  ['types','sumbar'].forEach(id => document.getElementById(id).addEventListener('click', e => { const b = e.target.closest('button[data-type]'); if(!b) return; st.type = b.dataset.type; render(); }));
 
   // длина
   const fBox = document.getElementById('formats');
-  fBox.innerHTML = FORMATS.map(f=>`<button type="button" class="chip" data-m="${f.m}" aria-pressed="${f.m===90}">${f.l}</button>`).join('');
-  fBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; setM(+b.dataset.m); });
+  fBox.innerHTML = FORMATS.map(f=>`<button type="button" class="chip" data-m="${f.m}"${f.teaser ? ' data-teaser="1"' : ''} aria-pressed="false">${f.l}</button>`).join('');
+  fBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; if (b.dataset.teaser) teaserOnly(); else setM(+b.dataset.m); });
   const len = document.getElementById('len');
   len.addEventListener('input', e => setM(+e.target.value));
-  function setM(m){ st.M = m; len.value = m; fBox.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.m===m))); render(); }
+  // «Тизер, 3»: в расчёте только тизер на 3 минуты, без этапов фильма
+  function teaserOnly(){ st.preset = 'teaser'; st.on = st.on.map(() => false); st.langs = 0; st.script = false; st.teaserOn = true; st.teaserLen = 3; st.M = 3; len.value = 3; render(); }
+  // любая другая длина возвращает весь фильм
+  function setM(m){ if (st.preset === 'teaser') { st.preset = null; st.on = [true,true,true,true,true,true,false]; st.teaserOn = false; st.want = 'pack'; } st.M = m; len.value = m; render(); }
 
   // скидка
   document.querySelectorAll('input[name=offer]').forEach(r => r.addEventListener('change', e => { st.want = e.target.value; render(); }));
@@ -517,27 +535,13 @@ footer a:hover{color:var(--text)}
   tBox.innerHTML = `<button type="button" class="chip" data-t="0" aria-pressed="true">Нет</button>` + TEASER_LENS.map(L=>`<button type="button" class="chip" data-t="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('');
   tBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; const L = +b.dataset.t; if (L) { st.teaserLen = L; st.teaserOn = true; } else st.teaserOn = false; render(); });
 
-  function render(){
-    const M = st.M, ty = T();
-    document.getElementById('len-out').textContent = M + ' мин';
-    document.getElementById('lang-out').textContent = st.langs;
-    // «под ключ» и сопродюсирование — только на весь фильм: выбраны этапы 1–6
-    const film = st.on.slice(0,6).every(Boolean);
-    const packOk = film, coproOk = film;
-    document.getElementById('o-pack').disabled = !packOk;
-    document.getElementById('o-copro').disabled = !coproOk;
-    let offer = st.want;
-    if ((offer === 'pack' && !packOk) || (offer === 'copro' && !coproOk)) offer = 'none';
-    st.offer = offer;
-    document.getElementById('o-' + offer).checked = true;
-
-    let gross = 0, disc = 0, extra = 0; const lines = [];
+  // расчёт под один тип: выбранные этапы и продукты; скидка и экспресс — только на этапы 1–6
+  function quote(ty){
+    const M = st.M; let gross = 0, disc = 0, extra = 0; const lines = [];
     STAGES.forEach((s,i)=>{
-      const one = s.f(M, ty);
-      if (!s.lang) document.getElementById('cp'+i).textContent = tenge(one);
       const on = s.lang ? st.langs > 0 : st.on[i];
       if (!on) return;
-      const price = s.lang ? one * st.langs : one;
+      const one = s.f(M, ty), price = s.lang ? one * st.langs : one;
       gross += price;
       if (s.n <= 6) {
         if (st.offer === 'pack') disc += price * PACK;
@@ -546,11 +550,29 @@ footer a:hover{color:var(--text)}
       }
       lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t}</span><b>${tenge(price)}</b></li>`);
     });
-    const scriptP = SCRIPT_F(M), teaserP = TEASER_F(st.teaserLen);
+    const scriptP = SCRIPT_F(M, ty), teaserP = TEASER_F(st.teaserLen, ty);
     if (st.script) { gross += scriptP; lines.unshift(`<li><span>Сценарий с нуля</span><b>${tenge(scriptP)}</b></li>`); }
     if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}</span><b>${tenge(teaserP)}</b></li>`); }
     if (extra > 0) lines.push(`<li><span>Экспресс, +20 % на этапы 1–6</span><b>+${tenge(extra)}</b></li>`);
     if (disc > 0) lines.push(`<li class="disc"><span>${st.offer==='pack' ? 'Скидка под ключ, 10 % на весь фильм' : 'Скидка за сопродюсирование, 15 % на весь фильм'}</span><b>−${tenge(disc)}</b></li>`);
+    return {total: gross + extra - disc, disc, lines};
+  }
+
+  function render(){
+    const M = st.M, ty = T();
+    // «Тизер, 3» держится, пока в расчёте только тизер
+    if (st.preset === 'teaser' && (st.on.some(Boolean) || st.langs || st.script || !st.teaserOn)) st.preset = null;
+    const teaserOnly = st.preset === 'teaser';
+    document.getElementById('len-out').textContent = M + ' мин';
+    document.getElementById('lang-out').textContent = st.langs;
+    // «под ключ» и сопродюсирование — только на весь фильм: выбраны этапы 1–6
+    const film = st.on.slice(0,6).every(Boolean);
+    document.getElementById('o-pack').disabled = !film;
+    document.getElementById('o-copro').disabled = !film;
+    st.offer = film ? st.want : 'none';
+    document.getElementById('o-' + st.offer).checked = true;
+
+    const q = quote(ty), qa = quote(TYPES.anim), qf = quote(TYPES.film), total = q.total;
     // срок: картинки и черновой фильм частично идут вместе; звук и цвет — параллельно продакшну;
     // маркетинг и IP — параллельно; языки — после мастера, до трёх языков одновременно
     const on = st.on, k = st.fast ? 2 : 1;
@@ -561,22 +583,24 @@ footer a:hover{color:var(--text)}
     const post = on[4] ? (on[3] ? 2 : 3) : 0;
     const langW = st.langs > 0 ? 1 + Math.ceil(st.langs / 3) : 0;
     const filmOn = on.slice(0,6).some(Boolean);
-    // тизер вместе с фильмом идёт параллельно после разработки героев; отдельно — 3–4 недели; сценарий с нуля — до всего
-    const sideW = Math.max(on[5] ? 1 : 0, on[6] ? 3 : 0, langW, (st.teaserOn && !filmOn) ? 4 : 0);
+    // тизер вместе с фильмом идёт параллельно после разработки героев; отдельно — 1–2 недели; сценарий с нуля — до всего
+    const sideW = Math.max(on[5] ? 1 : 0, on[6] ? 3 : 0, langW, (st.teaserOn && !filmOn) ? 2 : 0);
     const scriptW = st.script ? Math.ceil(writerMonths(M) * 4.33) : 0;
     const weeks = scriptW + pre + prod + post + ((on[3] || on[4]) ? langW : sideW);
-    const total = gross + extra - disc;
-    const allCore = st.on.slice(0,6).every(Boolean);
     const extras = st.on[6] || st.langs > 0 || st.script || st.teaserOn;
-    document.getElementById('total-lbl').textContent = 'Ориентир · ' + (allCore ? ty.l.toLowerCase() + ' под ключ' + (extras ? ' + дополнения' : '') : 'выбранные этапы');
+    const kind = teaserOnly ? 'тизер ' + (st.type === 'anim' ? 'мультфильма' : 'игрового фильма') + ', ' + fmtLen(st.teaserLen)
+      : film ? ty.l.toLowerCase() + ' под ключ' + (extras ? ' + дополнения' : '') : 'выбранные этапы';
+    const expr = st.fast && filmOn ? ' · экспресс +20 %' : '';
+    document.getElementById('total-lbl').textContent = 'Ориентир · ' + kind;
     document.getElementById('sum').textContent = total ? tenge(total) : '—';
     document.getElementById('sum-usd').textContent = total ? usd(total) : 'Выберите хотя бы один этап';
-    document.getElementById('per-min').textContent = total ? `≈ ${tenge(total / M)} за минуту готового фильма` : '';
-    document.getElementById('lines').innerHTML = lines.join('');
-    document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}${weeks >= 6 ? ' · ≈ ' + months(weeks) : ''}${st.fast ? ' · экспресс' : ''}` : '';
-    document.getElementById('fine').textContent = 'Ориентир без НДС; если НДС применяется, он добавляется к цене. Счёт в тенге по курсу на дату договора. Точную смету называем после скрининга, под NDA.' + (st.offer==='copro' && disc>0 ? ' Совместная дистрибуция и доля 10 % — по договору сопродюсирования.' : '');
-    // кнопки этапов, галочки и строка внизу экрана
-    STAGES.forEach((s,i)=>{ if (!s.lang) document.getElementById('c'+i).checked = st.on[i]; });
+    document.getElementById('per-min').textContent = !total ? '' : teaserOnly ? `≈ ${tenge(total / st.teaserLen)} за минуту тизера` : `≈ ${tenge(total / M)} за минуту готового фильма`;
+    document.getElementById('lines').innerHTML = q.lines.join('');
+    document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}${weeks >= 6 ? ' · ≈ ' + months(weeks) : ''}${expr ? ' · экспресс' : ''}` : '';
+    document.getElementById('fine').textContent = 'Ориентир без НДС; если НДС применяется, он добавляется к цене. Счёт в тенге по курсу на дату договора. Точную смету называем после скрининга, под NDA.' + (st.offer==='copro' && q.disc>0 ? ' Совместная дистрибуция и доля 10 % — по договору сопродюсирования.' : '');
+    // галочки, кнопки этапов, длина
+    STAGES.forEach((s,i)=>{ if (s.lang) return; document.getElementById('c'+i).checked = st.on[i]; document.getElementById('cp'+i).textContent = tenge(s.f(M, ty)); });
+    fBox.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.teaser ? teaserOnly : (!st.preset && +b.dataset.m === M))));
     stagesBox.querySelectorAll('.pick').forEach(b => {
       const v = b.dataset.pick; let on, txt;
       if (v === 'copro') { on = st.offer === 'copro'; txt = on ? 'Сопродюсирование выбрано' : 'Выбрать сопродюсирование'; }
@@ -586,33 +610,38 @@ footer a:hover{color:var(--text)}
       else { on = st.on[+v]; txt = on ? 'В расчёте' : 'Добавить в расчёт'; }
       b.setAttribute('aria-pressed', String(on)); b.textContent = txt;
     });
-    // цены этапов под выбранный формат и длину
-    const other = TYPES[st.type === 'film' ? 'anim' : 'film'];
+    // цены этапов: две колонки, мультфильм и кино
+    const put = (id, a, f, ua, uf) => {
+      document.getElementById('pa-' + id).textContent = tenge(a); document.getElementById('pa-' + id + '-u').textContent = ua || usd(a);
+      document.getElementById('pf-' + id).textContent = tenge(f); document.getElementById('pf-' + id + '-u').textContent = uf || usd(f);
+    };
     STAGES.forEach((s,i) => {
-      const one = s.f(M, ty);
-      document.getElementById('sp-'+i).textContent = tenge(one);
-      document.getElementById('spu-'+i).textContent = usd(one);
-      document.getElementById('spx-'+i).textContent = s.n === 4 ? `${tenge(ty.prod)} за минуту · ${other.l.toLowerCase()} — ${tenge(other.prod)}` : (s.lang ? 'за один язык' : '');
+      const a = s.f(M, TYPES.anim), f = s.f(M, TYPES.film);
+      const sub = (x, t) => usd(x) + (s.n === 4 ? ' · ' + usd(t.prod) + ' за мин' : s.lang ? ' · за язык' : '');
+      put(i, a, f, sub(a, TYPES.anim), sub(f, TYPES.film));
     });
-    document.getElementById('sw-3').textContent = ty.s4;
-    document.getElementById('sp-script').textContent = tenge(scriptP);
-    document.getElementById('spu-script').textContent = usd(scriptP);
-    document.getElementById('st-script').textContent = `1,5–3 месяца; для ${M} мин — около ${(Math.round(writerMonths(M)*2)/2).toLocaleString('ru-RU')} мес`;
-    document.getElementById('sp-teaser').textContent = tenge(teaserP);
-    document.getElementById('spu-teaser').textContent = usd(teaserP) + ' · ' + fmtLen(st.teaserLen);
+    put('script', SCRIPT_F(M, TYPES.anim), SCRIPT_F(M, TYPES.film));
+    const ta = TEASER_F(st.teaserLen, TYPES.anim), tf = TEASER_F(st.teaserLen, TYPES.film);
+    put('teaser', ta, tf, usd(ta) + ' · ' + fmtLen(st.teaserLen), usd(tf) + ' · ' + fmtLen(st.teaserLen));
+    stagesBox.dataset.sel = st.type;
+    const wmo = writerMonths(M), wk = Math.max(1, Math.round(wmo * 4.33));
+    document.getElementById('st-script').textContent = `для ${M} мин — около ${wmo < 0.75 ? wk + ' ' + nedel(wk) : (Math.round(wmo * 2) / 2).toLocaleString('ru-RU') + ' мес'}`;
     document.getElementById('c-script').checked = st.script;
-    document.getElementById('cp-script').textContent = tenge(scriptP);
+    document.getElementById('cp-script').textContent = tenge(SCRIPT_F(M, ty));
     tBox.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.t === (st.teaserOn ? st.teaserLen : 0))));
     stagesBox.querySelectorAll('[data-tlen]').forEach(b => b.setAttribute('aria-pressed', String(st.teaserOn && +b.dataset.tlen === st.teaserLen)));
     document.querySelectorAll('button[data-type]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === st.type)));
-    document.getElementById('et-fmt').textContent = `Цены — для формата «${ty.l.toLowerCase()}, ${M} мин». Каждый этап заканчивается готовым результатом. Отмечайте нужные — расчёт обновится сразу.`;
-    // планка над этапами
-    const lbl = total ? (allCore ? ty.l.toLowerCase() + ' под ключ' + (extras ? ' + дополнения' : '') : 'выбранные этапы') + (st.offer==='copro' ? ' · сопродюсирование' : st.offer==='pack' ? ' · −10 %' : '') : 'выберите этап';
-    document.getElementById('sb-sum').textContent = total ? tenge(total) : '—';
-    document.getElementById('sb-lbl').textContent = total ? lbl + ' · ' + usd(total) : lbl;
-    document.getElementById('sb-len').textContent = M + ' мин';
+    document.getElementById('et-fmt').textContent = `Цены для длины ${M} мин. Каждый этап заканчивается готовым результатом — отмечайте нужные, расчёт обновится сразу.`;
+    // шапка колонок над этапами и строка внизу экрана
+    const sel = teaserOnly ? 'тизер' : film ? 'под ключ' + (st.offer === 'pack' ? ' · −10 %' : st.offer === 'copro' ? ' · сопродюсирование −15 %' : '') + (extras ? ' + дополнения' : '') : (total ? 'выбранные этапы' : 'выберите этап');
+    document.getElementById('sb-len').textContent = teaserOnly ? fmtLen(st.teaserLen) : M + ' мин';
+    document.getElementById('sb-lbl').textContent = sel + expr;
+    document.getElementById('sb-anim').textContent = qa.total ? tenge(qa.total) : '—';
+    document.getElementById('sb-anim-usd').textContent = qa.total ? usd(qa.total) : '';
+    document.getElementById('sb-film').textContent = qf.total ? tenge(qf.total) : '—';
+    document.getElementById('sb-film-usd').textContent = qf.total ? usd(qf.total) : '';
     document.getElementById('dock-sum').textContent = total ? tenge(total) : '—';
-    document.getElementById('dock-lbl').textContent = lbl;
+    document.getElementById('dock-lbl').textContent = total ? kind + (film && st.offer === 'pack' ? ' · −10 %' : film && st.offer === 'copro' ? ' · сопродюсирование' : '') + expr : 'выберите этап';
   }
   function yazyk(n){ const a=n%10, b=n%100; return a===1&&b!==11 ? 'язык' : (a>=2&&a<=4&&(b<10||b>=20) ? 'языка' : 'языков'); }
   // «около N недель / недели»: родительный падеж
@@ -621,10 +650,10 @@ footer a:hover{color:var(--text)}
     if (m % 1) return t + ' месяца';
     const a = m%10, b = m%100; return t + ' ' + (a===1&&b!==11 ? 'месяц' : (a>=2&&a<=4&&(b<10||b>=20) ? 'месяца' : 'месяцев')); }
 
-  // фонды: 20 сценариев на скрининге, 6 — в картинки, 3 — в черновой фильм, скидка за портфель
-  const F = {a:20,b:6,c:3,M:90};
+  // фонды: 20 сценариев на скрининге, 6 — в картинки, 3 — в черновой фильм, скидка за портфель (цены игрового фильма)
+  const F = {a:20,b:6,c:3,M:90}, FT = TYPES.film;
   const k = 1 - FUND;
-  const fa = STAGES[0].f(F.M)*F.a*k, fb = STAGES[1].f(F.M)*F.b*k, fc = STAGES[2].f(F.M)*F.c*k;
+  const fa = STAGES[0].f(F.M, FT)*F.a*k, fb = STAGES[1].f(F.M, FT)*F.b*k, fc = STAGES[2].f(F.M, FT)*F.c*k;
   document.getElementById('fund').innerHTML =
     `<div class="card"><span class="mono">${F.a} сценариев · скрининг</span><b class="big">${tenge(fa)}</b><p>${usd(fa)} · по ${tenge(fa/F.a)} за сценарий со скидкой ${FUND*100} % за портфель</p></div>`+
     `<div class="card"><span class="mono">лучшие ${F.b} · в картинки</span><b class="big">${tenge(fb)}</b><p>${usd(fb)} · сценарий улучшен, фильм виден по кадрам</p></div>`+
