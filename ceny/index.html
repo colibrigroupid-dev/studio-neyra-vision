@@ -158,6 +158,7 @@ details.more .inner{display:flex;flex-direction:column;gap:18px;margin-top:14px}
 .pick[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
 .stage--dist .stage__n{color:var(--text)}
 .offer-note{font-size:.85rem;color:var(--dim)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
 .sumbar{position:sticky;top:calc(65px + env(safe-area-inset-top,0px));z-index:20;display:grid;grid-template-columns:56px minmax(0,1fr) 150px 150px;gap:6px 24px;align-items:end;padding:12px 0;margin-bottom:6px;background:color-mix(in oklab,var(--ink) 92%,transparent);backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--line)}
 .sumbar__l{grid-column:1 / 3;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;min-width:0;color:var(--muted);font-size:.9rem}
 .sumbar__l .mono{color:var(--text)}
@@ -275,8 +276,9 @@ footer a:hover{color:var(--text)}
           <span class="lbl" id="speed-lbl">Срок</span>
           <div class="seg" role="group" aria-labelledby="speed-lbl" id="speeds">
             <button type="button" data-fast="0" aria-pressed="true">Стандарт</button>
-            <button type="button" data-fast="1" aria-pressed="false">Экспресс · +20 %</button>
+            <button type="button" data-fast="1" aria-pressed="false">Экспресс · +20&nbsp;%</button>
           </div>
+          <p class="offer-note" id="speed-note" hidden>Экспресс ускоряет продакшн, картинки и черновой фильм — добавьте их в расчёт.</p>
         </div>
         <div class="field">
           <span class="lbl" id="offer-lbl">Скидка</span>
@@ -452,7 +454,7 @@ footer a:hover{color:var(--text)}
   // «Весь фильм» = этапы 1–6: на него считаются скидки «под ключ», «сопродюсирование» и надбавка за экспресс; IP и языки — по своей цене.
   const TYPES = {
     film:{l:'Игровой фильм', prod:2200, pace:30, k:{1:1, 2:1, 3:1, 5:1, 6:1, 7:1, 8:1, script:1}, teaser:[1800, 1400]},
-    anim:{l:'Мультфильм', prod:1700, pace:45, k:{1:.9, 2:.85, 3:.8, 5:.9, 6:.85, 7:.9, 8:.85, script:.95}, teaser:[1700, 1100]}
+    anim:{l:'Мультфильм', prod:1700, pace:45, k:{1:.9, 2:.9, 3:.85, 5:.85, 6:.87, 7:.9, 8:.85, script:.95}, teaser:[1700, 1100]}
   };
   const STAGES = [
     {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>r100(T.k[1]*(2750*g(M) + 25*M)), weeks:()=>1},
@@ -482,6 +484,8 @@ footer a:hover{color:var(--text)}
     return Math.round(t/1000).toLocaleString('ru-RU') + ' тыс ₸';
   };
   const usd = x => '$' + Math.round(x).toLocaleString('ru-RU');
+  // точные тенге: строки расчёта складываются в итог без округления
+  const tgx = x => Math.round(x * RATE).toLocaleString('ru-RU') + ' ₸';
   const T = () => TYPES[st.type];
 
   // этапы: слева что входит, справа две колонки цен — мультфильм и кино; у каждого кнопка «Добавить в расчёт»
@@ -522,7 +526,7 @@ footer a:hover{color:var(--text)}
   // скидка
   document.querySelectorAll('input[name=offer]').forEach(r => r.addEventListener('change', e => { st.want = e.target.value; render(); }));
   const speeds = document.getElementById('speeds');
-  speeds.addEventListener('click', e => { const b = e.target.closest('button'); if(!b) return; st.fast = b.dataset.fast === '1'; speeds.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed', String(x===b))); render(); });
+  speeds.addEventListener('click', e => { const b = e.target.closest('button'); if(!b || b.disabled) return; st.fast = b.dataset.fast === '1'; render(); });
 
   // этапы и языки
   const cBox = document.getElementById('checks');
@@ -546,15 +550,15 @@ footer a:hover{color:var(--text)}
       if (s.n <= 6) {
         if (st.offer === 'pack') disc += price * PACK;
         if (st.offer === 'copro') disc += price * COPRO;
-        if (st.fast) extra += price * EXPRESS;
+        if (st.fastOn) extra += price * EXPRESS;
       }
-      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t}</span><b>${tenge(price)}</b></li>`);
+      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t}</span><b>${tgx(price)}</b></li>`);
     });
     const scriptP = SCRIPT_F(M, ty), teaserP = TEASER_F(st.teaserLen, ty);
-    if (st.script) { gross += scriptP; lines.unshift(`<li><span>Сценарий с нуля</span><b>${tenge(scriptP)}</b></li>`); }
-    if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}</span><b>${tenge(teaserP)}</b></li>`); }
-    if (extra > 0) lines.push(`<li><span>Экспресс, +20 % на этапы 1–6</span><b>+${tenge(extra)}</b></li>`);
-    if (disc > 0) lines.push(`<li class="disc"><span>${st.offer==='pack' ? 'Скидка под ключ, 10 % на весь фильм' : 'Скидка за сопродюсирование, 15 % на весь фильм'}</span><b>−${tenge(disc)}</b></li>`);
+    if (st.script) { gross += scriptP; lines.unshift(`<li><span>Сценарий с нуля</span><b>${tgx(scriptP)}</b></li>`); }
+    if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}</span><b>${tgx(teaserP)}</b></li>`); }
+    if (extra > 0) lines.push(`<li><span>Экспресс, +20 % на этапы 1–6</span><b>+${tgx(extra)}</b></li>`);
+    if (disc > 0) lines.push(`<li class="disc"><span>${st.offer==='pack' ? 'Скидка под ключ, 10 % на весь фильм' : 'Скидка за сопродюсирование, 15 % на весь фильм'}</span><b>−${tgx(disc)}</b></li>`);
     return {total: gross + extra - disc, disc, lines};
   }
 
@@ -572,13 +576,19 @@ footer a:hover{color:var(--text)}
     st.offer = film ? st.want : 'none';
     document.getElementById('o-' + st.offer).checked = true;
 
+    // экспресс сокращает срок, только если в расчёте продакшн или картинки вместе с черновым фильмом
+    const expressOk = st.on[3] || (st.on[1] && st.on[2]);
+    st.fastOn = st.fast && expressOk;
+    speeds.querySelector('[data-fast="1"]').disabled = !expressOk;
+    speeds.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.fast === '1') === st.fastOn)));
+    document.getElementById('speed-note').hidden = expressOk;
     const q = quote(ty), qa = quote(TYPES.anim), qf = quote(TYPES.film), total = q.total;
     // срок: картинки и черновой фильм частично идут вместе; звук и цвет — параллельно продакшну;
     // маркетинг и IP — параллельно; языки — после мастера, до трёх языков одновременно
-    const on = st.on, k = st.fast ? 2 : 1;
+    const on = st.on, k = st.fastOn ? 2 : 1;
     let pre = (on[0]?1:0) + (on[1]?2:0) + (on[2]?3:0);
     if (on[1] && on[2]) pre -= 1;
-    if (st.fast && pre >= 4) pre -= 1;
+    if (st.fastOn && pre >= 4) pre -= 1;
     const prod = on[3] ? STAGES[3].weeks(M, ty, k) : 0;
     const post = on[4] ? (on[3] ? 2 : 3) : 0;
     const langW = st.langs > 0 ? 1 + Math.ceil(st.langs / 3) : 0;
@@ -590,10 +600,10 @@ footer a:hover{color:var(--text)}
     const extras = st.on[6] || st.langs > 0 || st.script || st.teaserOn;
     const kind = teaserOnly ? 'тизер ' + (st.type === 'anim' ? 'мультфильма' : 'игрового фильма') + ', ' + fmtLen(st.teaserLen)
       : film ? ty.l.toLowerCase() + ' под ключ' + (extras ? ' + дополнения' : '') : 'выбранные этапы';
-    const expr = st.fast && filmOn ? ' · экспресс +20 %' : '';
+    const expr = st.fastOn ? ' · экспресс +20 %' : '';
     document.getElementById('total-lbl').textContent = 'Ориентир · ' + kind;
     document.getElementById('sum').textContent = total ? tenge(total) : '—';
-    document.getElementById('sum-usd').textContent = total ? usd(total) : 'Выберите хотя бы один этап';
+    document.getElementById('sum-usd').textContent = total ? usd(total) + ' · ' + tgx(total) : 'Выберите хотя бы один этап';
     document.getElementById('per-min').textContent = !total ? '' : teaserOnly ? `≈ ${tenge(total / st.teaserLen)} за минуту тизера` : `≈ ${tenge(total / M)} за минуту готового фильма`;
     document.getElementById('lines').innerHTML = q.lines.join('');
     document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}${weeks >= 6 ? ' · ≈ ' + months(weeks) : ''}${expr ? ' · экспресс' : ''}` : '';
