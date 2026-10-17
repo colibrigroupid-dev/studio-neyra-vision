@@ -543,7 +543,7 @@ footer a:hover{color:var(--text)}
     if (li) { st.lip = li.dataset.lip === '1'; if (!st.langs) st.langs = 1; render(); return; }
     const b = e.target.closest('.pick'); if (!b) return;
     const v = b.dataset.pick;
-    if (v === 'copro') { for (let j=0;j<6;j++) st.on[j] = true; st.want = 'copro'; }
+    if (v === 'copro') { if (st.offer === 'copro') st.want = 'pack'; else { for (let j=0;j<6;j++) st.on[j] = true; st.want = 'copro'; } }
     else if (v === 'script') st.script = !st.script;
     else if (v === 'teaser') st.teaserOn = !st.teaserOn;
     else { const i = +v; if (STAGES[i].lang) st.langs = st.langs > 0 ? 0 : 1; else st.on[i] = !st.on[i]; }
@@ -678,7 +678,7 @@ footer a:hover{color:var(--text)}
     if (selChip) { const fb = fBox.getBoundingClientRect(), sb = selChip.getBoundingClientRect(); if (sb.left < fb.left + 16 || sb.right > fb.right - 16) fBox.scrollLeft += sb.left - fb.left - 16; }
     stagesBox.querySelectorAll('.pick').forEach(b => {
       const v = b.dataset.pick; let on, txt;
-      if (v === 'copro') { on = st.offer === 'copro'; txt = on ? 'Сопродюсирование выбрано' : 'Выбрать сопродюсирование'; }
+      if (v === 'copro') { on = st.offer === 'copro'; txt = on ? 'Выбрано · отменить' : 'Выбрать сопродюсирование'; }
       else if (v === 'script') { on = st.script; txt = on ? 'В расчёте' : 'Добавить в расчёт'; }
       else if (v === 'teaser') { on = st.teaserOn; txt = on ? 'В расчёте · ' + fmtLen(st.teaserLen) : 'Добавить в расчёт'; }
       else if (STAGES[+v].lang) { on = st.langs > 0; txt = on ? 'В расчёте · ' + st.langs + ' ' + yazyk(st.langs) : 'Добавить в расчёт'; }
