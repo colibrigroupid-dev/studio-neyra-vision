@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Цены, коротко — Digital Taurus Asia · технология NEYRA</title>
+<meta name="description" content="Сколько стоит ваш фильм или мультфильм под ключ: выберите длину и получите цену. Или идите по этапам — от скрининга сценария до перевода. Технология NEYRA, Казахстан.">
+<meta property="og:title" content="Цены — Digital Taurus Asia · технология NEYRA">
+<meta property="og:description" content="Фильм или мультфильм под ключ: выберите длину — увидите цену. Восемь этапов от сценария до проката.">
+<meta property="og:image" content="https://studio.neyra.vision/v2/media/og-v2.jpg">
+<link rel="icon" href="../../assets/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0b0b0b; --ink-2:#121212; --ink-3:#1b1b1b; --ink-4:#262626;
+  --line:#2a2a2a; --line-2:#3a3a3a;
+  --text:#f2f2f0; --muted:#a3a3a0; --dim:#7a7a76;
+  --disp:'Geologica',system-ui,sans-serif; --body:'Onest',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --step-0:clamp(1rem,.96rem + .2vw,1.125rem);
+  --step-1:clamp(1.2rem,1.08rem + .5vw,1.5rem);
+  --step-3:clamp(1.9rem,1.4rem + 2.2vw,3.2rem);
+  --step-5:clamp(2.5rem,1.6rem + 4.6vw,5.6rem);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--ink);color:var(--text);font:400 var(--step-0)/1.6 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img{display:block;max-width:100%}
+a{color:inherit}
+::selection{background:var(--text);color:var(--ink)}
+:focus-visible{outline:2px solid var(--text);outline-offset:3px;border-radius:4px}
+.wrap{width:min(1240px,100%);margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:700px){.wrap{padding-left:max(40px,env(safe-area-inset-left,0px));padding-right:max(40px,env(safe-area-inset-right,0px))}}
+h1,h2,h3{font-family:var(--disp);font-weight:600;letter-spacing:-.03em;line-height:1.04;margin:0;text-wrap:balance}
+p{margin:0}
+.mono{font-family:var(--mono);font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.btn{display:inline-flex;align-items:center;gap:.55em;min-height:48px;padding:0 1.35em;border-radius:999px;border:1px solid transparent;font:500 1rem/1 var(--body);text-decoration:none;cursor:pointer;transition:transform .25s var(--ease),background-color .2s,border-color .2s;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn--main{background:var(--text);color:var(--ink)}
+.btn--main:hover{background:#fff}
+.btn--ghost{background:transparent;color:var(--text);border-color:var(--line-2)}
+.btn--ghost:hover{border-color:var(--text)}
+
+/* шапка */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in oklab,var(--ink) 88%,transparent);backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px}
+.brand{display:inline-flex;align-items:center;gap:12px;min-height:44px;text-decoration:none}
+.brand svg{width:30px;height:31px;flex:none}
+.brand b{font:600 1rem/1.1 var(--disp);letter-spacing:-.01em;display:block}
+.brand small{font:400 .72rem/1.2 var(--mono);letter-spacing:.08em;color:var(--dim);text-transform:uppercase;display:block}
+.nav{display:flex;align-items:center;gap:clamp(10px,2vw,26px)}
+.nav a.link{font-size:.95rem;color:var(--muted);text-decoration:none;padding:10px 4px}
+.nav a.link:hover{color:var(--text)}
+.nav .btn{min-height:42px;font-size:.95rem}
+@media (max-width:900px){.nav a.link{display:none}}
+@media (max-width:480px){.brand small{display:none}.brand b{font-size:.92rem}.nav .btn{padding:0 1em}}
+
+/* первый экран */
+.hero{position:relative;padding:clamp(56px,8vw,112px) 0 clamp(44px,6vw,80px);overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__bg{position:absolute;inset:0;background:url("../../v2/media/konnica.jpg") center/cover no-repeat;filter:grayscale(1) brightness(.42)}
+.hero__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:heroDrift 40s ease-in-out infinite alternate}
+@keyframes heroDrift{from{transform:scale(1.04) translateX(-1%)}to{transform:scale(1.1) translateX(1%)}}
+@media (prefers-reduced-motion:reduce){.hero__video{display:none}}
+.hero__bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,11,11,.95) 0%,rgba(11,11,11,.7) 55%,rgba(11,11,11,.35) 100%)}
+.hero .wrap{position:relative}
+.hero h1{font-size:var(--step-5);font-weight:600;max-width:15ch;margin-top:16px}
+.hero h1 em{font-style:normal;font-weight:300;color:var(--muted)}
+.hero p.lead{max-width:620px;margin-top:22px;font-size:var(--step-1);line-height:1.4;color:#d7d7d3}
+.hero__cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+/* три афиши с ориентирами цен */
+.posters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:36px;max-width:820px}
+.offer-t{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:2px;aspect-ratio:16/10;padding:14px 16px;border:1px solid var(--line-2);border-radius:16px;overflow:hidden;background:var(--img) center/cover no-repeat #111;color:var(--text);text-align:left;cursor:pointer;isolation:isolate}
+.offer-t::before{content:"";position:absolute;inset:0;background:var(--img) center/cover no-repeat;filter:grayscale(1) brightness(.75);transition:filter .5s,transform .6s;z-index:-2}
+.offer-t::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.05) 30%,rgba(11,11,11,.9) 100%);z-index:-1}
+.offer-t:hover::before,.offer-t:focus-visible::before{filter:grayscale(0) brightness(.85);transform:scale(1.04)}
+.offer-t:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.offer-t__k{font:500 .7rem/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#d7d7d3}
+.offer-t b{font:500 clamp(1.15rem,1rem + .7vw,1.55rem)/1.1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:4px}
+.offer-t small{color:#c8c8c4;font-size:.85rem}
+@media (max-width:600px){
+  .posters{display:flex;overflow-x:auto;scrollbar-width:none;margin:28px -16px 0;padding:0 16px;gap:10px;scroll-snap-type:x mandatory}
+  .posters::-webkit-scrollbar{display:none}
+  .offer-t{flex:0 0 74vw;scroll-snap-align:start}
+}
+.facts{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:36px;color:var(--muted);font-size:.95rem}
+.facts b{color:var(--text);font-weight:500}
+
+section.block{padding:clamp(60px,8vw,112px) 0;border-bottom:1px solid var(--line)}
+.block__head{display:flex;flex-direction:column;gap:14px;margin-bottom:clamp(26px,4vw,44px);max-width:780px}
+.block__head h2{font-size:var(--step-3)}
+.block__head p{color:var(--muted);font-size:var(--step-1);line-height:1.45}
+
+/* калькулятор */
+.calc{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(22px,4vw,52px);align-items:start}
+@media (max-width:900px){.calc{grid-template-columns:1fr}}
+.panel{background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:clamp(18px,3vw,30px);display:flex;flex-direction:column;gap:24px;min-width:0}
+.field{display:flex;flex-direction:column;gap:10px;min-width:0}
+.field > label,.field > .lbl{font-size:.95rem;color:var(--muted)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--ink-4);border-radius:14px;padding:5px}
+.seg button{border:0;border-radius:10px;background:transparent;color:var(--muted);font:500 1rem/1.2 var(--body);padding:13px 10px;cursor:pointer;min-height:48px}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--ink)}
+.len{display:flex;align-items:center;gap:14px}
+.len input[type=range]{flex:1;min-width:0;accent-color:var(--text);height:28px}
+.len output{font:500 1.25rem/1 var(--mono);min-width:6.5ch;text-align:right;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips--row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:2px 16px;mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.chips--row::-webkit-scrollbar{display:none}
+.chips--row .chip{flex:0 0 auto;white-space:nowrap}
+@media (min-width:600px){.chips--row{margin:0;padding:2px 0;mask-image:none}}
+.chip{border:1px solid var(--line-2);background:transparent;color:var(--text);border-radius:999px;padding:9px 14px;font:500 .9rem/1 var(--body);cursor:pointer;min-height:40px}
+.chip[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
+.offers{display:grid;gap:8px}
+.offer{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;align-items:start;border:1px solid var(--line-2);border-radius:14px;padding:14px 16px;cursor:pointer}
+.offer:has(input:checked){border-color:var(--text);background:var(--ink-3)}
+.offer:has(input:disabled){opacity:.45;cursor:not-allowed}
+.offer input{width:18px;height:18px;accent-color:var(--text);margin:3px 0 0}
+.offer b{font-weight:500}
+.offer small{display:block;color:var(--dim);font-size:.85rem;margin-top:3px;line-height:1.4}
+details.more{border-top:1px solid var(--line);padding-top:16px}
+details.more summary{cursor:pointer;color:var(--muted);font-size:.95rem;list-style:none;display:flex;justify-content:space-between;align-items:center;min-height:32px}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::after{content:"+";font:400 1.3rem/1 var(--mono)}
+details.more[open] summary::after{content:"−"}
+details.more .inner{display:flex;flex-direction:column;gap:18px;margin-top:14px}
+.checks{display:grid}
+.check{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.check:last-child{border-bottom:0}
+.check input{width:20px;height:20px;accent-color:var(--text);margin:0}
+.check span{min-width:0}
+.check em{font-style:normal;font:500 .9rem/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.step-in{display:flex;align-items:center;gap:10px}
+.step-in button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--text);font:500 1.2rem/1 var(--body);cursor:pointer}
+.step-in output{font:500 1.2rem/1 var(--mono);min-width:2ch;text-align:center}
+.total{position:sticky;top:84px;background:var(--text);color:var(--ink);border-radius:18px;padding:clamp(20px,3vw,32px);display:flex;flex-direction:column;gap:16px;min-width:0}
+.total .mono{color:#55554f}
+.total__sum{font:500 clamp(2.1rem,1.5rem + 2.8vw,3.4rem)/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums;word-break:break-word}
+.total__usd{font:500 1.05rem/1.3 var(--mono);color:#55554f;margin-top:10px}
+.total__min{font-size:.95rem;color:#33332f}
+.total ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:.92rem}
+.total li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #d6d6d0;padding-bottom:8px}
+.total li b{font:500 .92rem/1.3 var(--mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+.total li.disc{border-bottom:0;font-weight:600}
+.total__time{font-size:.95rem}
+.total .btn{background:var(--ink);color:var(--text);justify-content:center}
+.total .btn:hover{background:#222}
+.total__fine{font-size:.8rem;color:#55554f;line-height:1.45}
+.total__incl{font-size:.85rem;color:#55554f;line-height:1.45;margin-top:-6px}
+
+/* лестница этапов: слева что входит, справа две колонки цен — мультфильм и кино */
+.stages{display:grid;border-top:1px solid var(--line)}
+.stage{display:grid;grid-template-columns:56px minmax(0,1fr) 150px 150px;gap:10px 24px;padding:22px 0;border-bottom:1px solid var(--line);align-items:start}
+.stage__n{font:500 1.4rem/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.stage h3{font-size:clamp(1.2rem,1.05rem + .6vw,1.55rem);letter-spacing:-.02em}
+.stage__what{color:var(--muted);margin-top:6px;max-width:58ch}
+.stage__meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:.88rem;color:var(--dim)}
+.stage__meta b{color:var(--muted);font-weight:500}
+.stage__p{text-align:right;min-width:0}
+.stage__p::before{content:attr(data-l);display:none;font:500 .7rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.stage__p b{display:block;font:500 clamp(1.05rem,.95rem + .45vw,1.35rem)/1.15 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--muted)}
+.stage__p small{display:block;color:var(--dim);font-size:.8rem;margin-top:4px;white-space:pre-line}
+.stages[data-sel="anim"] .stage__p[data-t="anim"] b,.stages[data-sel="film"] .stage__p[data-t="film"] b{color:var(--text)}
+.stage__p--wide{grid-column:3 / 5}
+.stage__p--wide b{font:500 1rem/1.3 var(--body);color:var(--muted)}
+@media (max-width:760px){
+  .stage{grid-template-columns:32px minmax(0,1fr) minmax(0,1fr);gap:10px 16px;padding:20px 0}
+  .stage__n{font-size:1.1rem}
+  .stage__t{grid-column:2 / 4}
+  .stage__p{text-align:left}
+  .stage__p::before{display:block}
+  .stage__p[data-t="anim"]{grid-column:2}
+  .stage__p[data-t="film"]{grid-column:3}
+  .stage__p--wide{grid-column:2 / 4}
+}
+.note{color:var(--dim);font-size:.9rem;margin-top:18px;max-width:80ch}
+.pick{margin-top:12px;border:1px solid var(--line-2);background:transparent;color:var(--text);border-radius:999px;padding:9px 14px;font:500 .88rem/1 var(--body);cursor:pointer;min-height:40px;white-space:nowrap}
+.pick:hover{border-color:var(--text)}
+.pick[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
+.stage--dist .stage__n{color:var(--text)}
+.offer-note{font-size:.85rem;color:var(--dim)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.sumbar{position:sticky;top:calc(65px + env(safe-area-inset-top,0px));z-index:20;display:grid;grid-template-columns:56px minmax(0,1fr) 150px 150px;gap:6px 24px;align-items:end;padding:12px 0;margin-bottom:6px;background:color-mix(in oklab,var(--ink) 92%,transparent);backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--line)}
+.sumbar__l{grid-column:1 / 3;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;min-width:0;color:var(--muted);font-size:.9rem}
+.sumbar__l .mono{color:var(--text)}
+.sumbar__l a{color:var(--text)}
+.sumbar__c{appearance:none;background:none;border:0;margin:0;padding:4px 0;color:inherit;font:inherit;text-align:right;cursor:pointer;min-width:0;border-radius:8px}
+.sumbar__c:focus-visible{outline:2px solid var(--text);outline-offset:4px}
+.sumbar__c span{display:block;font:500 .72rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.sumbar__c b{display:block;margin-top:6px;font:500 clamp(1.05rem,.95rem + .45vw,1.35rem)/1.1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--muted)}
+.sumbar__c small{display:block;margin-top:3px;color:var(--dim);font-size:.8rem}
+.sumbar__c[aria-pressed="true"] span,.sumbar__c[aria-pressed="true"] b{color:var(--text)}
+@media (max-width:760px){
+  .sumbar{grid-template-columns:32px minmax(0,1fr) minmax(0,1fr);gap:4px 16px;padding:8px 0}
+  .sumbar__l{grid-column:1 / 4}
+  .sumbar__c{text-align:left}
+  .sumbar__c[data-type="anim"]{grid-column:2}
+  .sumbar__c[data-type="film"]{grid-column:3}
+  .sumbar__c small{display:none}
+}
+.stage--extra .stage__n{color:var(--text)}
+.stage .chips{margin-top:12px}
+.stage__note{color:var(--dim);font-size:.85rem;margin-top:8px;max-width:58ch}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--text);color:var(--ink);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-shadow:0 -8px 30px rgba(0,0,0,.35)}
+.dock span{min-width:0;font-size:.9rem;color:#33332f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock b{font:500 1.15rem/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;margin-right:8px}
+.dock a{flex:none;background:var(--ink);color:var(--text);border-radius:999px;padding:11px 16px;font:500 .9rem/1 var(--body);text-decoration:none}
+
+/* скидки, фонды, условия */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px}
+.card{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card b.big{font:500 clamp(1.5rem,1.2rem + 1vw,2rem)/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.card h3{font-size:1.3rem;letter-spacing:-.01em}
+.card p{color:var(--muted)}
+.card__cred{color:var(--text);font-size:.92rem;border-top:1px solid var(--line);padding-top:10px;margin-top:auto}
+.terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:0 40px}
+.terms div{padding:18px 0;border-bottom:1px solid var(--line)}
+.terms h3{font-size:1.15rem;letter-spacing:-.01em}
+.terms p{color:var(--muted);margin-top:6px}
+.tech{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-top:16px}
+.tech a{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;color:inherit;text-decoration:none;min-width:0}
+.tech a:hover{border-color:var(--line-2)}
+.tech b{font:500 1.02rem/1.2 var(--mono);overflow-wrap:anywhere}
+.tech span{color:var(--muted);font-size:.92rem}
+.who{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
+
+.final{padding:clamp(72px,10vw,140px) 0}
+/* анкета заявки */
+.zayavka{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(24px,5vw,72px);align-items:start}
+@media (max-width:820px){.zayavka{grid-template-columns:1fr}}
+.final .zayavka__alt{margin-top:18px;color:var(--muted);font-size:.95rem;max-width:none}
+.zayavka__alt a{color:var(--text)}
+.form{display:flex;flex-direction:column;gap:14px;background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:clamp(18px,3vw,28px)}
+.form label{display:flex;flex-direction:column;gap:6px}
+.form label span{font-size:.85rem;color:var(--muted)}
+.form input,.form textarea{width:100%;background:var(--ink);border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;color:var(--text);font:400 1rem/1.4 var(--body);min-height:46px}
+.form textarea{resize:vertical}
+.form input:focus,.form textarea:focus{outline:none;border-color:var(--text)}
+.form input:user-invalid{border-color:#c46}
+.final .form__calc{font-size:.9rem;line-height:1.45;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;margin:0;max-width:none}
+.form__calc b{color:var(--text);font-weight:500}
+.final .form__note{font-size:.8rem;line-height:1.45;color:var(--dim);margin:0;max-width:none}
+.final h2{font-size:var(--step-5);max-width:12ch}
+.final p{color:#d7d7d3;max-width:560px;margin-top:22px;font-size:var(--step-1);line-height:1.4}
+footer{padding:40px 0 calc(96px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);color:var(--dim);font-size:.9rem}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px 32px}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Digital Taurus Asia · технология NEYRA">
+      <svg viewBox="20 18 160 166" aria-hidden="true"><circle cx="100" cy="132" r="44" fill="none" stroke="#f2f2f0" stroke-width="12"/><path d="M34,30 C34,82 66,88 100,88 C134,88 166,82 166,30" fill="none" stroke="#f2f2f0" stroke-width="12" stroke-linecap="round"/><polygon points="88,116 88,148 116,132" fill="#f2f2f0"/></svg>
+      <span><b>Digital Taurus Asia</b><small>× технология NEYRA</small></span>
+    </a>
+    <nav class="nav" aria-label="Разделы">
+      <a class="link" href="#kalkulyator">Калькулятор</a>
+      <a class="link" href="#etapy">Этапы</a>
+      <a class="link" href="#prava">Права</a>
+      <a class="link" href="#usloviya">Условия</a>
+      <a class="btn btn--main" href="#zayavka">Обсудить проект</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero__bg" aria-hidden="true"><video class="hero__video" autoplay muted loop playsinline preload="metadata" poster="../../v2/media/konnica.jpg"><source src="../../v2/media/konnica.mp4" type="video/mp4"></video></div>
+  <div class="wrap">
+    <div class="mono">Digital Taurus Asia · проекты на технологии NEYRA в Казахстане</div>
+    <h1 id="hero-title">Сколько стоит ваш фильм — <em>видно сразу.</em></h1>
+    <p class="lead">Выберите фильм или мультфильм и длину — цена и срок под ключ. Или идите по этапам и остановитесь на любом.</p>
+    <div class="hero__cta">
+      <a class="btn btn--main" href="#kalkulyator">Посчитать мой фильм</a>
+      <a class="btn btn--ghost" href="#etapy">Смотреть этапы</a>
+    </div>
+    <div class="posters" id="hero-offers" aria-label="Ориентиры цен">
+      <button type="button" class="offer-t" data-go="anim" style="--img:url('../../v2/media/play-skoro-er-tostik.jpg')"><span class="offer-t__k">Мультфильм · 90 минут</span><b id="ho-anim"></b><small id="ho-anim-t"></small></button>
+      <button type="button" class="offer-t" data-go="film" style="--img:url('../../v2/media/saka-voin.jpg')"><span class="offer-t__k">Игровой фильм · 90 минут</span><b id="ho-film"></b><small id="ho-film-t"></small></button>
+      <button type="button" class="offer-t" data-go="teaser" style="--img:url('../../v2/media/zoloto-plastiny.jpg')"><span class="offer-t__k">Тизер · 3 минуты</span><b id="ho-teaser"></b><small id="ho-teaser-t"></small></button>
+    </div>
+    <div class="facts">
+      <span><b>3–7 дней</b> — 3D-аниматик всего фильма</span>
+      <span><b>Под NDA</b> — с первого файла</span>
+      <span><b>Паспорт фильма</b> — права для стримингов</span>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="kalkulyator" aria-labelledby="calc-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Калькулятор</div>
+      <h2 id="calc-title">Весь фильм под ключ</h2>
+      <p>Цена и срок пересчитываются сразу.</p>
+    </div>
+    <div class="calc">
+      <div class="panel">
+        <div class="field">
+          <span class="lbl" id="type-lbl">Что делаем</span>
+          <div class="seg" role="group" aria-labelledby="type-lbl" id="types">
+            <button type="button" data-type="film" aria-pressed="true">Игровой фильм</button>
+            <button type="button" data-type="anim" aria-pressed="false">Мультфильм</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="len">Длина, минут</label>
+          <div class="len"><input type="range" id="len" min="3" max="150" step="1" value="90"><output id="len-out" for="len">90 мин</output></div>
+          <div class="chips chips--row" role="group" aria-label="Быстрый выбор длины" id="formats"></div>
+        </div>
+        <div class="field">
+          <span class="lbl" id="speed-lbl">Срок</span>
+          <div class="seg" role="group" aria-labelledby="speed-lbl" id="speeds">
+            <button type="button" data-fast="0" aria-pressed="true">Стандарт</button>
+            <button type="button" data-fast="1" aria-pressed="false">Экспресс · +20&nbsp;%</button>
+          </div>
+          <p class="offer-note" id="speed-note" hidden>Экспресс включается, только когда сокращает срок. Здесь срок уже минимальный.</p>
+        </div>
+        <div class="field">
+          <span class="lbl" id="offer-lbl">Скидка</span>
+          <div class="offers" role="radiogroup" aria-labelledby="offer-lbl">
+            <label class="offer" for="o-none"><input type="radio" name="offer" id="o-none" value="none"><span><b>Без скидки</b><small>По этапам, решение после каждого.</small></span></label>
+            <label class="offer" for="o-pack"><input type="radio" name="offer" id="o-pack" value="pack" checked><span><b>Под ключ — минус 10 %</b><small>Весь фильм одним договором, оплата по этапам.</small></span></label>
+            <label class="offer" for="o-copro"><input type="radio" name="offer" id="o-copro" value="copro"><span><b>Сопродюсирование — минус 15 %</b><small>Плюс совместная дистрибуция. Взамен — 10 % чистых поступлений продюсера. Для проектов с высокой оценкой на скрининге.</small></span></label>
+          </div>
+          <p class="offer-note">Скидки и экспресс — от цены этапов 1–6. Сценарий, музыка, тизер, IP и языки — без скидки.</p>
+        </div>
+        <details class="more" id="more">
+          <summary>Настроить этапы, сценарий, тизер и языки</summary>
+          <div class="inner">
+            <div class="checks"><label class="check" for="c-script"><input type="checkbox" id="c-script"><span>0. Сценарий с нуля</span><em id="cp-script"></em></label></div>
+            <div class="checks" id="checks"></div>
+            <div class="field">
+              <span class="lbl" id="teaser-lbl">Тизер в кинокачестве</span>
+              <div class="chips" role="group" aria-labelledby="teaser-lbl" id="teaser-chips"></div>
+            </div>
+            <div class="field">
+              <span class="lbl" id="lang-lbl">Языковые версии</span>
+              <div class="step-in" role="group" aria-labelledby="lang-lbl"><button type="button" id="lang-minus" aria-label="Меньше языков">−</button><output id="lang-out">0</output><button type="button" id="lang-plus" aria-label="Больше языков">+</button></div>
+              <div id="lip-box"></div>
+            </div>
+            <div class="field">
+              <span class="lbl" id="music-lbl">Музыка к этапу 5</span>
+              <div id="music-box"></div>
+            </div>
+          </div>
+        </details>
+      </div>
+      <aside class="total" aria-live="polite">
+        <div class="mono" id="total-lbl">Игровой фильм под ключ</div>
+        <div><div class="total__sum" id="sum">—</div><div class="total__usd" id="sum-usd"></div></div>
+        <p class="total__min" id="per-min"></p>
+        <ul id="lines"></ul>
+        <p class="total__time" id="time"></p>
+        <p class="total__incl" id="incl"></p>
+        <a class="btn" href="#zayavka">Обсудить смету</a>
+        <p class="total__fine" id="fine">Без НДС. Точную смету называем после скрининга, под NDA. Оплата по этапам.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="etapy" aria-labelledby="etapy-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Этапы и отдельные продукты</div>
+      <h2 id="etapy-title">Из чего складывается цена</h2>
+      <p id="et-fmt">Цены для длины 90 мин. Отмечайте нужные — расчёт обновится.</p>
+    </div>
+    <div class="sumbar" id="sumbar">
+      <div class="sumbar__l"><span class="mono" id="sb-len">90 мин</span><span id="sb-lbl"></span><a href="#kalkulyator">Изменить</a></div>
+      <button type="button" class="sumbar__c" data-type="anim" aria-pressed="false"><span>Мультфильм</span><b id="sb-anim">—</b><small id="sb-anim-usd"></small></button>
+      <button type="button" class="sumbar__c" data-type="film" aria-pressed="true"><span>Кино</span><b id="sb-film">—</b><small id="sb-film-usd"></small></button>
+    </div>
+    <div class="stages" id="stages"></div>
+    <p class="note">Ориентир без НДС, 1 $ = 450 ₸. Точная смета — после скрининга.</p>
+  </div>
+</section>
+
+<section class="block" id="skidki" aria-labelledby="skidki-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Скидки</div>
+      <h2 id="skidki-title">Чем дальше идём вместе, тем дешевле</h2>
+      <p>Скидки не складываются — действует бо́льшая.</p>
+    </div>
+    <div class="cols">
+      <div class="card"><span class="mono">Под ключ</span><b class="big">−10 %</b><h3>Весь фильм одним договором</h3><p>Этапы 1–6, оплата по этапам. Остановились — оплаченное остаётся со скидкой.</p></div>
+      <div class="card"><span class="mono">Сопродюсирование</span><b class="big">−15 %</b><h3>Сопродюсирование и дистрибуция</h3><p>Вместе выводим фильм к зрителю: фестивали, другие страны, стриминги, Neyra Play. Взамен — 10 % чистых поступлений продюсера по договору.</p></div>
+      <div class="card"><span class="mono">Портфель</span><b class="big">−20 %</b><h3>Фондам и студиям</h3><p>От 10 сценариев на скрининге и для лучших на этапах 2–3.</p><p class="card__cred" id="fund"></p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="prava" aria-labelledby="prava-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Технология и права</div>
+      <h2 id="prava-title">Права подтверждены, данные под&nbsp;замком</h2>
+      <p>Договор и продюсеры — Digital Taurus Asia, официальный представитель технологии NEYRA в Казахстане: Анна Чакиртова и Анара Жунусова («Приговор», «Қара бекіре», «Томирис»). Производство — Neyra Vision Studio. Права на каждый элемент фильма собираем с первого дня — так, как требуют стриминги.</p>
+    </div>
+    <div class="cols">
+      <div class="card"><span class="mono">ДНК фильма</span><h3>Паспорт фильма</h3><p>Кто, когда и из чего сделал каждый кадр, героя, музыку и звук; согласия актёров и лицензии. Передаём вместе с фильмом.</p></div>
+      <div class="card"><span class="mono">Авторское право</span><h3>Права переходят вам</h3><p>Исключительные права на картинки, видео, музыку и звук — продюсеру по договору. Паспорт доказывает творческий вклад человека.</p></div>
+      <div class="card"><span class="mono">Конфиденциально</span><h3>Секретно и безопасно</h3><p>Материалы не идут в обучение публичных моделей ИИ. NDA с первого файла. Все файлы проекта — в хранилище GhostDrive, зашифрованы до загрузки, доступ только у вас.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="usloviya" aria-labelledby="terms-title">
+  <div class="wrap">
+    <div class="block__head">
+      <div class="mono">Условия</div>
+      <h2 id="terms-title">Как мы работаем</h2>
+    </div>
+    <div class="terms">
+      <div><h3>Оплата по этапам</h3><p>50 % до начала этапа, 50 % при сдаче. Следующий этап — после вашего «да».</p></div>
+      <div><h3>Два раунда правок</h3><p>На каждый этап, по сводному списку от одного представителя.</p></div>
+      <div><h3>Сначала NDA</h3><p>Сценарий присылаете после подписания. Документы по ИИ — согласия актёров, лицензии, паспорт фильма — готовим мы, под законодательство Казахстана.</p></div>
+      <div><h3>Режиссёр решает</h3><p>Режиссёр и оператор утверждают кадры на общей доске. Снимаете сами — даём книгу стейджинга.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="final" id="zayavka" aria-labelledby="final-title">
+  <div class="wrap">
+    <div class="zayavka">
+      <div>
+        <h2 id="final-title">Начните со&nbsp;сценария.</h2>
+        <p>Оставьте заявку — пришлём NDA, после него точную смету первого этапа. Расчёт приложится к письму сам.</p>
+        <p class="zayavka__alt">Или напишите напрямую: <a href="mailto:alex@neyra.ai">alex@neyra.ai</a> · <a href="https://t.me/mis_ter_bro">Telegram</a></p>
+      </div>
+      <form class="form" id="form" novalidate>
+        <label><span>Как вас зовут</span><input type="text" name="name" autocomplete="name" required></label>
+        <label><span>Телефон, Telegram или почта</span><input type="text" name="contact" autocomplete="tel" required></label>
+        <label><span>О проекте — пара строк</span><textarea name="about" rows="3" placeholder="Жанр, есть ли сценарий, когда хотите премьеру"></textarea></label>
+        <p class="form__calc" id="form-calc"></p>
+        <button type="submit" class="btn btn--main">Отправить заявку</button>
+        <p class="form__note">Откроется ваша почта с готовым письмом на alex@neyra.ai — останется нажать «Отправить».</p>
+      </form>
+    </div>
+  </div>
+</section>
+</main>
+
+<div class="dock" id="dock" hidden><span><b id="dock-sum"></b><em id="dock-lbl" style="font-style:normal"></em></span><a href="#kalkulyator">К расчёту</a></div>
+
+<footer>
+  <div class="wrap">
+    <div>Digital Taurus Asia — продюсер и договор · технология NEYRA<br>Производство — Neyra Vision Studio · Показ — Neyra Play · Алматы</div>
+    <nav aria-label="Ссылки">
+      <a href="../../v2/">Платформа</a>
+      <a href="https://play.neyra.vision/">Neyra Play</a>
+      <a href="https://t.me/mis_ter_bro">Telegram</a>
+      <a href="../">Полная версия</a>
+      <span>alex@neyra.ai</span>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const RATE = 450;               // ₸ за $
+  const PACK = 0.10, COPRO = 0.15, FUND = 0.20;
+  const r100 = x => Math.round(x / 100) * 100;
+  // Цены в $ от длины M (минуты).
+  // Короткий формат: постоянная часть этапа (разбор, разработка героев и локаций, сборка, пакет маркетинга) растёт с длиной до 45 минут, дальше постоянна.
+  const g = M => Math.min(1, Math.pow(M / 45, 0.75));
+  // prod: $ за минуту продакшна; pace: минут готового фильма в месяц в стандарте (экспресс — вдвое быстрее).
+  // k: цена мультфильма к цене кино по этапам — стилизованный мир проще фотореализма, нет внешности и согласий живых актёров, дубляж проще.
+  // teaser: [постоянная часть, $ за минуту, постоянная часть с этапом 2] — тизер в темпе трейлера: до 3 героев и 2 локаций, 1080p, музыка и звук;
+  // если этап 2 в расчёте, герои и локации уже сделаны — остаются минуты тизера, музыка и звук.
+  // «Весь фильм» = этапы 1–6: на него считаются скидки «под ключ», «сопродюсирование» и надбавка за экспресс; IP и языки — по своей цене.
+  const TYPES = {
+    film:{l:'Игровой фильм', prod:2200, pace:30, k:{1:1, 2:1, 3:1, 5:1, 6:1, 7:1, 8:1, script:1}, teaser:[1800, 1400, 500]},
+    anim:{l:'Мультфильм', prod:1700, pace:45, k:{1:.9, 2:.9, 3:.85, 5:.85, 6:.87, 7:.9, 8:.85, script:.95}, teaser:[1700, 1100, 450]}
+  };
+  const STAGES = [
+    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>r100(T.k[1]*(2750*g(M) + 25*M)), weeks:()=>1},
+    {n:2, t:'Улучшение и картинки', w:'Лечение сценария с автором, герои и локации с закреплённым обликом, кадр на каждый план.', time:'1–2 недели', f:(M,T)=>r100(T.k[2]*(7000*g(M) + 55*M)), weeks:()=>2},
+    {n:3, t:'Черновой фильм', w:'Весь фильм в движении: черновое качество, монтаж, временный звук.', time:'2–3 недели', f:(M,T)=>r100(T.k[3]*(4000*g(M) + 122*M)), weeks:()=>3},
+    {n:4, t:'Продакшн', w:'Чистовые кадры 1080p, апскейл до 4K. Кино — фотореализм и синхрон губ, мультфильм — единый стиль и живые голоса.', time:'ориентир: кино — 30 минут в месяц, мультфильм — 45; в экспрессе вдвое быстрее', f:(M,T)=>T.prod*M, weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
+    {n:5, t:'Звук и выпуск', w:'Шумы, фоли, сведение 5.1, цвет, мастер 4K и DCP. Музыка — на выбор.', time:'2–4 недели', f:(M,T)=>r100(T.k[5]*(1450*g(M) + 165*M)), weeks:()=>3},
+    {n:6, t:'Маркетинг', w:'Тизеры, вертикальные ролики, постер и презентация для прокатчиков.', time:'1 неделя', f:(M,T)=>r100(T.k[6]*(4000*g(M) + 22*M)), weeks:()=>0},
+    {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн.', time:'2–3 недели', f:(M,T)=>r100(9000*T.k[7]), weeks:()=>0},
+    {n:8, t:'Перевод на другой язык', w:'Перевод, кастинг голосов, запись, сведение 5.1 и стерео. С синхроном губ — губы героев совпадают с новой речью.', time:'2–3 недели, языки параллельно', f:(M,T,lip)=>LANG_F(M, lip), weeks:()=>0, lang:true}
+  ];
+  const FORMATS = [{l:'Тизер, 3',m:3,teaser:true},{l:'Короткий, 15',m:15},{l:'Фильм, 90',m:90},{l:'Эпос, 120',m:120}];
+  // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1,5–3 мин)
+  const writerMonths = M => Math.min(3, g(M) + M/60);
+  const scriptWeeks = M => Math.ceil(writerMonths(M) * 4.33);
+  const SCRIPT_F = (M,T) => r100(T.k.script*(7000*g(M) + 140*M));
+  const TEASER_F = (L,T,dev=true) => r100((dev ? T.teaser[0] : T.teaser[2]) + T.teaser[1]*L);
+  // со сценарием с нуля этап 2 не берёт за лечение сценария: оно уже в двух редакциях сценария
+  const DOCTOR_F = (M,T) => r100(T.k[2] * 3000 * g(M));
+  const TEASER_LENS = [1.5, 2, 3];
+  // музыка к этапу 5: музыка звучит половину фильма; цена за минуту музыки по уровню; своя — 0.
+  // Скидки и экспресс на музыку не действуют.
+  const MUSIC = {neyra:{l:'NEYRA', line:'Музыка NEYRA', perMin:100}, composer:{l:'Композитор', line:'Музыка композитора', perMin:750}, own:{l:'Своя', line:'', perMin:0}};
+  const MUSIC_F = (M, key) => r100(MUSIC[key].perMin * M / 2);
+  // перевод одной ценой для кино и мультфильма: дубляж — перевод, голоса, запись, 5.1 и стерео; синхрон губ — надбавкой
+  const LANG_F = (M, lip) => r100(Math.max(800, 47*M)) + (lip ? r100(Math.max(800, 44*M)) : 0);
+  const fmtLen = L => L.toLocaleString('ru-RU') + ' мин';
+  // по умолчанию — «весь фильм»: этапы 1–6, без IP и языков
+  const EXPRESS = 0.20;
+  const st = {M:90, type:'film', on:[true,true,true,true,true,true,false], langs:0, offer:'pack', want:'pack', fast:false, script:false, teaserOn:false, teaserLen:2, preset:null, music:'neyra', lip:false};
+
+  const tenge = usd => {
+    const t = usd * RATE;
+    if (t >= 1e9) return (t/1e9).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' млрд ₸';
+    if (t >= 1e6) return (t/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' млн ₸';
+    return Math.round(t/1000).toLocaleString('ru-RU') + ' тыс ₸';
+  };
+  const usd = x => '$' + Math.round(x).toLocaleString('ru-RU');
+  // точные тенге: строки расчёта складываются в итог без округления
+  const tgx = x => Math.round(x * RATE).toLocaleString('ru-RU') + ' ₸';
+  const T = () => TYPES[st.type];
+
+  // этапы: слева что входит, справа две колонки цен — мультфильм и кино; у каждого кнопка «Добавить в расчёт»
+  const stagesBox = document.getElementById('stages');
+  const cells = id => `<div class="stage__p" data-t="anim" data-l="Мультфильм"><b id="pa-${id}"></b><small id="pa-${id}-u"></small></div><div class="stage__p" data-t="film" data-l="Кино"><b id="pf-${id}"></b><small id="pf-${id}-u"></small></div>`;
+  const pickBtn = v => `<button type="button" class="pick" data-pick="${v}" aria-pressed="false">Добавить в расчёт</button>`;
+  const musicChips = id => `<div class="chips" role="group" aria-label="Музыка" id="${id}">${Object.keys(MUSIC).map(k => `<button type="button" class="chip" data-music="${k}" aria-pressed="false">${MUSIC[k].l}</button>`).join('')}</div>`;
+  const lipChips = id => `<div class="chips" role="group" aria-label="Вид перевода" id="${id}"><button type="button" class="chip" data-lip="0" aria-pressed="true">Дубляж</button><button type="button" class="chip" data-lip="1" aria-pressed="false">С синхроном губ</button></div>`;
+  stagesBox.innerHTML =
+    `<div class="stage"><div class="stage__n">00</div><div class="stage__t"><h3>Сценарий с нуля</h3><p class="stage__what">Идея, синопсис, поэпизодный план и сценарий. Пишет живой сценарист, NEYRA проверяет структуру.</p><div class="stage__meta"><span>Срок: <b id="st-script"></b></span></div>${pickBtn('script')}</div>${cells('script')}</div>` +
+    STAGES.map((s,i) => `<div class="stage"><div class="stage__n">0${s.n}</div><div class="stage__t"><h3>${s.t}</h3><p class="stage__what">${s.w}</p><div class="stage__meta"><span>Срок: <b>${s.time}</b></span></div>${s.n === 5 ? musicChips('music-chips2') + '<p class="stage__note">Музыка NEYRA — для фестивалей и онлайна. Для проката и стримингов советуем композитора: права на его музыку надёжнее.</p>' : ''}${s.lang ? lipChips('lip-chips2') : ''}${pickBtn(i)}</div>${cells(i)}</div>`).join('') +
+    `<div class="stage stage--dist"><div class="stage__n">+</div><div class="stage__t"><h3>Дистрибуция</h3><p class="stage__what">Фестивали, другие страны, стриминги и Neyra Play — вместе с вами. Взамен — 10 % чистых поступлений продюсера.</p><button type="button" class="pick" data-pick="copro" aria-pressed="false">Выбрать сопродюсирование</button></div><div class="stage__p stage__p--wide"><b>в сопродюсировании</b></div></div>` +
+    `<div class="stage stage--extra"><div class="stage__n">+</div><div class="stage__t"><h3>Тизер в кинокачестве</h3><p class="stage__what">Для питча, фонда и инвестора: до 3 героев и 2 локаций, монтаж в темпе трейлера, 1080p, музыка и звук.</p><div class="stage__meta"><span>Срок: <b>1–2 недели</b></span></div><div class="chips" role="group" aria-label="Длина тизера" id="teaser-chips2">${TEASER_LENS.map(L=>`<button type="button" class="chip" data-tlen="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('')}</div>${pickBtn('teaser')}</div>${cells('teaser')}</div>`;
+  stagesBox.addEventListener('click', e => {
+    const c = e.target.closest('[data-tlen]');
+    if (c) { st.teaserLen = +c.dataset.tlen; st.teaserOn = true; render(); return; }
+    const mu = e.target.closest('[data-music]');
+    if (mu) { st.music = mu.dataset.music; st.on[4] = true; render(); return; }
+    const li = e.target.closest('[data-lip]');
+    if (li) { st.lip = li.dataset.lip === '1'; if (!st.langs) st.langs = 1; render(); return; }
+    const b = e.target.closest('.pick'); if (!b) return;
+    const v = b.dataset.pick;
+    if (v === 'copro') { for (let j=0;j<6;j++) st.on[j] = true; st.want = 'copro'; }
+    else if (v === 'script') st.script = !st.script;
+    else if (v === 'teaser') st.teaserOn = !st.teaserOn;
+    else { const i = +v; if (STAGES[i].lang) st.langs = st.langs > 0 ? 0 : 1; else st.on[i] = !st.on[i]; }
+    render();
+  });
+
+  // тип: в калькуляторе и в шапке колонок над этапами
+  ['types','sumbar'].forEach(id => document.getElementById(id).addEventListener('click', e => { const b = e.target.closest('button[data-type]'); if(!b) return; st.type = b.dataset.type; render(); }));
+
+  // длина
+  const fBox = document.getElementById('formats');
+  fBox.innerHTML = FORMATS.map(f=>`<button type="button" class="chip" data-m="${f.m}"${f.teaser ? ' data-teaser="1"' : ''} aria-pressed="false">${f.l}</button>`).join('');
+  fBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; if (b.dataset.teaser) teaserOnly(); else setM(+b.dataset.m); });
+  const len = document.getElementById('len');
+  len.addEventListener('input', e => setM(+e.target.value));
+  // «Тизер, 3»: в расчёте только тизер на 3 минуты, без этапов фильма
+  function teaserOnly(){ st.preset = 'teaser'; st.on = st.on.map(() => false); st.langs = 0; st.script = false; st.teaserOn = true; st.teaserLen = 3; st.M = 3; len.value = 3; render(); }
+  // любая другая длина возвращает весь фильм
+  function setM(m){ if (st.preset === 'teaser' || !st.on.slice(0,6).some(Boolean)) { st.preset = null; st.on = [true,true,true,true,true,true,false]; st.teaserOn = false; st.want = 'pack'; } st.M = m; len.value = m; render(); }
+
+  // скидка
+  document.querySelectorAll('input[name=offer]').forEach(r => r.addEventListener('change', e => { st.want = e.target.value; render(); }));
+  const speeds = document.getElementById('speeds');
+  speeds.addEventListener('click', e => { const b = e.target.closest('button'); if(!b || b.disabled) return; st.fast = b.dataset.fast === '1'; render(); });
+
+  // этапы и языки
+  const cBox = document.getElementById('checks');
+  cBox.innerHTML = STAGES.filter(s=>!s.lang).map((s,i)=>`<label class="check" for="c${i}"><input type="checkbox" id="c${i}" ${st.on[i]?'checked':''}><span>${s.n}. ${s.t}</span><em id="cp${i}"></em></label>`).join('');
+  STAGES.forEach((s,i)=>{ if(s.lang) return; document.getElementById('c'+i).addEventListener('change',e=>{ st.on[i]=e.target.checked; render(); }); });
+  document.getElementById('lang-minus').addEventListener('click',()=>{ st.langs=Math.max(0,st.langs-1); render(); });
+  document.getElementById('lang-plus').addEventListener('click',()=>{ st.langs=Math.min(10,st.langs+1); render(); });
+  document.getElementById('c-script').addEventListener('change', e => { st.script = e.target.checked; render(); });
+  document.getElementById('music-box').innerHTML = musicChips('music-chips');
+  document.getElementById('lip-box').innerHTML = lipChips('lip-chips');
+  document.getElementById('music-box').addEventListener('click', e => { const b = e.target.closest('[data-music]'); if (!b) return; st.music = b.dataset.music; render(); });
+  document.getElementById('lip-box').addEventListener('click', e => { const b = e.target.closest('[data-lip]'); if (!b) return; st.lip = b.dataset.lip === '1'; render(); });
+  const tBox = document.getElementById('teaser-chips');
+  tBox.innerHTML = `<button type="button" class="chip" data-t="0" aria-pressed="true">Нет</button>` + TEASER_LENS.map(L=>`<button type="button" class="chip" data-t="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('');
+  tBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; const L = +b.dataset.t; if (L) { st.teaserLen = L; st.teaserOn = true; } else st.teaserOn = false; render(); });
+
+  // срок в неделях для выбранного набора: картинки и черновой фильм частично идут вместе; звук и цвет — параллельно продакшну;
+  // маркетинг и IP — параллельно; языки — после мастера, до трёх языков одновременно; сценарий с нуля — до всего
+  function weeksFor(fast, ty){
+    const M = st.M, on = st.on, k = fast ? 2 : 1;
+    let pre = (on[0]?1:0) + (on[1]?2:0) + (on[2]?3:0);
+    if (on[1] && on[2]) pre -= 1;
+    if (fast && pre >= 4) pre -= 1;
+    const prod = on[3] ? STAGES[3].weeks(M, ty, k) : 0;
+    const post = on[4] ? (on[3] ? 2 : 3) : 0;
+    const langW = st.langs > 0 ? 1 + Math.ceil(st.langs / 3) : 0;
+    // основная ветка: подготовка → продакшн → пост; языки — после мастера
+    const core = pre + prod + post + ((on[3] || on[4]) ? langW : 0);
+    // параллельные ветки: тизер (2 недели, с готовыми героями из этапа 2 — 1), IP — 3, маркетинг — 1, языки без мастера
+    const side = Math.max(st.teaserOn ? (on[1] ? 1 : 2) : 0, on[6] ? 3 : 0, on[5] ? 1 : 0, (on[3] || on[4]) ? 0 : langW);
+    const scriptW = st.script ? scriptWeeks(M) : 0;
+    return scriptW + Math.max(core, side);
+  }
+  // экспресс +20 % — только когда срок на экране становится короче; у кино и мультфильма темп разный
+  const fastFor = ty => st.fast && weeksFor(true, ty) < weeksFor(false, ty);
+
+  // расчёт под один тип: выбранные этапы и продукты; скидка и экспресс — только на этапы 1–6
+  function quote(ty){
+    const M = st.M, fastOn = fastFor(ty); let gross = 0, disc = 0, extra = 0; const lines = [];
+    STAGES.forEach((s,i)=>{
+      const on = s.lang ? st.langs > 0 : st.on[i];
+      if (!on) return;
+      const one = i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty, st.lip), price = s.lang ? one * st.langs : one;
+      gross += price;
+      if (s.n <= 6) {
+        if (st.offer === 'pack') disc += price * PACK;
+        if (st.offer === 'copro') disc += price * COPRO;
+        if (fastOn) extra += price * EXPRESS;
+      }
+      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs + (st.lip ? ' — с синхроном губ' : ' — дубляж') : s.t + (i === 1 && st.script ? ' — лечение уже в сценарии' : i === 4 ? ' — без музыки' : '')}</span><b>${tgx(price)}</b></li>`);
+    });
+    // музыка — к этапу 5, своей ценой
+    if (st.on[4] && st.music !== 'own') { const mp = MUSIC_F(M, st.music); gross += mp; lines.push(`<li><span>${MUSIC[st.music].line}, ${fmtLen(M / 2)} музыки</span><b>${tgx(mp)}</b></li>`); }
+    const scriptP = SCRIPT_F(M, ty), teaserP = TEASER_F(st.teaserLen, ty, !st.on[1]);
+    if (st.script) { gross += scriptP; lines.unshift(`<li><span>Сценарий с нуля</span><b>${tgx(scriptP)}</b></li>`); }
+    if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}${st.on[1] ? ' — герои из этапа 2' : ''}</span><b>${tgx(teaserP)}</b></li>`); }
+    if (extra > 0) lines.push(`<li><span>Экспресс, +20 % к этапам 1–6 до скидки</span><b>+${tgx(extra)}</b></li>`);
+    if (disc > 0) lines.push(`<li class="disc"><span>${st.offer==='pack' ? 'Скидка под ключ, 10 % на весь фильм' : 'Скидка за сопродюсирование, 15 % на весь фильм'}</span><b>−${tgx(disc)}</b></li>`);
+    return {total: gross + extra - disc, disc, lines};
+  }
+
+  function render(){
+    const M = st.M, ty = T();
+    // «Тизер, 3» держится, пока в расчёте только тизер
+    if (st.preset === 'teaser' && (st.on.some(Boolean) || st.langs || st.script || !st.teaserOn)) st.preset = null;
+    const teaserOnly = st.preset === 'teaser';
+    document.getElementById('len-out').textContent = M + ' мин';
+    document.getElementById('lang-out').textContent = st.langs;
+    // «под ключ» и сопродюсирование — только на весь фильм: выбраны этапы 1–6
+    const film = st.on.slice(0,6).every(Boolean);
+    document.getElementById('o-pack').disabled = !film;
+    document.getElementById('o-copro').disabled = !film;
+    st.offer = film ? st.want : 'none';
+    document.getElementById('o-' + st.offer).checked = true;
+
+    // экспресс доступен, только когда срок выбранного типа на экране становится короче
+    const expressOk = weeksFor(true, ty) < weeksFor(false, ty);
+    st.fastOn = st.fast && expressOk;
+    speeds.querySelector('[data-fast="1"]').disabled = !expressOk;
+    speeds.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.fast === '1') === st.fastOn)));
+    document.getElementById('speed-note').hidden = expressOk;
+    const q = quote(ty), qa = quote(TYPES.anim), qf = quote(TYPES.film), total = q.total;
+    const weeks = weeksFor(st.fastOn, ty), filmOn = st.on.slice(0,6).some(Boolean);
+    const extras = st.on[6] || st.langs > 0 || st.script || st.teaserOn;
+    const kind = teaserOnly ? 'тизер ' + (st.type === 'anim' ? 'мультфильма' : 'игрового фильма') + ', ' + fmtLen(st.teaserLen)
+      : film ? ty.l.toLowerCase() + ' под ключ' + (extras ? ' + дополнения' : '') : 'выбранные этапы';
+    const expr = st.fastOn ? ' · экспресс +20 %' : '';
+    document.getElementById('total-lbl').textContent = 'Ориентир · ' + kind;
+    document.getElementById('sum').textContent = total ? tenge(total) : '—';
+    document.getElementById('sum-usd').textContent = total ? usd(total) + ' · ' + tgx(total) : 'Выберите хотя бы один этап';
+    document.getElementById('per-min').textContent = !total ? '' : teaserOnly ? `≈ ${tenge(total / st.teaserLen)} за минуту тизера` : st.on[3] ? `≈ ${tenge(total / M)} за минуту готового фильма` : '';
+    document.getElementById('lines').innerHTML = q.lines.join('');
+    document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}${weeks >= 6 ? ' · ≈ ' + months(weeks) : ''}${expr ? ' · экспресс' : ''}` : '';
+    document.getElementById('incl').textContent = !total || !film ? '' : [
+      st.script ? 'сценарий пишем мы' : 'ваш готовый сценарий',
+      st.on[3] ? (st.type === 'anim' ? 'все кадры на технологии NEYRA, голоса — живые актёры' : 'все кадры на технологии NEYRA, без съёмок') : null,
+      st.on[4] ? (st.music === 'own' ? 'музыка ваша' : st.music === 'composer' ? 'музыка композитора' : 'музыка NEYRA') : null,
+      st.on[4] ? 'мастер 4K и DCP' : null,
+      'один язык оригинала' + (st.langs ? ` + ${st.langs} ${yazyk(st.langs)}` : ''),
+      'два раунда правок на этап'
+    ].filter(Boolean).join(' · ');
+    document.getElementById('fine').textContent = 'Ориентир без НДС; если НДС применяется, он добавляется к цене. Счёт в тенге по курсу на дату договора. Точную смету называем после скрининга, под NDA.' + (st.offer==='copro' && q.disc>0 ? ' Совместная дистрибуция и доля 10 % — по договору сопродюсирования.' : '');
+    // галочки, кнопки этапов, длина
+    STAGES.forEach((s,i)=>{ if (s.lang) return; document.getElementById('c'+i).checked = st.on[i]; document.getElementById('cp'+i).textContent = tenge(i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty)); });
+    fBox.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.teaser ? teaserOnly : (!st.preset && +b.dataset.m === M))));
+    // на телефоне ряд чипов прокручивается — выбранный держим в поле зрения
+    const selChip = fBox.querySelector('[aria-pressed="true"]');
+    if (selChip) { const fb = fBox.getBoundingClientRect(), sb = selChip.getBoundingClientRect(); if (sb.left < fb.left + 16 || sb.right > fb.right - 16) fBox.scrollLeft += sb.left - fb.left - 16; }
+    stagesBox.querySelectorAll('.pick').forEach(b => {
+      const v = b.dataset.pick; let on, txt;
+      if (v === 'copro') { on = st.offer === 'copro'; txt = on ? 'Сопродюсирование выбрано' : 'Выбрать сопродюсирование'; }
+      else if (v === 'script') { on = st.script; txt = on ? 'В расчёте' : 'Добавить в расчёт'; }
+      else if (v === 'teaser') { on = st.teaserOn; txt = on ? 'В расчёте · ' + fmtLen(st.teaserLen) : 'Добавить в расчёт'; }
+      else if (STAGES[+v].lang) { on = st.langs > 0; txt = on ? 'В расчёте · ' + st.langs + ' ' + yazyk(st.langs) : 'Добавить в расчёт'; }
+      else { on = st.on[+v]; txt = on ? 'В расчёте' : 'Добавить в расчёт'; }
+      b.setAttribute('aria-pressed', String(on)); b.textContent = txt;
+    });
+    // цены этапов: две колонки, мультфильм и кино
+    const put = (id, a, f, ua, uf) => {
+      document.getElementById('pa-' + id).textContent = tenge(a); document.getElementById('pa-' + id + '-u').textContent = ua || usd(a);
+      document.getElementById('pf-' + id).textContent = tenge(f); document.getElementById('pf-' + id + '-u').textContent = uf || usd(f);
+    };
+    const nb = t => t.replace(/ /g, '\u00a0');
+    const doc = st.script;
+    STAGES.forEach((s,i) => {
+      const pr = t => i === 1 && doc ? s.f(M, t) - DOCTOR_F(M, t) : s.f(M, t, st.lip);
+      const a = pr(TYPES.anim), f = pr(TYPES.film);
+      const sub = (x, t) => usd(x) + (s.n === 4 ? '\n' + nb(usd(t.prod) + ' за мин этапа') : s.lang ? '\nза\u00a0язык' : s.n === 5 ? '\n' + nb(st.music === 'own' ? 'музыка ваша' : '+ музыка ' + usd(MUSIC_F(M, st.music))) : i === 1 && doc ? '\n' + nb('без лечения сценария') : '');
+      put(i, a, f, sub(a, TYPES.anim), sub(f, TYPES.film));
+    });
+    put('script', SCRIPT_F(M, TYPES.anim), SCRIPT_F(M, TYPES.film));
+    const dev = !st.on[1], ta = TEASER_F(st.teaserLen, TYPES.anim, dev), tf = TEASER_F(st.teaserLen, TYPES.film, dev);
+    const tsub = x => usd(x) + ' · ' + nb(fmtLen(st.teaserLen)) + (dev ? '' : '\n' + nb('герои из этапа 2'));
+    put('teaser', ta, tf, tsub(ta), tsub(tf));
+    stagesBox.dataset.sel = st.type;
+    const wmo = writerMonths(M), wk = scriptWeeks(M);
+    document.getElementById('st-script').textContent = `для ${M} мин — около ${wmo < 0.75 ? wk + ' ' + nedel(wk) : (Math.round(wmo * 2) / 2).toLocaleString('ru-RU') + ' мес'}`;
+    document.getElementById('c-script').checked = st.script;
+    document.getElementById('cp-script').textContent = tenge(SCRIPT_F(M, ty));
+    tBox.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.t === (st.teaserOn ? st.teaserLen : 0))));
+    document.querySelectorAll('[data-music]').forEach(b => { const k = b.dataset.music; b.setAttribute('aria-pressed', String(k === st.music)); b.textContent = MUSIC[k].l + (k === 'own' ? '' : ' · ' + usd(MUSIC_F(M, k))); });
+    document.querySelectorAll('[data-lip]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.lip === '1') === st.lip)));
+    stagesBox.querySelectorAll('[data-tlen]').forEach(b => b.setAttribute('aria-pressed', String(st.teaserOn && +b.dataset.tlen === st.teaserLen)));
+    document.querySelectorAll('button[data-type]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === st.type)));
+    document.getElementById('et-fmt').textContent = `Цены для длины ${M} мин. Отмечайте нужные — расчёт обновится.`;
+    // шапка колонок над этапами и строка внизу экрана
+    const sel = teaserOnly ? 'тизер' : film ? 'под ключ' + (st.offer === 'pack' ? ' · −10 %' : st.offer === 'copro' ? ' · сопродюсирование −15 %' : '') + (extras ? ' + дополнения' : '') : (total ? 'выбранные этапы' : 'выберите этап');
+    document.getElementById('sb-len').textContent = teaserOnly ? fmtLen(st.teaserLen) : M + ' мин';
+    document.getElementById('sb-lbl').textContent = sel + expr;
+    document.getElementById('sb-anim').textContent = qa.total ? tenge(qa.total) : '—';
+    const perMin = x => x ? usd(x) + (film || teaserOnly ? ' · ' + usd(x / (teaserOnly ? st.teaserLen : M)) + '/мин' : '') : '';
+    document.getElementById('sb-anim-usd').textContent = perMin(qa.total);
+    document.getElementById('sb-film').textContent = qf.total ? tenge(qf.total) : '—';
+    document.getElementById('sb-film-usd').textContent = perMin(qf.total);
+    document.getElementById('dock-sum').textContent = total ? tenge(total) : '—';
+    document.getElementById('dock-lbl').textContent = total ? kind + (film && st.offer === 'pack' ? ' · −10 %' : film && st.offer === 'copro' ? ' · сопродюсирование' : '') + expr : 'выберите этап';
+  }
+  function yazyk(n){ const a=n%10, b=n%100; return a===1&&b!==11 ? 'язык' : (a>=2&&a<=4&&(b<10||b>=20) ? 'языка' : 'языков'); }
+  // «около N недель / недели»: родительный падеж
+  function nedel(n){ return (n%10===1 && n%100!==11) ? 'недели' : 'недель'; }
+  function months(w){ const m = Math.round(w/4.33*2)/2; const t = m.toLocaleString('ru-RU');
+    if (m % 1) return t + ' месяца';
+    const a = m%10, b = m%100; return t + ' ' + (a===1&&b!==11 ? 'месяц' : (a>=2&&a<=4&&(b<10||b>=20) ? 'месяца' : 'месяцев')); }
+
+  // фонды: 20 сценариев на скрининге, 6 — в картинки, 3 — в черновой фильм, скидка за портфель (цены игрового фильма)
+  const F = {a:20,b:6,c:3,M:90}, FT = TYPES.film;
+  const k = 1 - FUND;
+  const fa = STAGES[0].f(F.M, FT)*F.a*k, fb = STAGES[1].f(F.M, FT)*F.b*k, fc = STAGES[2].f(F.M, FT)*F.c*k;
+  document.getElementById('fund').textContent = `Пример: ${F.a} сценариев на скрининге — ${tenge(fa)}, лучшие ${F.b} в картинки и ${F.c} в черновой фильм — весь портфель ${tenge(fa+fb+fc)}.`;
+
+  render();
+
+  // афиши на первом экране: те же формулы, стандартный срок, под ключ −10 % с музыкой NEYRA; тизер — отдельно
+  (function heroOffers(){
+    const keep = {M: st.M, type: st.type, on: [...st.on], langs: st.langs, script: st.script, teaserOn: st.teaserOn, teaserLen: st.teaserLen, fast: st.fast, music: st.music};
+    const put = (id, price, w) => { document.getElementById(id).textContent = 'от ' + tenge(price); document.getElementById(id + '-t').textContent = w >= 6 ? '≈ ' + months(w) : 'около ' + w + ' ' + nedel(w); };
+    Object.assign(st, {M: 90, on: [true,true,true,true,true,true,false], langs: 0, script: false, teaserOn: false, fast: false, music: 'neyra'});
+    ['anim','film'].forEach(k => { const T = TYPES[k]; const core = STAGES.slice(0,6).reduce((a, s) => a + s.f(90, T), 0) * (1 - PACK) + MUSIC_F(90, 'neyra'); put('ho-' + k, core, weeksFor(false, T)); });
+    Object.assign(st, {M: 3, on: st.on.map(() => false), teaserOn: true, teaserLen: 3});
+    put('ho-teaser', Math.min(TEASER_F(3, TYPES.anim), TEASER_F(3, TYPES.film)), weeksFor(false, TYPES.film));
+    Object.assign(st, keep); render();
+    document.getElementById('hero-offers').addEventListener('click', e => {
+      const b = e.target.closest('[data-go]'); if (!b) return;
+      if (b.dataset.go === 'teaser') teaserOnly(); else { st.type = b.dataset.go; setM(90); }
+      document.getElementById('kalkulyator').scrollIntoView({behavior: 'smooth', block: 'start'});
+    });
+  })();
+
+  // заявка: сводка расчёта в анкете и в письме; письмо открывается в почте клиента
+  const formCalc = document.getElementById('form-calc');
+  function calcSummary(){
+    const q = quote(T()), M = st.M;
+    const rows = [...document.querySelectorAll('#lines li')].map(li => li.querySelector('span').textContent + ' — ' + li.querySelector('b').textContent);
+    const head = document.getElementById('total-lbl').textContent.replace('Ориентир · ', '') + (st.preset === 'teaser' ? '' : ', ' + M + ' мин') + (st.fastOn ? ', экспресс' : '');
+    return {head, total: q.total ? tenge(q.total) + ' · ' + usd(q.total) : '—', time: document.getElementById('time').textContent, rows};
+  }
+  const baseRender = render;
+  render = function(){ baseRender(); const c = calcSummary(); formCalc.innerHTML = c.total === '—' ? 'Расчёт пока пустой — выберите этапы в калькуляторе.' : `К письму приложится расчёт: <b>${c.head}</b> — <b>${c.total}</b>`; };
+  render();
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target; if (!f.reportValidity()) return;
+    const c = calcSummary();
+    const body = [`Имя: ${f.name.value.trim()}`, `Связь: ${f.contact.value.trim()}`, f.about.value.trim() ? `О проекте: ${f.about.value.trim()}` : null, '',
+      `Расчёт на studio.neyra.vision/ceny: ${c.head}`, `Итого: ${c.total}`, c.time, ...c.rows, '', 'Без НДС, 1 $ = 450 ₸, ориентир до скрининга.'].filter(x => x !== null).join('\n');
+    location.href = 'mailto:alex@neyra.ai?cc=neyravision@gmail.com&subject=' + encodeURIComponent('Заявка: ' + c.head) + '&body=' + encodeURIComponent(body);
+  });
+
+  // строка с суммой внизу экрана — когда калькулятор уже прокручен вверх
+  const dock = document.getElementById('dock');
+  if ('IntersectionObserver' in window) {
+    let pastCalc = false, inStages = false;
+    const upd = () => { dock.hidden = !pastCalc || inStages; };
+    new IntersectionObserver(([e]) => { pastCalc = !e.isIntersecting && e.boundingClientRect.top < 0; upd(); }).observe(document.getElementById('kalkulyator'));
+    new IntersectionObserver(([e]) => { inStages = e.isIntersecting; upd(); }).observe(document.getElementById('etapy'));
+  }
+})();
+</script>
+</body>
+</html>
