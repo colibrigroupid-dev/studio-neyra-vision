@@ -94,9 +94,11 @@ section.block{padding:clamp(60px,8vw,112px) 0;border-bottom:1px solid var(--line
 .calc-sec{position:relative;overflow:hidden}
 .calc-sec>.wrap{position:relative;z-index:1}
 .calc__bg{position:absolute;inset:0;z-index:0;background:#0b0b0b}
-.calc__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.42);opacity:0;transition:opacity 1.2s ease}
+.calc__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(.75) brightness(.62) contrast(1.05);opacity:0;transition:opacity 1.2s ease}
 .calc__video.on{opacity:1}
-.calc__bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.96) 0%,rgba(11,11,11,.55) 35%,rgba(11,11,11,.55) 65%,rgba(11,11,11,.96) 100%)}
+.calc__bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.95) 0%,rgba(11,11,11,.3) 30%,rgba(11,11,11,.3) 70%,rgba(11,11,11,.95) 100%)}
+.calc-sec .block__head h2,.calc-sec .block__head p{text-shadow:0 2px 24px rgba(0,0,0,.8)}
+.calc-sec .panel{background:color-mix(in oklab,var(--ink-2) 88%,transparent);backdrop-filter:blur(10px)}
 @media (prefers-reduced-motion:reduce){.calc__video{display:none}}
 .block__head{display:flex;flex-direction:column;gap:14px;margin-bottom:clamp(26px,4vw,44px);max-width:780px}
 .block__head h2{font-size:var(--step-3)}
@@ -305,7 +307,7 @@ footer a:hover{color:var(--text)}
 </section>
 
 <section class="block calc-sec" id="kalkulyator" aria-labelledby="calc-title">
-  <div class="calc__bg" aria-hidden="true"><video class="calc__video" muted playsinline preload="none" poster="media/calc-1.jpg" data-src="media/calc-1.mp4,media/calc-2.mp4,media/calc-3.mp4,media/calc-4.mp4" data-poster="media/calc-1.jpg,media/calc-2.jpg,media/calc-3.jpg,media/calc-4.jpg"></video></div>
+  <div class="calc__bg" aria-hidden="true"><video class="calc__video" muted playsinline preload="none" poster="media/calc-1.jpg" data-src="media/calc-1.mp4,media/calc-3.mp4,media/calc-4.mp4,media/calc-2.mp4" data-poster="media/calc-1.jpg,media/calc-3.jpg,media/calc-4.jpg,media/calc-2.jpg"></video></div>
   <div class="wrap">
     <div class="block__head">
       <div class="mono">Калькулятор</div>
@@ -543,7 +545,7 @@ footer a:hover{color:var(--text)}
   const packPrice = (c, lic=0) => r100((c + lic)/P.share);
   const stagePrice = (n, M, T) => r100(packPrice(COST[n](M, T), n === 4 ? P.lic : 0)/(1 - PACK));
   const STAGES = [
-    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>stagePrice(1, M, T), weeks:()=>1},
+    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>Math.max(stagePrice(1, M, T), r100(5000*g(M))), weeks:()=>1},
     {n:2, t:'Улучшение и картинки', w:'Лечение сценария с автором, герои и локации с закреплённым обликом, кадр на каждый план.', time:'1–2 недели', f:(M,T)=>stagePrice(2, M, T), weeks:()=>2},
     {n:3, t:'Черновой фильм', w:'Весь фильм в движении: черновое качество, монтаж, временный звук.', time:'2–3 недели', f:(M,T)=>stagePrice(3, M, T), weeks:()=>3},
     {n:4, t:'Продакшн', w:'Чистовые кадры 1080p, апскейл до 4K. Кино — фотореализм и синхрон губ, мультфильм — единый стиль и живые голоса.', time:'ориентир: кино — 30 минут в месяц, мультфильм — 45; в экспрессе вдвое быстрее', f:(M,T)=>stagePrice(4, M, T), weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
