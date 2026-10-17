@@ -138,7 +138,7 @@ details.more .inner{display:flex;flex-direction:column;gap:18px;margin-top:14px}
 .stage__p{text-align:right;min-width:0}
 .stage__p::before{content:attr(data-l);display:none;font:500 .7rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 .stage__p b{display:block;font:500 clamp(1.05rem,.95rem + .45vw,1.35rem)/1.15 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--muted)}
-.stage__p small{display:block;color:var(--dim);font-size:.8rem;margin-top:4px}
+.stage__p small{display:block;color:var(--dim);font-size:.8rem;margin-top:4px;white-space:pre-line}
 .stages[data-sel="anim"] .stage__p[data-t="anim"] b,.stages[data-sel="film"] .stage__p[data-t="film"] b{color:var(--text)}
 .stage__p--wide{grid-column:3 / 5}
 .stage__p--wide b{font:500 1rem/1.3 var(--body);color:var(--muted)}
@@ -450,11 +450,12 @@ footer a:hover{color:var(--text)}
   const g = M => Math.min(1, Math.pow(M / 45, 0.75));
   // prod: $ за минуту продакшна; pace: минут готового фильма в месяц в стандарте (экспресс — вдвое быстрее).
   // k: цена мультфильма к цене кино по этапам — стилизованный мир проще фотореализма, нет внешности и согласий живых актёров, дубляж проще.
-  // teaser: [постоянная часть, $ за минуту] — тизер в темпе трейлера: до 3 героев и 2 локаций, 1080p, музыка и звук.
+  // teaser: [постоянная часть, $ за минуту, постоянная часть с этапом 2] — тизер в темпе трейлера: до 3 героев и 2 локаций, 1080p, музыка и звук;
+  // если этап 2 в расчёте, герои и локации уже сделаны — остаются минуты тизера, музыка и звук.
   // «Весь фильм» = этапы 1–6: на него считаются скидки «под ключ», «сопродюсирование» и надбавка за экспресс; IP и языки — по своей цене.
   const TYPES = {
-    film:{l:'Игровой фильм', prod:2200, pace:30, k:{1:1, 2:1, 3:1, 5:1, 6:1, 7:1, 8:1, script:1}, teaser:[1800, 1400]},
-    anim:{l:'Мультфильм', prod:1700, pace:45, k:{1:.9, 2:.9, 3:.85, 5:.85, 6:.87, 7:.9, 8:.85, script:.95}, teaser:[1700, 1100]}
+    film:{l:'Игровой фильм', prod:2200, pace:30, k:{1:1, 2:1, 3:1, 5:1, 6:1, 7:1, 8:1, script:1}, teaser:[1800, 1400, 500]},
+    anim:{l:'Мультфильм', prod:1700, pace:45, k:{1:.9, 2:.9, 3:.85, 5:.85, 6:.87, 7:.9, 8:.85, script:.95}, teaser:[1700, 1100, 450]}
   };
   const STAGES = [
     {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>r100(T.k[1]*(2750*g(M) + 25*M)), weeks:()=>1},
@@ -470,7 +471,9 @@ footer a:hover{color:var(--text)}
   // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1,5–3 мин)
   const writerMonths = M => Math.min(3, g(M) + M/60);
   const SCRIPT_F = (M,T) => r100(T.k.script*(7000*g(M) + 140*M));
-  const TEASER_F = (L,T) => r100(T.teaser[0] + T.teaser[1]*L);
+  const TEASER_F = (L,T,dev=true) => r100((dev ? T.teaser[0] : T.teaser[2]) + T.teaser[1]*L);
+  // со сценарием с нуля этап 2 не берёт за лечение сценария: оно уже в двух редакциях сценария
+  const DOCTOR_F = (M,T) => r100(T.k[2] * 3000 * g(M));
   const TEASER_LENS = [1.5, 2, 3];
   const fmtLen = L => L.toLocaleString('ru-RU') + ' мин';
   // по умолчанию — «весь фильм»: этапы 1–6, без IP и языков
@@ -564,18 +567,18 @@ footer a:hover{color:var(--text)}
     STAGES.forEach((s,i)=>{
       const on = s.lang ? st.langs > 0 : st.on[i];
       if (!on) return;
-      const one = s.f(M, ty), price = s.lang ? one * st.langs : one;
+      const one = i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty), price = s.lang ? one * st.langs : one;
       gross += price;
       if (s.n <= 6) {
         if (st.offer === 'pack') disc += price * PACK;
         if (st.offer === 'copro') disc += price * COPRO;
         if (fastOn) extra += price * EXPRESS;
       }
-      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t}</span><b>${tgx(price)}</b></li>`);
+      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t + (i === 1 && st.script ? ' — лечение уже в сценарии' : '')}</span><b>${tgx(price)}</b></li>`);
     });
-    const scriptP = SCRIPT_F(M, ty), teaserP = TEASER_F(st.teaserLen, ty);
+    const scriptP = SCRIPT_F(M, ty), teaserP = TEASER_F(st.teaserLen, ty, !st.on[1]);
     if (st.script) { gross += scriptP; lines.unshift(`<li><span>Сценарий с нуля</span><b>${tgx(scriptP)}</b></li>`); }
-    if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}</span><b>${tgx(teaserP)}</b></li>`); }
+    if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}${st.on[1] ? ' — герои из этапа 2' : ''}</span><b>${tgx(teaserP)}</b></li>`); }
     if (extra > 0) lines.push(`<li><span>Экспресс, +20 % на этапы 1–6</span><b>+${tgx(extra)}</b></li>`);
     if (disc > 0) lines.push(`<li class="disc"><span>${st.offer==='pack' ? 'Скидка под ключ, 10 % на весь фильм' : 'Скидка за сопродюсирование, 15 % на весь фильм'}</span><b>−${tgx(disc)}</b></li>`);
     return {total: gross + extra - disc, disc, lines};
@@ -615,7 +618,7 @@ footer a:hover{color:var(--text)}
     document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}${weeks >= 6 ? ' · ≈ ' + months(weeks) : ''}${expr ? ' · экспресс' : ''}` : '';
     document.getElementById('fine').textContent = 'Ориентир без НДС; если НДС применяется, он добавляется к цене. Счёт в тенге по курсу на дату договора. Точную смету называем после скрининга, под NDA.' + (st.offer==='copro' && q.disc>0 ? ' Совместная дистрибуция и доля 10 % — по договору сопродюсирования.' : '');
     // галочки, кнопки этапов, длина
-    STAGES.forEach((s,i)=>{ if (s.lang) return; document.getElementById('c'+i).checked = st.on[i]; document.getElementById('cp'+i).textContent = tenge(s.f(M, ty)); });
+    STAGES.forEach((s,i)=>{ if (s.lang) return; document.getElementById('c'+i).checked = st.on[i]; document.getElementById('cp'+i).textContent = tenge(i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty)); });
     fBox.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.teaser ? teaserOnly : (!st.preset && +b.dataset.m === M))));
     stagesBox.querySelectorAll('.pick').forEach(b => {
       const v = b.dataset.pick; let on, txt;
@@ -631,14 +634,18 @@ footer a:hover{color:var(--text)}
       document.getElementById('pa-' + id).textContent = tenge(a); document.getElementById('pa-' + id + '-u').textContent = ua || usd(a);
       document.getElementById('pf-' + id).textContent = tenge(f); document.getElementById('pf-' + id + '-u').textContent = uf || usd(f);
     };
+    const nb = t => t.replace(/ /g, '\u00a0');
+    const doc = st.script;
     STAGES.forEach((s,i) => {
-      const a = s.f(M, TYPES.anim), f = s.f(M, TYPES.film);
-      const sub = (x, t) => usd(x) + (s.n === 4 ? ' · ' + usd(t.prod) + ' за мин' : s.lang ? ' · за язык' : '');
+      const pr = t => i === 1 && doc ? s.f(M, t) - DOCTOR_F(M, t) : s.f(M, t);
+      const a = pr(TYPES.anim), f = pr(TYPES.film);
+      const sub = (x, t) => usd(x) + (s.n === 4 ? '\n' + nb(usd(t.prod) + ' за мин этапа') : s.lang ? '\nза\u00a0язык' : i === 1 && doc ? '\n' + nb('без лечения сценария') : '');
       put(i, a, f, sub(a, TYPES.anim), sub(f, TYPES.film));
     });
     put('script', SCRIPT_F(M, TYPES.anim), SCRIPT_F(M, TYPES.film));
-    const ta = TEASER_F(st.teaserLen, TYPES.anim), tf = TEASER_F(st.teaserLen, TYPES.film);
-    put('teaser', ta, tf, usd(ta) + ' · ' + fmtLen(st.teaserLen), usd(tf) + ' · ' + fmtLen(st.teaserLen));
+    const dev = !st.on[1], ta = TEASER_F(st.teaserLen, TYPES.anim, dev), tf = TEASER_F(st.teaserLen, TYPES.film, dev);
+    const tsub = x => usd(x) + ' · ' + nb(fmtLen(st.teaserLen)) + (dev ? '' : '\n' + nb('герои из этапа 2'));
+    put('teaser', ta, tf, tsub(ta), tsub(tf));
     stagesBox.dataset.sel = st.type;
     const wmo = writerMonths(M), wk = Math.max(1, Math.round(wmo * 4.33));
     document.getElementById('st-script').textContent = `для ${M} мин — около ${wmo < 0.75 ? wk + ' ' + nedel(wk) : (Math.round(wmo * 2) / 2).toLocaleString('ru-RU') + ' мес'}`;
@@ -653,9 +660,10 @@ footer a:hover{color:var(--text)}
     document.getElementById('sb-len').textContent = teaserOnly ? fmtLen(st.teaserLen) : M + ' мин';
     document.getElementById('sb-lbl').textContent = sel + expr;
     document.getElementById('sb-anim').textContent = qa.total ? tenge(qa.total) : '—';
-    document.getElementById('sb-anim-usd').textContent = qa.total ? usd(qa.total) : '';
+    const perMin = x => x ? usd(x) + (film || teaserOnly ? ' · ' + usd(x / (teaserOnly ? st.teaserLen : M)) + '/мин' : '') : '';
+    document.getElementById('sb-anim-usd').textContent = perMin(qa.total);
     document.getElementById('sb-film').textContent = qf.total ? tenge(qf.total) : '—';
-    document.getElementById('sb-film-usd').textContent = qf.total ? usd(qf.total) : '';
+    document.getElementById('sb-film-usd').textContent = perMin(qf.total);
     document.getElementById('dock-sum').textContent = total ? tenge(total) : '—';
     document.getElementById('dock-lbl').textContent = total ? kind + (film && st.offer === 'pack' ? ' · −10 %' : film && st.offer === 'copro' ? ' · сопродюсирование' : '') + expr : 'выберите этап';
   }
