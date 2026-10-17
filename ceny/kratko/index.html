@@ -90,6 +90,14 @@ p{margin:0}
 .facts b{color:var(--text);font-weight:500}
 
 section.block{padding:clamp(60px,8vw,112px) 0;border-bottom:1px solid var(--line)}
+/* фон калькулятора: четыре кинокадра по кругу, приглушённые, панели поверх */
+.calc-sec{position:relative;overflow:hidden}
+.calc-sec>.wrap{position:relative;z-index:1}
+.calc__bg{position:absolute;inset:0;z-index:0;background:#0b0b0b}
+.calc__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.32);opacity:0;transition:opacity 1.2s ease}
+.calc__video.on{opacity:1}
+.calc__bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.96) 0%,rgba(11,11,11,.55) 35%,rgba(11,11,11,.55) 65%,rgba(11,11,11,.96) 100%)}
+@media (prefers-reduced-motion:reduce){.calc__video{display:none}}
 .block__head{display:flex;flex-direction:column;gap:14px;margin-bottom:clamp(26px,4vw,44px);max-width:780px}
 .block__head h2{font-size:var(--step-3)}
 .block__head p{color:var(--muted);font-size:var(--step-1);line-height:1.45}
@@ -294,7 +302,8 @@ footer a:hover{color:var(--text)}
   </div>
 </section>
 
-<section class="block" id="kalkulyator" aria-labelledby="calc-title">
+<section class="block calc-sec" id="kalkulyator" aria-labelledby="calc-title">
+  <div class="calc__bg" aria-hidden="true"><video class="calc__video" muted playsinline preload="none" poster="../media/calc-1.jpg" data-src="../media/calc-1.mp4,../media/calc-2.mp4,../media/calc-3.mp4,../media/calc-4.mp4" data-poster="../media/calc-1.jpg,../media/calc-2.jpg,../media/calc-3.jpg,../media/calc-4.jpg"></video></div>
   <div class="wrap">
     <div class="block__head">
       <div class="mono">Калькулятор</div>
@@ -775,6 +784,16 @@ footer a:hover{color:var(--text)}
       `Расчёт на studio.neyra.vision/ceny: ${c.head}`, `Итого: ${c.total}`, c.time, ...c.rows, '', 'Без НДС, 1 $ = 450 ₸, ориентир до скрининга.'].filter(x => x !== null).join('\n');
     location.href = 'mailto:alex@neyra.ai?cc=neyravision@gmail.com&subject=' + encodeURIComponent('Заявка: ' + c.head) + '&body=' + encodeURIComponent(body);
   });
+
+  // фон калькулятора: ролики по кругу с затемнением на стыке; грузятся, когда секция близко к экрану
+  (function calcBg(){
+    const v = document.querySelector('.calc__video'); if (!v) return;
+    const srcs = v.dataset.src.split(','), posters = v.dataset.poster.split(','); let i = 0, started = false;
+    const play = () => { v.poster = posters[i]; v.src = srcs[i]; v.play().then(() => v.classList.add('on')).catch(() => {}); };
+    v.addEventListener('ended', () => { v.classList.remove('on'); setTimeout(() => { i = (i + 1) % srcs.length; play(); }, 1200); });
+    const start = () => { if (started) return; started = true; play(); };
+    if ('IntersectionObserver' in window) new IntersectionObserver((es, o) => { if (es.some(e => e.isIntersecting)) { start(); o.disconnect(); } }, {rootMargin: '400px'}).observe(v); else start();
+  })();
 
   // строка с суммой внизу экрана — когда калькулятор уже прокручен вверх
   const dock = document.getElementById('dock');
