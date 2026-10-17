@@ -133,6 +133,7 @@ details.more .inner{display:flex;flex-direction:column;gap:18px;margin-top:14px}
 .total .btn{background:var(--ink);color:var(--text);justify-content:center}
 .total .btn:hover{background:#222}
 .total__fine{font-size:.8rem;color:#55554f;line-height:1.45}
+.total__incl{font-size:.85rem;color:#55554f;line-height:1.45;margin-top:-6px}
 
 /* лестница этапов: слева что входит, справа две колонки цен — мультфильм и кино */
 .stages{display:grid;border-top:1px solid var(--line)}
@@ -296,7 +297,7 @@ footer a:hover{color:var(--text)}
             <label class="offer" for="o-pack"><input type="radio" name="offer" id="o-pack" value="pack" checked><span><b>Под ключ — минус 10 %</b><small>Весь фильм одним договором — этапы 1–6, от скрининга до маркетинга.</small></span></label>
             <label class="offer" for="o-copro"><input type="radio" name="offer" id="o-copro" value="copro"><span><b>Сопродюсирование — минус 15 %</b><small>Весь фильм минус 15 % и совместная дистрибуция: фестивали, другие страны, стриминги. Взамен — 10 % чистых поступлений продюсера от фильма. Для проектов с высокой оценкой на скрининге.</small></span></label>
           </div>
-          <p class="offer-note">Скидки и экспресс считаются на весь фильм — этапы 1–6. Сценарий с нуля, тизер, IP-вселенная и языки — по своей цене.</p>
+          <p class="offer-note">Скидки и экспресс считаются от цены этапов 1–6 до скидки. Сценарий с нуля, музыка, тизер, IP-вселенная и языки — по своей цене.</p>
         </div>
         <details class="more" id="more">
           <summary>Настроить этапы, сценарий, тизер и языки</summary>
@@ -325,6 +326,7 @@ footer a:hover{color:var(--text)}
         <p class="total__min" id="per-min"></p>
         <ul id="lines"></ul>
         <p class="total__time" id="time"></p>
+        <p class="total__incl" id="incl"></p>
         <a class="btn" href="https://t.me/mis_ter_bro">Обсудить смету</a>
         <p class="total__fine" id="fine">Без НДС. Точную смету называем после скрининга, под NDA. Оплата по этапам.</p>
       </aside>
@@ -354,7 +356,7 @@ footer a:hover{color:var(--text)}
     <div class="block__head">
       <div class="mono">Скидки</div>
       <h2 id="skidki-title">Чем дальше идём вместе, тем дешевле</h2>
-      <p>Скидки не складываются — действует бо́льшая из подходящих. Сценарий с нуля, тизер, IP-вселенная и языки — по своей цене, без скидки.</p>
+      <p>Скидки не складываются — действует бо́льшая из подходящих. Сценарий с нуля, музыка, тизер, IP-вселенная и языки — по своей цене, без скидки.</p>
     </div>
     <div class="cols">
       <div class="card"><span class="mono">Под ключ</span><b class="big">−10 %</b><h3>Весь фильм одним договором</h3><p>Скидка на этапы 1–6 — от скрининга до маркетинга. Оплата всё равно по этапам.</p></div>
@@ -459,7 +461,7 @@ footer a:hover{color:var(--text)}
   const RATE = 450;               // ₸ за $
   const PACK = 0.10, COPRO = 0.15, FUND = 0.20;
   const r100 = x => Math.round(x / 100) * 100;
-  // Рыночные цены в $ от длины M (минуты). Игровой фильм на 90 минутах совпадает с внутренним расчётом экономики.
+  // Цены в $ от длины M (минуты).
   // Короткий формат: постоянная часть этапа (разбор, разработка героев и локаций, сборка, пакет маркетинга) растёт с длиной до 45 минут, дальше постоянна.
   const g = M => Math.min(1, Math.pow(M / 45, 0.75));
   // prod: $ за минуту продакшна; pace: минут готового фильма в месяц в стандарте (экспресс — вдвое быстрее).
@@ -484,12 +486,13 @@ footer a:hover{color:var(--text)}
   const FORMATS = [{l:'Тизер, 3',m:3,teaser:true},{l:'Короткий, 15',m:15},{l:'Серия, 45',m:45},{l:'Фильм, 90',m:90},{l:'Эпос, 120',m:120}];
   // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1,5–3 мин)
   const writerMonths = M => Math.min(3, g(M) + M/60);
+  const scriptWeeks = M => Math.ceil(writerMonths(M) * 4.33);
   const SCRIPT_F = (M,T) => r100(T.k.script*(7000*g(M) + 140*M));
   const TEASER_F = (L,T,dev=true) => r100((dev ? T.teaser[0] : T.teaser[2]) + T.teaser[1]*L);
   // со сценарием с нуля этап 2 не берёт за лечение сценария: оно уже в двух редакциях сценария
   const DOCTOR_F = (M,T) => r100(T.k[2] * 3000 * g(M));
   const TEASER_LENS = [1.5, 2, 3];
-  // музыка к этапу 5: считаем, что музыка звучит половину фильма; за минуту музыки — NEYRA $100, композитор $750 (его $600 + ведение студии и Taurus); своя — 0.
+  // музыка к этапу 5: музыка звучит половину фильма; цена за минуту музыки по уровню; своя — 0.
   // Скидки и экспресс на музыку не действуют.
   const MUSIC = {neyra:{l:'NEYRA', line:'Музыка NEYRA', perMin:100}, composer:{l:'Композитор', line:'Музыка композитора', perMin:750}, own:{l:'Своя', line:'', perMin:0}};
   const MUSIC_F = (M, key) => r100(MUSIC[key].perMin * M / 2);
@@ -582,11 +585,12 @@ footer a:hover{color:var(--text)}
     const prod = on[3] ? STAGES[3].weeks(M, ty, k) : 0;
     const post = on[4] ? (on[3] ? 2 : 3) : 0;
     const langW = st.langs > 0 ? 1 + Math.ceil(st.langs / 3) : 0;
-    const filmOn = on.slice(0,6).some(Boolean);
-    // тизер вместе с фильмом идёт параллельно после разработки героев; отдельно — 1–2 недели
-    const sideW = Math.max(on[5] ? 1 : 0, on[6] ? 3 : 0, langW, (st.teaserOn && !filmOn) ? 2 : 0);
-    const scriptW = st.script ? Math.ceil(writerMonths(M) * 4.33) : 0;
-    return scriptW + pre + prod + post + ((on[3] || on[4]) ? langW : sideW);
+    // основная ветка: подготовка → продакшн → пост; языки — после мастера
+    const core = pre + prod + post + ((on[3] || on[4]) ? langW : 0);
+    // параллельные ветки: тизер (2 недели, с готовыми героями из этапа 2 — 1), IP — 3, маркетинг — 1, языки без мастера
+    const side = Math.max(st.teaserOn ? (on[1] ? 1 : 2) : 0, on[6] ? 3 : 0, on[5] ? 1 : 0, (on[3] || on[4]) ? 0 : langW);
+    const scriptW = st.script ? scriptWeeks(M) : 0;
+    return scriptW + Math.max(core, side);
   }
   // экспресс +20 % — только когда срок на экране становится короче; у кино и мультфильма темп разный
   const fastFor = ty => st.fast && weeksFor(true, ty) < weeksFor(false, ty);
@@ -611,7 +615,7 @@ footer a:hover{color:var(--text)}
     const scriptP = SCRIPT_F(M, ty), teaserP = TEASER_F(st.teaserLen, ty, !st.on[1]);
     if (st.script) { gross += scriptP; lines.unshift(`<li><span>Сценарий с нуля</span><b>${tgx(scriptP)}</b></li>`); }
     if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}${st.on[1] ? ' — герои из этапа 2' : ''}</span><b>${tgx(teaserP)}</b></li>`); }
-    if (extra > 0) lines.push(`<li><span>Экспресс, +20 % на этапы 1–6</span><b>+${tgx(extra)}</b></li>`);
+    if (extra > 0) lines.push(`<li><span>Экспресс, +20 % к этапам 1–6 до скидки</span><b>+${tgx(extra)}</b></li>`);
     if (disc > 0) lines.push(`<li class="disc"><span>${st.offer==='pack' ? 'Скидка под ключ, 10 % на весь фильм' : 'Скидка за сопродюсирование, 15 % на весь фильм'}</span><b>−${tgx(disc)}</b></li>`);
     return {total: gross + extra - disc, disc, lines};
   }
@@ -645,9 +649,17 @@ footer a:hover{color:var(--text)}
     document.getElementById('total-lbl').textContent = 'Ориентир · ' + kind;
     document.getElementById('sum').textContent = total ? tenge(total) : '—';
     document.getElementById('sum-usd').textContent = total ? usd(total) + ' · ' + tgx(total) : 'Выберите хотя бы один этап';
-    document.getElementById('per-min').textContent = !total ? '' : teaserOnly ? `≈ ${tenge(total / st.teaserLen)} за минуту тизера` : `≈ ${tenge(total / M)} за минуту готового фильма`;
+    document.getElementById('per-min').textContent = !total ? '' : teaserOnly ? `≈ ${tenge(total / st.teaserLen)} за минуту тизера` : st.on[3] ? `≈ ${tenge(total / M)} за минуту готового фильма` : '';
     document.getElementById('lines').innerHTML = q.lines.join('');
     document.getElementById('time').textContent = total ? `Срок: около ${weeks <= 1 ? 'недели' : weeks + ' ' + nedel(weeks)}${weeks >= 6 ? ' · ≈ ' + months(weeks) : ''}${expr ? ' · экспресс' : ''}` : '';
+    document.getElementById('incl').textContent = !total || !film ? '' : [
+      st.script ? 'сценарий пишем мы' : 'ваш готовый сценарий',
+      st.on[3] ? (st.type === 'anim' ? 'все кадры на технологии NEYRA, голоса — живые актёры' : 'все кадры на технологии NEYRA, без съёмок') : null,
+      st.on[4] ? (st.music === 'own' ? 'музыка ваша' : st.music === 'composer' ? 'музыка композитора' : 'музыка NEYRA') : null,
+      st.on[4] ? 'мастер 4K и DCP' : null,
+      'один язык оригинала' + (st.langs ? ` + ${st.langs} ${yazyk(st.langs)}` : ''),
+      'два раунда правок на этап'
+    ].filter(Boolean).join(' · ');
     document.getElementById('fine').textContent = 'Ориентир без НДС; если НДС применяется, он добавляется к цене. Счёт в тенге по курсу на дату договора. Точную смету называем после скрининга, под NDA.' + (st.offer==='copro' && q.disc>0 ? ' Совместная дистрибуция и доля 10 % — по договору сопродюсирования.' : '');
     // галочки, кнопки этапов, длина
     STAGES.forEach((s,i)=>{ if (s.lang) return; document.getElementById('c'+i).checked = st.on[i]; document.getElementById('cp'+i).textContent = tenge(i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty)); });
@@ -682,7 +694,7 @@ footer a:hover{color:var(--text)}
     const tsub = x => usd(x) + ' · ' + nb(fmtLen(st.teaserLen)) + (dev ? '' : '\n' + nb('герои из этапа 2'));
     put('teaser', ta, tf, tsub(ta), tsub(tf));
     stagesBox.dataset.sel = st.type;
-    const wmo = writerMonths(M), wk = Math.max(1, Math.round(wmo * 4.33));
+    const wmo = writerMonths(M), wk = scriptWeeks(M);
     document.getElementById('st-script').textContent = `для ${M} мин — около ${wmo < 0.75 ? wk + ' ' + nedel(wk) : (Math.round(wmo * 2) / 2).toLocaleString('ru-RU') + ' мес'}`;
     document.getElementById('c-script').checked = st.script;
     document.getElementById('cp-script').textContent = tenge(SCRIPT_F(M, ty));
