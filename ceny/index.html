@@ -431,7 +431,7 @@ footer a:hover{color:var(--text)}
       <h2 id="who-title">Продюсер, студия и экран</h2>
     </div>
     <div class="who">
-      <div class="card"><span class="mono">Официальный представитель в Казахстане</span><h3>Digital Taurus Asia</h3><p>Единственный официальный представитель технологии NEYRA в Казахстане. Продюсеры Анна Чакиртова и Анара Жунусова ведут ваш проект от первого разговора до премьеры: договор, смета, сроки и связь со студией — на одном языке с вами.</p><p class="card__cred">За плечами — «Приговор» (фильм года Freedom Ticketon Awards), «Қара бекіре», «Томирис» и «Дорога к матери» Акана Сатаева. Члены Национальной киноакадемии.</p></div>
+      <div class="card"><span class="mono">Официальный представитель в Казахстане</span><h3>Digital Taurus Asia</h3><p>Единственный официальный представитель технологии NEYRA в Казахстане. Продюсеры Анна Чакиртова и Анара Жунусова ведут ваш проект от первого разговора до премьеры: договор, смета, сроки и связь со студией — на одном языке с вами.</p><p class="card__cred">За плечами — «Приговор» («Отечественный фильм года», Freedom Ticketon Awards 2025), «Қара бекіре», «Томирис» и «Дорога к матери» Акана Сатаева. Члены Национальной киноакадемии.</p></div>
       <div class="card"><span class="mono">Производство</span><h3>Neyra Vision Studio</h3><p>Команда, которая делает фильм на технологии NEYRA: от разбора сценария до мастера.</p></div>
       <div class="card"><span class="mono">Дистрибуция</span><h3>Фестивали, страны, Neyra Play</h3><p>В сопродюсировании вместе выводим фильм к зрителю: фестивали, продажи в другие страны, стриминги и Neyra Play.</p></div>
     </div>
@@ -490,8 +490,8 @@ footer a:hover{color:var(--text)}
         <label><span>Телефон, Telegram или почта</span><input type="text" name="contact" autocomplete="tel" required></label>
         <label><span>О проекте — пара строк</span><textarea name="about" rows="3" placeholder="Жанр, есть ли сценарий, когда хотите премьеру"></textarea></label>
         <p class="form__calc" id="form-calc"></p>
-        <button type="submit" class="btn btn--main">Отправить заявку</button>
-        <p class="form__note">Откроется ваша почта с готовым письмом на alex@neyra.ai — останется нажать «Отправить».</p>
+        <button type="submit" class="btn btn--main">Составить письмо с расчётом</button>
+        <p class="form__note">Откроется ваша почта с готовым письмом на alex@neyra.ai (копия — neyravision@gmail.com) — останется нажать «Отправить».</p>
       </form>
     </div>
   </div>
@@ -525,26 +525,18 @@ footer a:hover{color:var(--text)}
   // teaser: [постоянная часть, $ за минуту, постоянная часть с этапом 2] — тизер в темпе трейлера: до 3 героев и 2 локаций, 1080p, музыка и звук;
   // если этап 2 в расчёте, герои и локации уже сделаны — остаются минуты тизера, музыка и звук.
   // «Весь фильм» = этапы 1–6: на него считаются скидки «под ключ», «сопродюсирование» и надбавка за экспресс; IP и языки — по своей цене.
-  // Правило цены: себестоимость + 4 % технология NEYRA + 15 % студии + 15 % продюсера + 1 % Astana Hub — всё от суммы клиента.
-  // Себестоимость — люди (ставки в день, команда продакшна в месяц, 15 % людей в штате КЗ с налогами 51 %), генерации и кредиты, резерв 10 %.
-  const P = {dir:230, art:115, op:70, team:13300, take:48, tax:1 + 0.15*0.51, res:1.1, share:1 - 0.04 - 0.15 - 0.15 - 0.01};
+  // цена этапа = часть за разработку (растёт с длиной до 45 минут) + часть за минуту фильма; отдельно от пакета — на 10 % дороже
+  const RATES = {film:{1:[2148.4862,7.6354],2:[4953.9642,40.5232],3:[2732.6538,83.1233],4:[0,1926.815],5:[846.1538,136.6327],6:[3751.8758,0],7:[0,0,7002.2996]},
+    anim:{1:[2148.4862,7.6354],2:[4953.9642,40.5232],3:[2732.6538,83.1233],4:[0,1482.2613],5:[846.1538,136.6327],6:[3751.8758,0],7:[0,0,7002.2996]},
+    script:[1970.1465, 34.2817, 4609.0762], doc:2095.0346, music:34.6495};
   const TYPES = {
-    film:{l:'Игровой фильм', pace:30, cpace:20, takes:3, voice:0, teaser:[1800, 1400, 500]},
-    anim:{l:'Мультфильм', pace:45, cpace:30, takes:2, voice:80, teaser:[1700, 1100, 450]}
+    film:{id:'film', l:'Игровой фильм', pace:30, teaser:[1800, 1400, 500]},
+    anim:{id:'anim', l:'Мультфильм', pace:45, teaser:[1700, 1100, 450]}
   };
-  const cost = (cr, pp) => (cr + pp*P.tax)*P.res;
-  const COST = {
-    1:(M,T)=>cost(150*g(M) + 2*M, g(M)*(3*P.dir + 5*P.op) + (M/30)*P.op),
-    2:(M,T)=>cost(7.2*M + 80*g(M), g(M)*(17*P.art + 3*P.dir) + 2*(M/9)*P.op),
-    3:(M,T)=>cost(24*M, 3*(M/9)*P.op + g(M)*(5*P.op + 5*P.dir)),
-    4:(M,T)=>cost(M*((P.take*T.takes + 85)*1.3 + 2500/T.cpace) + M*T.voice, M*P.team/T.cpace),
-    5:(M,T)=>cost(500*g(M), 75*M),
-    6:(M,T)=>cost(500*g(M), g(M)*(8*P.op + 2*P.dir + 5*P.art)),
-    7:(M,T)=>cost(300, 25*P.art + 3*P.dir)
-  };
-  // цена этапа в пакете «под ключ» = себестоимость / 0,65; отдельно от пакета — на 10 % дороже (PACK)
-  const packPrice = c => r100(c/P.share);
-  const stagePrice = (n, M, T) => r100(packPrice(COST[n](M, T))/(1 - PACK));
+  const base = (c, M) => c[0]*g(M) + c[1]*M + (c[2] || 0);
+  const stagePrice = (n, M, T) => r100(r100(base(RATES[T.id][n], M))/(1 - PACK));
+  // со сценарием с нуля этап 2 без лечения сценария: оно уже в двух редакциях сценария
+  const STAGE2_SCRIPT = (M, T) => r100(r100(base(RATES[T.id][2], M) - RATES.doc*g(M))/(1 - PACK));
   const STAGES = [
     {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>Math.max(stagePrice(1, M, T), r100(5000*g(M))), weeks:()=>1},
     {n:2, t:'Улучшение и картинки', w:'Лечение сценария с автором, герои и локации с закреплённым обликом, кадр на каждый план.', time:'1–2 недели', f:(M,T)=>stagePrice(2, M, T), weeks:()=>2},
@@ -559,16 +551,13 @@ footer a:hover{color:var(--text)}
   // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1,5–3 мин)
   const writerMonths = M => Math.min(3, g(M) + M/60);
   const scriptWeeks = M => Math.ceil(writerMonths(M) * 4.33);
-  const SCRIPT_F = (M,T) => r100(packPrice(cost(50*g(M) + M, writerMonths(M)*22*P.art + (5*g(M) + M/9)*P.art + (2*g(M) + M/45)*P.dir))/(1 - PACK));
+  const SCRIPT_F = (M,T) => r100(r100(RATES.script[0]*g(M) + RATES.script[1]*M + RATES.script[2]*writerMonths(M))/(1 - PACK));
   const TEASER_F = (L,T,dev=true) => r100((dev ? T.teaser[0] : T.teaser[2]) + T.teaser[1]*L);
-  // со сценарием с нуля этап 2 не берёт за лечение сценария: оно уже в двух редакциях сценария
-  const DOCTOR_F = (M,T) => r100(packPrice(cost(0, 10*P.art*g(M)))/(1 - PACK));
   const TEASER_LENS = [1.5, 2, 3];
   // музыка к этапу 5: музыка звучит половину фильма; цена за минуту музыки по уровню; своя — 0.
   // Скидки и экспресс на музыку не действуют.
   const MUSIC = {neyra:{l:'NEYRA', line:'Музыка NEYRA', perMin:100}, composer:{l:'Композитор', line:'Музыка композитора', perMin:750}, own:{l:'Своя', line:'', perMin:0}};
-  // музыка NEYRA — по правилу от себестоимости (генерация и музыкальный редактор); композитор — его $600 за минуту музыки плюс ведение и продюсер
-  const MUSIC_F = (M, key) => key === 'neyra' ? r100(packPrice(cost(M/2*10, M/2*0.25*P.art))) : r100(MUSIC[key].perMin * M / 2);
+  const MUSIC_F = (M, key) => key === 'neyra' ? r100(RATES.music*M) : r100(MUSIC[key].perMin * M / 2);
   // перевод одной ценой для кино и мультфильма: дубляж — перевод, голоса, запись, 5.1 и стерео; синхрон губ — надбавкой
   const LANG_F = (M, lip) => r100(Math.max(800, 47*M)) + (lip ? r100(Math.max(800, 44*M)) : 0);
   const fmtLen = L => L.toLocaleString('ru-RU') + ' мин';
@@ -625,8 +614,8 @@ footer a:hover{color:var(--text)}
   len.addEventListener('input', e => setM(+e.target.value));
   // «Тизер, 3»: в расчёте только тизер на 3 минуты, без этапов фильма
   function teaserOnly(){ st.preset = 'teaser'; st.on = st.on.map(() => false); st.langs = 0; st.script = false; st.teaserOn = true; st.teaserLen = 3; st.M = 3; len.value = 3; render(); }
-  // любая другая длина возвращает весь фильм
-  function setM(m){ if (st.preset === 'teaser' || !st.on.slice(0,6).some(Boolean)) { st.preset = null; st.on = [true,true,true,true,true,true,false]; st.teaserOn = false; st.want = 'pack'; } st.M = m; len.value = m; render(); }
+  // длина меняет только минуты; весь фильм возвращается, когда в расчёте пусто или стоял один тизер
+  function setM(m){ const empty = !st.on.some(Boolean) && !st.script && !st.langs && !st.teaserOn; if (st.preset === 'teaser' || empty) { st.preset = null; st.on = [true,true,true,true,true,true,false]; st.teaserOn = false; st.want = 'pack'; } st.M = m; len.value = m; render(); }
 
   // скидка
   document.querySelectorAll('input[name=offer]').forEach(r => r.addEventListener('change', e => { st.want = e.target.value; render(); }));
@@ -674,7 +663,7 @@ footer a:hover{color:var(--text)}
     STAGES.forEach((s,i)=>{
       const on = s.lang ? st.langs > 0 : st.on[i];
       if (!on) return;
-      const one = i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty, st.lip), price = s.lang ? one * st.langs : one;
+      const one = i === 1 && st.script ? STAGE2_SCRIPT(M, ty) : s.f(M, ty, st.lip), price = s.lang ? one * st.langs : one;
       gross += price;
       if (s.n <= 6) {
         if (st.offer === 'pack') disc += price * PACK;
@@ -698,7 +687,7 @@ footer a:hover{color:var(--text)}
     // «Тизер, 3» держится, пока в расчёте только тизер
     if (st.preset === 'teaser' && (st.on.some(Boolean) || st.langs || st.script || !st.teaserOn)) st.preset = null;
     const teaserOnly = st.preset === 'teaser';
-    document.getElementById('len-out').textContent = M + ' мин';
+    document.getElementById('len-out').textContent = teaserOnly ? fmtLen(st.teaserLen) : M + ' мин';
     document.getElementById('lang-out').textContent = st.langs;
     // «под ключ» и сопродюсирование — только на весь фильм: выбраны этапы 1–6
     const film = st.on.slice(0,6).every(Boolean);
@@ -735,8 +724,8 @@ footer a:hover{color:var(--text)}
     ].filter(Boolean).join(' · ');
     document.getElementById('fine').textContent = 'Ориентир без НДС; если НДС применяется, он добавляется к цене. Счёт в тенге по курсу на дату договора. Точную смету называем после скрининга, под NDA.' + (st.offer==='copro' && q.disc>0 ? ' Совместная дистрибуция и доля 10 % — по договору сопродюсирования.' : '');
     // галочки, кнопки этапов, длина
-    STAGES.forEach((s,i)=>{ if (s.lang) return; document.getElementById('c'+i).checked = st.on[i]; document.getElementById('cp'+i).textContent = tenge(i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty)); });
-    fBox.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.teaser ? teaserOnly : (!st.preset && +b.dataset.m === M))));
+    STAGES.forEach((s,i)=>{ if (s.lang) return; document.getElementById('c'+i).checked = st.on[i]; document.getElementById('cp'+i).textContent = tenge(i === 1 && st.script ? STAGE2_SCRIPT(M, ty) : s.f(M, ty)); });
+    fBox.querySelectorAll('.chip').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.teaser ? teaserOnly : (!st.preset && +b.dataset.m === M))); if (b.dataset.teaser) b.textContent = 'Тизер, ' + (teaserOnly ? st.teaserLen : 3).toLocaleString('ru-RU'); });
     // на телефоне ряд чипов прокручивается — выбранный держим в поле зрения
     const selChip = fBox.querySelector('[aria-pressed="true"]');
     if (selChip) { const fb = fBox.getBoundingClientRect(), sb = selChip.getBoundingClientRect(); if (sb.left < fb.left + 16 || sb.right > fb.right - 16) fBox.scrollLeft += sb.left - fb.left - 16; }
@@ -757,7 +746,7 @@ footer a:hover{color:var(--text)}
     const nb = t => t.replace(/ /g, '\u00a0');
     const doc = st.script;
     STAGES.forEach((s,i) => {
-      const pr = t => i === 1 && doc ? s.f(M, t) - DOCTOR_F(M, t) : s.f(M, t, st.lip);
+      const pr = t => i === 1 && doc ? STAGE2_SCRIPT(M, t) : s.f(M, t, st.lip);
       const a = pr(TYPES.anim), f = pr(TYPES.film);
       const sub = (x, t) => usd(x) + (s.n === 4 ? '\n' + nb(usd(x/M) + ' за мин этапа') : s.lang ? '\nза\u00a0язык' : s.n === 5 ? '\n' + nb(st.music === 'own' ? 'музыка ваша' : '+ музыка ' + usd(MUSIC_F(M, st.music))) : i === 1 && doc ? '\n' + nb('без лечения сценария') : '');
       put(i, a, f, sub(a, TYPES.anim), sub(f, TYPES.film));
@@ -815,11 +804,14 @@ footer a:hover{color:var(--text)}
     Object.assign(st, {M: 90, on: [true,true,true,true,true,true,false], langs: 0, script: false, teaserOn: false, fast: false, music: 'neyra'});
     ['anim','film'].forEach(k => { const T = TYPES[k]; const core = STAGES.slice(0,6).reduce((a, s) => a + s.f(90, T), 0) * (1 - PACK) + MUSIC_F(90, 'neyra'); put('ho-' + k, core, weeksFor(false, T)); });
     Object.assign(st, {M: 3, on: st.on.map(() => false), teaserOn: true, teaserLen: 3});
-    put('ho-teaser', Math.min(TEASER_F(3, TYPES.anim), TEASER_F(3, TYPES.film)), weeksFor(false, TYPES.film));
+    put('ho-teaser', TEASER_F(3, TYPES.anim), weeksFor(false, TYPES.anim));
+    document.getElementById('ho-teaser-t').textContent = 'мультфильм · кино — ' + tenge(TEASER_F(3, TYPES.film));
     Object.assign(st, keep); render();
     document.getElementById('hero-offers').addEventListener('click', e => {
       const b = e.target.closest('[data-go]'); if (!b) return;
-      if (b.dataset.go === 'teaser') teaserOnly(); else { st.type = b.dataset.go; setM(90); }
+      Object.assign(st, {fast: false, music: 'neyra', lip: false, want: 'pack'});
+      if (b.dataset.go === 'teaser') { st.type = 'anim'; teaserOnly(); }
+      else { Object.assign(st, {type: b.dataset.go, preset: null, on: [true,true,true,true,true,true,false], langs: 0, script: false, teaserOn: false, M: 90}); len.value = 90; render(); }
       document.getElementById('kalkulyator').scrollIntoView({behavior: 'smooth', block: 'start'});
     });
   })();
