@@ -94,7 +94,7 @@ section.block{padding:clamp(60px,8vw,112px) 0;border-bottom:1px solid var(--line
 .calc-sec{position:relative;overflow:hidden}
 .calc-sec>.wrap{position:relative;z-index:1}
 .calc__bg{position:absolute;inset:0;z-index:0;background:#0b0b0b}
-.calc__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.32);opacity:0;transition:opacity 1.2s ease}
+.calc__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.42);opacity:0;transition:opacity 1.2s ease}
 .calc__video.on{opacity:1}
 .calc__bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.96) 0%,rgba(11,11,11,.55) 35%,rgba(11,11,11,.55) 65%,rgba(11,11,11,.96) 100%)}
 @media (prefers-reduced-motion:reduce){.calc__video{display:none}}
@@ -522,33 +522,50 @@ footer a:hover{color:var(--text)}
   // teaser: [постоянная часть, $ за минуту, постоянная часть с этапом 2] — тизер в темпе трейлера: до 3 героев и 2 локаций, 1080p, музыка и звук;
   // если этап 2 в расчёте, герои и локации уже сделаны — остаются минуты тизера, музыка и звук.
   // «Весь фильм» = этапы 1–6: на него считаются скидки «под ключ», «сопродюсирование» и надбавка за экспресс; IP и языки — по своей цене.
+  // Правило цены: себестоимость + лицензия NEYRA (до $5 000 на проект, в продакшне) + 15 % студии + 15 % продюсера + 1 % Astana Hub.
+  // Себестоимость — люди (ставки в день, команда продакшна в месяц, 15 % людей в штате КЗ с налогами 51 %), генерации и кредиты, резерв 10 %.
+  const P = {dir:230, art:115, op:70, team:13300, take:48, tax:1 + 0.15*0.51, res:1.1, lic:5000, share:0.69};
   const TYPES = {
-    film:{l:'Игровой фильм', prod:2200, pace:30, k:{1:1, 2:1, 3:1, 5:1, 6:1, 7:1, 8:1, script:1}, teaser:[1800, 1400, 500]},
-    anim:{l:'Мультфильм', prod:1700, pace:45, k:{1:.9, 2:.9, 3:.85, 5:.85, 6:.87, 7:.9, 8:.85, script:.95}, teaser:[1700, 1100, 450]}
+    film:{l:'Игровой фильм', pace:30, cpace:20, takes:3, voice:0, teaser:[1800, 1400, 500]},
+    anim:{l:'Мультфильм', pace:45, cpace:30, takes:2, voice:80, teaser:[1700, 1100, 450]}
   };
+  const cost = (cr, pp) => (cr + pp*P.tax)*P.res;
+  const COST = {
+    1:(M,T)=>cost(150*g(M) + 2*M, g(M)*(3*P.dir + 5*P.op) + (M/30)*P.op),
+    2:(M,T)=>cost(7.2*M + 80*g(M), g(M)*(17*P.art + 3*P.dir) + 2*(M/9)*P.op),
+    3:(M,T)=>cost(24*M, 3*(M/9)*P.op + g(M)*(5*P.op + 5*P.dir)),
+    4:(M,T)=>cost(M*((P.take*T.takes + 85)*1.3 + 2500/T.cpace) + M*T.voice, M*P.team/T.cpace),
+    5:(M,T)=>cost(500*g(M), 75*M),
+    6:(M,T)=>cost(500*g(M), g(M)*(8*P.op + 2*P.dir + 5*P.art)),
+    7:(M,T)=>cost(300, 25*P.art + 3*P.dir)
+  };
+  // цена этапа в пакете «под ключ» = (себестоимость + лицензия) / 0,69; отдельно от пакета — на 10 % дороже (PACK)
+  const packPrice = (c, lic=0) => r100((c + lic)/P.share);
+  const stagePrice = (n, M, T) => r100(packPrice(COST[n](M, T), n === 4 ? P.lic : 0)/(1 - PACK));
   const STAGES = [
-    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>r100(T.k[1]*(2750*g(M) + 25*M)), weeks:()=>1},
-    {n:2, t:'Улучшение и картинки', w:'Лечение сценария с автором, герои и локации с закреплённым обликом, кадр на каждый план.', time:'1–2 недели', f:(M,T)=>r100(T.k[2]*(7000*g(M) + 55*M)), weeks:()=>2},
-    {n:3, t:'Черновой фильм', w:'Весь фильм в движении: черновое качество, монтаж, временный звук.', time:'2–3 недели', f:(M,T)=>r100(T.k[3]*(4000*g(M) + 122*M)), weeks:()=>3},
-    {n:4, t:'Продакшн', w:'Чистовые кадры 1080p, апскейл до 4K. Кино — фотореализм и синхрон губ, мультфильм — единый стиль и живые голоса.', time:'ориентир: кино — 30 минут в месяц, мультфильм — 45; в экспрессе вдвое быстрее', f:(M,T)=>T.prod*M, weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
-    {n:5, t:'Звук и выпуск', w:'Шумы, фоли, сведение 5.1, цвет, мастер 4K и DCP. Музыка — на выбор.', time:'2–4 недели', f:(M,T)=>r100(T.k[5]*(1450*g(M) + 165*M)), weeks:()=>3},
-    {n:6, t:'Маркетинг', w:'Тизеры, вертикальные ролики, постер и презентация для прокатчиков.', time:'1 неделя', f:(M,T)=>r100(T.k[6]*(4000*g(M) + 22*M)), weeks:()=>0},
-    {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн.', time:'2–3 недели', f:(M,T)=>r100(9000*T.k[7]), weeks:()=>0},
+    {n:1, t:'Скрининг и 3D-аниматик', w:'Оценка сценария и реакции зрителя, риски и рынок. 3D-аниматик всего фильма.', time:'ориентир 3–7 дней', f:(M,T)=>stagePrice(1, M, T), weeks:()=>1},
+    {n:2, t:'Улучшение и картинки', w:'Лечение сценария с автором, герои и локации с закреплённым обликом, кадр на каждый план.', time:'1–2 недели', f:(M,T)=>stagePrice(2, M, T), weeks:()=>2},
+    {n:3, t:'Черновой фильм', w:'Весь фильм в движении: черновое качество, монтаж, временный звук.', time:'2–3 недели', f:(M,T)=>stagePrice(3, M, T), weeks:()=>3},
+    {n:4, t:'Продакшн', w:'Чистовые кадры 1080p, апскейл до 4K. Кино — фотореализм и синхрон губ, мультфильм — единый стиль и живые голоса.', time:'ориентир: кино — 30 минут в месяц, мультфильм — 45; в экспрессе вдвое быстрее', f:(M,T)=>stagePrice(4, M, T), weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
+    {n:5, t:'Звук и выпуск', w:'Шумы, фоли, сведение 5.1, цвет, мастер 4K и DCP. Музыка — на выбор.', time:'2–4 недели', f:(M,T)=>stagePrice(5, M, T), weeks:()=>3},
+    {n:6, t:'Маркетинг', w:'Тизеры, вертикальные ролики, постер и презентация для прокатчиков.', time:'1 неделя', f:(M,T)=>stagePrice(6, M, T), weeks:()=>0},
+    {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн.', time:'2–3 недели', f:(M,T)=>stagePrice(7, M, T), weeks:()=>0},
     {n:8, t:'Перевод на другой язык', w:'Перевод, кастинг голосов, запись, сведение 5.1 и стерео. С синхроном губ — губы героев совпадают с новой речью.', time:'2–3 недели, языки параллельно', f:(M,T,lip)=>LANG_F(M, lip), weeks:()=>0, lang:true}
   ];
   const FORMATS = [{l:'Тизер, 3',m:3,teaser:true},{l:'Короткий, 15',m:15},{l:'Фильм, 90',m:90},{l:'Эпос, 120',m:120}];
   // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1,5–3 мин)
   const writerMonths = M => Math.min(3, g(M) + M/60);
   const scriptWeeks = M => Math.ceil(writerMonths(M) * 4.33);
-  const SCRIPT_F = (M,T) => r100(T.k.script*(7000*g(M) + 140*M));
+  const SCRIPT_F = (M,T) => r100(packPrice(cost(50*g(M) + M, writerMonths(M)*22*P.art + (5*g(M) + M/9)*P.art + (2*g(M) + M/45)*P.dir))/(1 - PACK));
   const TEASER_F = (L,T,dev=true) => r100((dev ? T.teaser[0] : T.teaser[2]) + T.teaser[1]*L);
   // со сценарием с нуля этап 2 не берёт за лечение сценария: оно уже в двух редакциях сценария
-  const DOCTOR_F = (M,T) => r100(T.k[2] * 3000 * g(M));
+  const DOCTOR_F = (M,T) => r100(packPrice(cost(0, 10*P.art*g(M)))/(1 - PACK));
   const TEASER_LENS = [1.5, 2, 3];
   // музыка к этапу 5: музыка звучит половину фильма; цена за минуту музыки по уровню; своя — 0.
   // Скидки и экспресс на музыку не действуют.
   const MUSIC = {neyra:{l:'NEYRA', line:'Музыка NEYRA', perMin:100}, composer:{l:'Композитор', line:'Музыка композитора', perMin:750}, own:{l:'Своя', line:'', perMin:0}};
-  const MUSIC_F = (M, key) => r100(MUSIC[key].perMin * M / 2);
+  // музыка NEYRA — по правилу от себестоимости (генерация и музыкальный редактор); композитор — его $600 за минуту музыки плюс ведение и продюсер
+  const MUSIC_F = (M, key) => key === 'neyra' ? r100(packPrice(cost(M/2*10, M/2*0.25*P.art))) : r100(MUSIC[key].perMin * M / 2);
   // перевод одной ценой для кино и мультфильма: дубляж — перевод, голоса, запись, 5.1 и стерео; синхрон губ — надбавкой
   const LANG_F = (M, lip) => r100(Math.max(800, 47*M)) + (lip ? r100(Math.max(800, 44*M)) : 0);
   const fmtLen = L => L.toLocaleString('ru-RU') + ' мин';
@@ -739,7 +756,7 @@ footer a:hover{color:var(--text)}
     STAGES.forEach((s,i) => {
       const pr = t => i === 1 && doc ? s.f(M, t) - DOCTOR_F(M, t) : s.f(M, t, st.lip);
       const a = pr(TYPES.anim), f = pr(TYPES.film);
-      const sub = (x, t) => usd(x) + (s.n === 4 ? '\n' + nb(usd(t.prod) + ' за мин этапа') : s.lang ? '\nза\u00a0язык' : s.n === 5 ? '\n' + nb(st.music === 'own' ? 'музыка ваша' : '+ музыка ' + usd(MUSIC_F(M, st.music))) : i === 1 && doc ? '\n' + nb('без лечения сценария') : '');
+      const sub = (x, t) => usd(x) + (s.n === 4 ? '\n' + nb(usd(x/M) + ' за мин этапа') : s.lang ? '\nза\u00a0язык' : s.n === 5 ? '\n' + nb(st.music === 'own' ? 'музыка ваша' : '+ музыка ' + usd(MUSIC_F(M, st.music))) : i === 1 && doc ? '\n' + nb('без лечения сценария') : '');
       put(i, a, f, sub(a, TYPES.anim), sub(f, TYPES.film));
     });
     put('script', SCRIPT_F(M, TYPES.anim), SCRIPT_F(M, TYPES.film));
