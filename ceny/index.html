@@ -179,6 +179,7 @@ details.more .inner{display:flex;flex-direction:column;gap:18px;margin-top:14px}
 }
 .stage--extra .stage__n{color:var(--text)}
 .stage .chips{margin-top:12px}
+.stage__note{color:var(--dim);font-size:.85rem;margin-top:8px;max-width:58ch}
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--text);color:var(--ink);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-shadow:0 -8px 30px rgba(0,0,0,.35)}
 .dock span{min-width:0;font-size:.9rem;color:#33332f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dock b{font:500 1.15rem/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;margin-right:8px}
@@ -299,8 +300,13 @@ footer a:hover{color:var(--text)}
               <div class="chips" role="group" aria-labelledby="teaser-lbl" id="teaser-chips"></div>
             </div>
             <div class="field">
-              <span class="lbl" id="lang-lbl">Языковые версии с синхроном губ</span>
+              <span class="lbl" id="lang-lbl">Языковые версии</span>
               <div class="step-in" role="group" aria-labelledby="lang-lbl"><button type="button" id="lang-minus" aria-label="Меньше языков">−</button><output id="lang-out">0</output><button type="button" id="lang-plus" aria-label="Больше языков">+</button></div>
+              <div id="lip-box"></div>
+            </div>
+            <div class="field">
+              <span class="lbl" id="music-lbl">Музыка к этапу 5</span>
+              <div id="music-box"></div>
             </div>
           </div>
         </details>
@@ -462,10 +468,10 @@ footer a:hover{color:var(--text)}
     {n:2, t:'Улучшение и картинки', w:'Лечение сценария с автором, герои и локации с закреплённым обликом, кадр на каждый план.', time:'1–2 недели', f:(M,T)=>r100(T.k[2]*(7000*g(M) + 55*M)), weeks:()=>2},
     {n:3, t:'Черновой фильм', w:'Весь фильм в движении: черновое качество, монтаж, временный звук.', time:'2–3 недели', f:(M,T)=>r100(T.k[3]*(4000*g(M) + 122*M)), weeks:()=>3},
     {n:4, t:'Продакшн', w:'Чистовые кадры 1080p, апскейл до 4K. Кино — фотореализм и синхрон губ, мультфильм — единый стиль и живые голоса.', time:'ориентир: кино — 30 минут в месяц, мультфильм — 45; в экспрессе вдвое быстрее', f:(M,T)=>T.prod*M, weeks:(M,T,k)=>Math.ceil(M/(T.pace*k)*4.3)},
-    {n:5, t:'Звук и выпуск', w:'Музыка, шумы, сведение 5.1, цвет, мастер 4K и DCP.', time:'2–4 недели', f:(M,T)=>r100(T.k[5]*(1450*g(M) + 295*M)), weeks:()=>3},
+    {n:5, t:'Звук и выпуск', w:'Шумы, фоли, сведение 5.1, цвет, мастер 4K и DCP. Музыка — на выбор.', time:'2–4 недели', f:(M,T)=>r100(T.k[5]*(1450*g(M) + 165*M)), weeks:()=>3},
     {n:6, t:'Маркетинг', w:'Тизеры, вертикальные ролики, постер и презентация для прокатчиков.', time:'1 неделя', f:(M,T)=>r100(T.k[6]*(4000*g(M) + 22*M)), weeks:()=>0},
     {n:7, t:'IP-вселенная', w:'Игра, настольная игра, книга, одежда: концепции и дизайн.', time:'2–3 недели', f:(M,T)=>r100(9000*T.k[7]), weeks:()=>0},
-    {n:8, t:'Перевод на другой язык', w:'Перевод, голоса, синхрон губ и сведение — на любой язык.', time:'2–3 недели, языки параллельно', f:(M,T)=>r100(T.k[8]*Math.max(1500, 111*M)), weeks:()=>0, lang:true}
+    {n:8, t:'Перевод на другой язык', w:'Перевод, кастинг голосов, запись, сведение 5.1 и стерео. С синхроном губ — губы героев совпадают с новой речью.', time:'2–3 недели, языки параллельно', f:(M,T,lip)=>LANG_F(M, lip), weeks:()=>0, lang:true}
   ];
   const FORMATS = [{l:'Тизер, 3',m:3,teaser:true},{l:'Короткий, 15',m:15},{l:'Серия, 45',m:45},{l:'Полный метр, 90',m:90},{l:'Эпос, 120',m:120}];
   // отдельные продукты: сценарий с нуля (цена и срок — от длины фильма) и тизер в кинокачестве (своя длина 1,5–3 мин)
@@ -475,10 +481,16 @@ footer a:hover{color:var(--text)}
   // со сценарием с нуля этап 2 не берёт за лечение сценария: оно уже в двух редакциях сценария
   const DOCTOR_F = (M,T) => r100(T.k[2] * 3000 * g(M));
   const TEASER_LENS = [1.5, 2, 3];
+  // музыка к этапу 5: считаем, что музыка звучит половину фильма; за минуту музыки — NEYRA $100, композитор $750 (его $600 + ведение студии и Taurus); своя — 0.
+  // Скидки и экспресс на музыку не действуют.
+  const MUSIC = {neyra:{l:'NEYRA', line:'Музыка NEYRA', perMin:100}, composer:{l:'Композитор', line:'Музыка композитора', perMin:750}, own:{l:'Своя', line:'', perMin:0}};
+  const MUSIC_F = (M, key) => r100(MUSIC[key].perMin * M / 2);
+  // перевод одной ценой для кино и мультфильма: дубляж — перевод, голоса, запись, 5.1 и стерео; синхрон губ — надбавкой
+  const LANG_F = (M, lip) => r100(Math.max(800, 47*M)) + (lip ? r100(Math.max(800, 44*M)) : 0);
   const fmtLen = L => L.toLocaleString('ru-RU') + ' мин';
   // по умолчанию — «весь фильм»: этапы 1–6, без IP и языков
   const EXPRESS = 0.20;
-  const st = {M:90, type:'film', on:[true,true,true,true,true,true,false], langs:0, offer:'pack', want:'pack', fast:false, script:false, teaserOn:false, teaserLen:2, preset:null};
+  const st = {M:90, type:'film', on:[true,true,true,true,true,true,false], langs:0, offer:'pack', want:'pack', fast:false, script:false, teaserOn:false, teaserLen:2, preset:null, music:'neyra', lip:false};
 
   const tenge = usd => {
     const t = usd * RATE;
@@ -495,14 +507,20 @@ footer a:hover{color:var(--text)}
   const stagesBox = document.getElementById('stages');
   const cells = id => `<div class="stage__p" data-t="anim" data-l="Мультфильм"><b id="pa-${id}"></b><small id="pa-${id}-u"></small></div><div class="stage__p" data-t="film" data-l="Кино"><b id="pf-${id}"></b><small id="pf-${id}-u"></small></div>`;
   const pickBtn = v => `<button type="button" class="pick" data-pick="${v}" aria-pressed="false">Добавить в расчёт</button>`;
+  const musicChips = id => `<div class="chips" role="group" aria-label="Музыка" id="${id}">${Object.keys(MUSIC).map(k => `<button type="button" class="chip" data-music="${k}" aria-pressed="false">${MUSIC[k].l}</button>`).join('')}</div>`;
+  const lipChips = id => `<div class="chips" role="group" aria-label="Вид перевода" id="${id}"><button type="button" class="chip" data-lip="0" aria-pressed="true">Дубляж</button><button type="button" class="chip" data-lip="1" aria-pressed="false">С синхроном губ</button></div>`;
   stagesBox.innerHTML =
     `<div class="stage"><div class="stage__n">00</div><div class="stage__t"><h3>Сценарий с нуля</h3><p class="stage__what">Идея, синопсис, поэпизодный план и сценарий. Пишет живой сценарист, NEYRA проверяет структуру.</p><div class="stage__meta"><span>Срок: <b id="st-script"></b></span></div>${pickBtn('script')}</div>${cells('script')}</div>` +
-    STAGES.map((s,i) => `<div class="stage"><div class="stage__n">0${s.n}</div><div class="stage__t"><h3>${s.t}</h3><p class="stage__what">${s.w}</p><div class="stage__meta"><span>Срок: <b>${s.time}</b></span></div>${pickBtn(i)}</div>${cells(i)}</div>`).join('') +
+    STAGES.map((s,i) => `<div class="stage"><div class="stage__n">0${s.n}</div><div class="stage__t"><h3>${s.t}</h3><p class="stage__what">${s.w}</p><div class="stage__meta"><span>Срок: <b>${s.time}</b></span></div>${s.n === 5 ? musicChips('music-chips2') + '<p class="stage__note">Музыка NEYRA — для фестивалей и онлайна. Для проката и стримингов советуем композитора: права на его музыку надёжнее.</p>' : ''}${s.lang ? lipChips('lip-chips2') : ''}${pickBtn(i)}</div>${cells(i)}</div>`).join('') +
     `<div class="stage stage--dist"><div class="stage__n">+</div><div class="stage__t"><h3>Дистрибуция</h3><p class="stage__what">Фестивали, другие страны, стриминги и Neyra Play — вместе с вами. Взамен — 10 % чистых поступлений продюсера.</p><button type="button" class="pick" data-pick="copro" aria-pressed="false">Выбрать сопродюсирование</button></div><div class="stage__p stage__p--wide"><b>в сопродюсировании</b></div></div>` +
     `<div class="stage stage--extra"><div class="stage__n">+</div><div class="stage__t"><h3>Тизер в кинокачестве</h3><p class="stage__what">Для питча, фонда и инвестора: до 3 героев и 2 локаций, монтаж в темпе трейлера, 1080p, музыка и звук.</p><div class="stage__meta"><span>Срок: <b>1–2 недели</b></span></div><div class="chips" role="group" aria-label="Длина тизера" id="teaser-chips2">${TEASER_LENS.map(L=>`<button type="button" class="chip" data-tlen="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('')}</div>${pickBtn('teaser')}</div>${cells('teaser')}</div>`;
   stagesBox.addEventListener('click', e => {
     const c = e.target.closest('[data-tlen]');
     if (c) { st.teaserLen = +c.dataset.tlen; st.teaserOn = true; render(); return; }
+    const mu = e.target.closest('[data-music]');
+    if (mu) { st.music = mu.dataset.music; st.on[4] = true; render(); return; }
+    const li = e.target.closest('[data-lip]');
+    if (li) { st.lip = li.dataset.lip === '1'; if (!st.langs) st.langs = 1; render(); return; }
     const b = e.target.closest('.pick'); if (!b) return;
     const v = b.dataset.pick;
     if (v === 'copro') { for (let j=0;j<6;j++) st.on[j] = true; st.want = 'copro'; }
@@ -538,6 +556,10 @@ footer a:hover{color:var(--text)}
   document.getElementById('lang-minus').addEventListener('click',()=>{ st.langs=Math.max(0,st.langs-1); render(); });
   document.getElementById('lang-plus').addEventListener('click',()=>{ st.langs=Math.min(10,st.langs+1); render(); });
   document.getElementById('c-script').addEventListener('change', e => { st.script = e.target.checked; render(); });
+  document.getElementById('music-box').innerHTML = musicChips('music-chips');
+  document.getElementById('lip-box').innerHTML = lipChips('lip-chips');
+  document.getElementById('music-box').addEventListener('click', e => { const b = e.target.closest('[data-music]'); if (!b) return; st.music = b.dataset.music; render(); });
+  document.getElementById('lip-box').addEventListener('click', e => { const b = e.target.closest('[data-lip]'); if (!b) return; st.lip = b.dataset.lip === '1'; render(); });
   const tBox = document.getElementById('teaser-chips');
   tBox.innerHTML = `<button type="button" class="chip" data-t="0" aria-pressed="true">Нет</button>` + TEASER_LENS.map(L=>`<button type="button" class="chip" data-t="${L}" aria-pressed="false">${fmtLen(L)}</button>`).join('');
   tBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; const L = +b.dataset.t; if (L) { st.teaserLen = L; st.teaserOn = true; } else st.teaserOn = false; render(); });
@@ -567,15 +589,17 @@ footer a:hover{color:var(--text)}
     STAGES.forEach((s,i)=>{
       const on = s.lang ? st.langs > 0 : st.on[i];
       if (!on) return;
-      const one = i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty), price = s.lang ? one * st.langs : one;
+      const one = i === 1 && st.script ? s.f(M, ty) - DOCTOR_F(M, ty) : s.f(M, ty, st.lip), price = s.lang ? one * st.langs : one;
       gross += price;
       if (s.n <= 6) {
         if (st.offer === 'pack') disc += price * PACK;
         if (st.offer === 'copro') disc += price * COPRO;
         if (fastOn) extra += price * EXPRESS;
       }
-      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs : s.t + (i === 1 && st.script ? ' — лечение уже в сценарии' : '')}</span><b>${tgx(price)}</b></li>`);
+      lines.push(`<li><span>${s.lang ? s.t + ' × ' + st.langs + (st.lip ? ' — с синхроном губ' : ' — дубляж') : s.t + (i === 1 && st.script ? ' — лечение уже в сценарии' : i === 4 ? ' — без музыки' : '')}</span><b>${tgx(price)}</b></li>`);
     });
+    // музыка — к этапу 5, своей ценой
+    if (st.on[4] && st.music !== 'own') { const mp = MUSIC_F(M, st.music); gross += mp; lines.push(`<li><span>${MUSIC[st.music].line}, ${fmtLen(M / 2)} музыки</span><b>${tgx(mp)}</b></li>`); }
     const scriptP = SCRIPT_F(M, ty), teaserP = TEASER_F(st.teaserLen, ty, !st.on[1]);
     if (st.script) { gross += scriptP; lines.unshift(`<li><span>Сценарий с нуля</span><b>${tgx(scriptP)}</b></li>`); }
     if (st.teaserOn) { gross += teaserP; lines.push(`<li><span>Тизер в кинокачестве, ${fmtLen(st.teaserLen)}${st.on[1] ? ' — герои из этапа 2' : ''}</span><b>${tgx(teaserP)}</b></li>`); }
@@ -637,9 +661,9 @@ footer a:hover{color:var(--text)}
     const nb = t => t.replace(/ /g, '\u00a0');
     const doc = st.script;
     STAGES.forEach((s,i) => {
-      const pr = t => i === 1 && doc ? s.f(M, t) - DOCTOR_F(M, t) : s.f(M, t);
+      const pr = t => i === 1 && doc ? s.f(M, t) - DOCTOR_F(M, t) : s.f(M, t, st.lip);
       const a = pr(TYPES.anim), f = pr(TYPES.film);
-      const sub = (x, t) => usd(x) + (s.n === 4 ? '\n' + nb(usd(t.prod) + ' за мин этапа') : s.lang ? '\nза\u00a0язык' : i === 1 && doc ? '\n' + nb('без лечения сценария') : '');
+      const sub = (x, t) => usd(x) + (s.n === 4 ? '\n' + nb(usd(t.prod) + ' за мин этапа') : s.lang ? '\nза\u00a0язык' : s.n === 5 ? '\n' + nb(st.music === 'own' ? 'музыка ваша' : '+ музыка ' + usd(MUSIC_F(M, st.music))) : i === 1 && doc ? '\n' + nb('без лечения сценария') : '');
       put(i, a, f, sub(a, TYPES.anim), sub(f, TYPES.film));
     });
     put('script', SCRIPT_F(M, TYPES.anim), SCRIPT_F(M, TYPES.film));
@@ -652,6 +676,8 @@ footer a:hover{color:var(--text)}
     document.getElementById('c-script').checked = st.script;
     document.getElementById('cp-script').textContent = tenge(SCRIPT_F(M, ty));
     tBox.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.t === (st.teaserOn ? st.teaserLen : 0))));
+    document.querySelectorAll('[data-music]').forEach(b => { const k = b.dataset.music; b.setAttribute('aria-pressed', String(k === st.music)); b.textContent = MUSIC[k].l + (k === 'own' ? '' : ' · ' + usd(MUSIC_F(M, k))); });
+    document.querySelectorAll('[data-lip]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.lip === '1') === st.lip)));
     stagesBox.querySelectorAll('[data-tlen]').forEach(b => b.setAttribute('aria-pressed', String(st.teaserOn && +b.dataset.tlen === st.teaserLen)));
     document.querySelectorAll('button[data-type]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === st.type)));
     document.getElementById('et-fmt').textContent = `Цены для длины ${M} мин. Каждый этап заканчивается готовым результатом — отмечайте нужные, расчёт обновится сразу.`;
